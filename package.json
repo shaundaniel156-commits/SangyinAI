@@ -1,0 +1,12 @@
+{
+  "name": "sangyin-ai",
+  "private": true,
+  "description": "Sangyin AI — AI-Guided Adaptive Education System. Root scripts delegate to the frontend UI prototype in ./frontend.",
+  "scripts": {
+    "postinstall": "npm --prefix frontend install",
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "preview": "npm --prefix frontend run preview",
+    "lint": "npm --prefix frontend run lint"
+  }
+}
