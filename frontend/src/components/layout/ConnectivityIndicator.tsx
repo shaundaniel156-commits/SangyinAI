@@ -14,7 +14,7 @@ const STATES: Record<ConnectivityStatus, { label: string; icon: typeof Wifi; dot
  * Offline-first status indicator (UI ONLY). The status can be previewed from
  * the menu; no network detection or synchronisation is performed.
  */
-export function ConnectivityIndicator({ compact = false }: { compact?: boolean }) {
+export function ConnectivityIndicator({ compact = false, placement = 'down' }: { compact?: boolean; placement?: 'down' | 'up' }) {
   const { status, lastSynced, pendingItems, setStatus } = useConnectivity()
   const { open, setOpen, ref } = usePopover()
   const state = STATES[status]
@@ -53,7 +53,14 @@ export function ConnectivityIndicator({ compact = false }: { compact?: boolean }
         {!compact && status !== 'syncing' && <span className="hidden whitespace-nowrap font-normal text-ink-3 min-[1500px]:inline">· Last synced: {lastSynced}</span>}
       </button>
       {open && (
-        <div role="dialog" aria-label="Connection status" className="absolute right-0 z-40 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-line bg-surface p-4 shadow-xl">
+        <div
+          role="dialog"
+          aria-label="Connection status"
+          className={cn(
+            'absolute z-40 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-line bg-surface p-4 shadow-xl',
+            placement === 'up' ? 'bottom-full left-0 mb-3' : 'right-0 mt-2',
+          )}
+        >
           <div className="flex items-center gap-2">
             <span className={cn('size-2.5 rounded-full', state.dot)} aria-hidden />
             <p className="text-sm font-semibold text-ink">{state.label}</p>

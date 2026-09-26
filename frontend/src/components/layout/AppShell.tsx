@@ -7,6 +7,7 @@ import { cn } from '../../lib/cn'
 import { Drawer } from '../ui/Modal'
 import { MobileNav } from './MobileNav'
 import { Sidebar } from './Sidebar'
+import { StatusDot } from './StatusDot'
 import { TopNav } from './TopNav'
 
 /** Application shell: top navigation + routed content. */
@@ -43,6 +44,7 @@ export function AppShell() {
       <main id="main" className={cn('mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12', portal && 'pb-24 lg:pb-12')}>
         <Outlet />
       </main>
+      <StatusDot aboveMobileNav={portal} />
       {portal && <MobileNav />}
     </div>
   )
