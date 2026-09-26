@@ -12,8 +12,10 @@ export const LOGO_BLUE = '#1f5fbf'
 /** Full-page black canvas with the blue background glows. */
 export function AuthCanvas({ children }: { children: ReactNode }) {
   return (
-    <div className="relative flex min-h-dvh flex-col overflow-x-hidden bg-black text-white scheme-dark">
-      <div className="pointer-events-none absolute inset-0" aria-hidden>
+    // overflow-x-clip (not hidden) so this wrapper never becomes a second scroll container;
+    // the glow layer clips itself so its oversized blurs can't add scroll height.
+    <div className="relative flex min-h-dvh flex-col overflow-x-clip bg-black text-white scheme-dark">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
         <div
           className="absolute inset-x-0 top-0 h-225"
           style={{
