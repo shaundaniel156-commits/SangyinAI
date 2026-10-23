@@ -111,7 +111,7 @@ export function ParentHomeSupportPage() {
               <p className="tabular mt-2 text-xs text-ink-3">{sms.length} / 160 characters · one SMS</p>
             </CardBody>
           </Card>
-          <DemoNotice>These are sample suggestions for this prototype. Printing uses your browser’s print option; SMS and USSD delivery are not connected.</DemoNotice>
+          <DemoNotice>Suggestions come from plans your child’s teacher has approved; updates also reach you by email and SMS. Printing uses your browser’s print option; USSD is not connected yet.</DemoNotice>
         </div>
       </div>
     </>

@@ -1,7 +1,6 @@
 /**
- * DEMO DATA — prerequisite links between curriculum topics (the knowledge graph
- * the diagnostic engine uses to trace a gap back to earlier foundations).
- * Illustrative only; the expert-reviewed graph will be loaded later.
+ * Starter prerequisite links between curriculum topics (the knowledge graph the diagnostic
+ * engine uses to trace a gap back to earlier foundations). Not yet expert-reviewed.
  */
 export const TOPIC_PREREQUISITES: Record<string, string[]> = {
   Fractions: ['Whole Numbers'],

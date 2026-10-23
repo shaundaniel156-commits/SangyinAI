@@ -22,7 +22,7 @@ const MILESTONE_STATE: Record<MilestoneState, { label: string; icon: typeof Flag
 
 export function StudentProgressPage() {
   const student = getCurrentStudent()
-  const trend = getStudentTrend(student.average, student.trend)
+  const trend = getStudentTrend(student.id, student.classId)
   const values = trend.map((p) => p.value)
   const min = Math.max(0, Math.floor((Math.min(...values) - 10) / 10) * 10)
   const max = Math.min(100, Math.ceil((Math.max(...values) + 10) / 10) * 10)
@@ -44,7 +44,7 @@ export function StudentProgressPage() {
           className="lg:col-span-2"
           title="My progress over time"
           description="Your average in recent school work"
-          table={{ headers: ['Month', 'Average'], rows: trend.map((p) => [p.label, `${p.value}%`]) }}
+          table={{ headers: ['Date', 'Result'], rows: trend.map((p) => [p.label, `${p.value}%`]) }}
         >
           <LineChart ariaLabel="Line chart of your average over recent months" min={min} max={max} series={[{ name: 'My average', points: trend, color: 'var(--color-series-1)' }]} />
         </ChartContainer>
@@ -115,7 +115,6 @@ export function StudentProgressPage() {
           </CardBody>
         </Card>
       )}
-      <p className="mt-4 text-xs text-ink-3">Demo data for UI preview.</p>
     </>
   )
 }

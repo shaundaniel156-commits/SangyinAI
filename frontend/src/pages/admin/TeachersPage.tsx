@@ -109,14 +109,13 @@ export function TeachersPage() {
               id: 'classes',
               header: 'Classes',
               hideBelow: 'lg',
-              cell: (t) => <span className="text-ink-2">{t.classIds.map((id) => getClass(id)?.name.replace(' (Sample Class)', '')).join(', ')}</span>,
+              cell: (t) => <span className="text-ink-2">{t.classIds.map((id) => getClass(id)?.name).join(', ')}</span>,
             },
             { id: 'status', header: 'Status', cell: (t) => <AccountStatusBadge status={t.status} /> },
             { id: 'last', header: 'Last active', hideBelow: 'sm', className: 'whitespace-nowrap text-ink-2', cell: (t) => t.lastActive },
           ]}
         />
       </Card>
-      <p className="mt-3 text-xs text-ink-3">Demo accounts for UI preview only.</p>
 
       <Drawer
         open={selected !== null}

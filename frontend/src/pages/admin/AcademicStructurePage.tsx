@@ -11,7 +11,7 @@ import { SegmentedControl } from '../../components/ui/Tabs'
 import { useToast } from '../../context/ToastContext'
 import { CLASSES } from '../../data/classes'
 import { CURRICULUM_FRAMEWORKS, FRAMEWORK_LABEL } from '../../data/curriculum'
-import { DEMO_SCHOOL } from '../../data/school'
+import { SCHOOL } from '../../data/school'
 import { STUDENTS } from '../../data/students'
 import { getTeacher } from '../../data/teachers'
 import type { CurriculumFramework } from '../../types'
@@ -22,7 +22,7 @@ const INITIAL_CLASS_FRAMEWORKS = Object.fromEntries(CLASSES.map((c) => [c.id, c.
 
 export function AcademicStructurePage() {
   const { notify } = useToast()
-  const [schoolFramework, setSchoolFramework] = useState<CurriculumFramework>(DEMO_SCHOOL.primaryFramework)
+  const [schoolFramework, setSchoolFramework] = useState<CurriculumFramework>(SCHOOL.primaryFramework)
   const [classFrameworks, setClassFrameworks] = useState(INITIAL_CLASS_FRAMEWORKS)
 
   const levels = useMemo(() => {
@@ -32,11 +32,11 @@ export function AcademicStructurePage() {
   }, [])
 
   const dirty =
-    schoolFramework !== DEMO_SCHOOL.primaryFramework || CLASSES.some((c) => classFrameworks[c.id] !== c.framework)
+    schoolFramework !== SCHOOL.primaryFramework || CLASSES.some((c) => classFrameworks[c.id] !== c.framework)
 
   const save = () => notify('Curriculum configuration saved', { description: 'Saved locally for preview — not persisted in this prototype.' })
   const reset = () => {
-    setSchoolFramework(DEMO_SCHOOL.primaryFramework)
+    setSchoolFramework(SCHOOL.primaryFramework)
     setClassFrameworks(INITIAL_CLASS_FRAMEWORKS)
   }
 

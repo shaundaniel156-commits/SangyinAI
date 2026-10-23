@@ -1,6 +1,6 @@
 import { LevelBadge } from '../../../components/ui/StatusBadge'
 import { getClassCompetencyAverages } from '../../../data/classes'
-import { DEMO_COMPETENCIES, getStudentsByClass } from '../../../data/students'
+import { COMPETENCIES, getStudentsByClass } from '../../../data/students'
 import { levelFromScore } from '../../../lib/competency'
 import type { SchoolClass } from '../../../types'
 import { DocSection, DocStats, DocTable, type DocColumn } from './ReportDocument'
@@ -20,7 +20,7 @@ export function CompetencyReport({ classes, filters }: { classes: SchoolClass[];
   const students = classes.flatMap((c) => getStudentsByClass(c.id))
   const pupils = classes.reduce((n, c) => n + c.studentCount, 0)
 
-  const rows: Row[] = DEMO_COMPETENCIES.filter((c) => filters.subject === 'all' || c.subject === filters.subject).map((comp) => {
+  const rows: Row[] = COMPETENCIES.filter((c) => filters.subject === 'all' || c.subject === filters.subject).map((comp) => {
     const perClass: Record<string, number> = {}
     let weighted = 0
     for (const c of classes) {
@@ -51,7 +51,7 @@ export function CompetencyReport({ classes, filters }: { classes: SchoolClass[];
       ),
     },
     ...(classes.length > 1
-      ? classes.map((c) => ({ header: c.name.replace(' (Sample Class)', ''), align: 'right' as const, cell: (r: Row) => `${r.perClass[c.id]}%` }))
+      ? classes.map((c) => ({ header: c.name, align: 'right' as const, cell: (r: Row) => `${r.perClass[c.id]}%` }))
       : []),
     { header: classes.length > 1 ? 'Overall' : 'Average', align: 'right', cell: (r) => <span className="font-medium">{r.overall}%</span> },
     { header: 'Level', cell: (r) => <LevelBadge level={levelFromScore(r.overall)} /> },
@@ -74,7 +74,7 @@ export function CompetencyReport({ classes, filters }: { classes: SchoolClass[];
       />
       <DocSection
         title="Competency averages across classes"
-        description="Average demo mastery (%). Overall is weighted by class size; level uses demo display thresholds."
+        description="Average mastery (%). Overall is weighted by class size."
       >
         <DocTable caption="Competency averages across classes" rows={rows} rowKey={(r) => r.id} columns={columns} />
       </DocSection>

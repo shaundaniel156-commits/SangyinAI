@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { useNotifications } from '../../context/NotificationsContext'
 import { useSession } from '../../context/SessionContext'
-import { DEMO_SCHOOL } from '../../data/school'
+import { SCHOOL, schoolName } from '../../data/school'
 import { cn } from '../../lib/cn'
 import { NAVIGATION } from '../../routes/navigation'
 import { Logo } from './Logo'
@@ -53,9 +53,9 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         ))}
       </div>
       <div className="shrink-0 border-t border-line px-5 py-4">
-        <p className="text-xs font-medium text-ink">{DEMO_SCHOOL.name}</p>
+        <p className="text-xs font-medium text-ink">{schoolName()}</p>
         <p className="text-xs text-ink-3">
-          {DEMO_SCHOOL.currentTerm}, {DEMO_SCHOOL.academicYear}
+          {SCHOOL.currentTerm}, {SCHOOL.academicYear}
         </p>
       </div>
     </nav>

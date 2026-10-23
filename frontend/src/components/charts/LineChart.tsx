@@ -48,6 +48,10 @@ export function LineChart({ series, height = 240, min = 0, max = 100, valueSuffi
     setHover(Math.max(0, Math.min(labels.length - 1, idx)))
   }
 
+  if (!series.some((s) => s.points.length)) {
+    return <p className="grid place-items-center text-sm text-ink-3" style={{ minHeight: height / 2 }}>No results recorded yet.</p>
+  }
+
   return (
     <div className="relative">
       {series.length > 1 && (

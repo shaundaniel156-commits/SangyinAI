@@ -8,7 +8,7 @@ import { PRACTICE_ACTIVITIES } from '../../data/practice'
 import { formatShortDate } from '../../lib/format'
 import type { PracticeActivity } from '../../types'
 import { LearningSteps } from './components/LearningSteps'
-import { SamplePracticeModal } from './components/SamplePracticeModal'
+import { PracticeModal } from './components/PracticeModal'
 import { getCurrentStudent, getLearningSequence } from './components/studentData'
 
 export function StudentLearningPage() {
@@ -82,7 +82,7 @@ export function StudentLearningPage() {
         </div>
       </div>
 
-      <SamplePracticeModal activity={open} onClose={() => setOpen(null)} />
+      <PracticeModal activity={open} onClose={() => setOpen(null)} />
     </>
   )
 }

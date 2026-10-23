@@ -28,7 +28,7 @@ export function ClassOverviewTable({ classes, showTeacher = false }: { classes: 
           ),
         },
         ...(showTeacher ? [{ id: 'teacher', header: 'Class teacher', hideBelow: 'md' as const, cell: (c: SchoolClass) => getTeacher(c.teacherId)?.name }] : []),
-        { id: 'framework', header: 'Framework', hideBelow: 'lg', className: 'whitespace-nowrap', cell: (c) => <span className="text-ink-2">{c.framework === 'uganda' ? 'Uganda (NCDC)' : 'Cambridge'}</span> },
+        { id: 'framework', header: 'Framework', hideBelow: 'lg', className: 'whitespace-nowrap', cell: (c) => <span className="text-ink-2">{c.framework === 'uganda' ? 'Uganda (NCDC)' : c.framework === 'cambridge' ? 'Cambridge' : 'Own curriculum'}</span> },
         { id: 'students', header: 'Students', align: 'right', hideBelow: 'sm', cell: (c) => <span className="tabular">{c.studentCount}</span> },
         {
           id: 'average',

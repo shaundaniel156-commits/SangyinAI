@@ -4,7 +4,7 @@ import { PRACTICE_ACTIVITIES } from '../../data/practice'
 import type { PracticeActivity, PracticeStatus } from '../../types'
 import { FromTeacherSection } from './components/FromTeacherSection'
 import { PracticeActivityCard } from './components/PracticeActivityCard'
-import { SamplePracticeModal } from './components/SamplePracticeModal'
+import { PracticeModal } from './components/PracticeModal'
 
 const GROUPS: { status: PracticeStatus; title: string }[] = [
   { status: 'in_progress', title: 'In progress' },
@@ -38,7 +38,7 @@ export function StudentPracticePage() {
           )
         })}
       </div>
-      <SamplePracticeModal activity={open} onClose={() => setOpen(null)} />
+      <PracticeModal activity={open} onClose={() => setOpen(null)} />
     </>
   )
 }

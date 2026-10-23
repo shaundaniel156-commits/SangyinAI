@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { StatusBadge } from '../../../../components/ui/StatusBadge'
 import { useSession } from '../../../../context/SessionContext'
 import { CURRICULUM_FRAMEWORKS, FRAMEWORK_LABEL } from '../../../../data/curriculum'
-import { DEMO_SCHOOL } from '../../../../data/school'
+import { SCHOOL } from '../../../../data/school'
 import { classesInScope } from '../../../../data/selectors'
 import { cn } from '../../../../lib/cn'
 import type { CurriculumFramework } from '../../../../types'
@@ -13,7 +13,7 @@ export function CurriculumSection() {
   const { role } = useSession()
   const admin = role === 'admin'
   const classes = classesInScope(role)
-  const [framework, setFramework] = useState<CurriculumFramework>(DEMO_SCHOOL.primaryFramework)
+  const [framework, setFramework] = useState<CurriculumFramework>(SCHOOL.primaryFramework)
 
   return (
     <SettingsSection

@@ -4,11 +4,15 @@ import { Card, CardBody, CardHeader } from '../../components/ui/Card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { StatusBadge } from '../../components/ui/StatusBadge'
-import { DIFFICULTY_OPTIONS, PRACTICE_ACTIVITIES, STUDENT_FEEDBACK } from '../../data/practice'
+import { useAiAssessments } from '../../context/AiAssessmentsContext'
+import { DIFFICULTY_OPTIONS, PRACTICE_ACTIVITIES, teacherMessages } from '../../data/practice'
+import { ROLE_USERS } from '../../data/users'
 import { formatShortDate, initialsFrom } from '../../lib/format'
 import { FeedbackControl } from './components/FeedbackControl'
 
 export function StudentFeedbackPage() {
+  const { items } = useAiAssessments()
+  const messages = teacherMessages(items, ROLE_USERS.student.id)
   const current = PRACTICE_ACTIVITIES.find((a) => a.status === 'in_progress')
   const answered = PRACTICE_ACTIVITIES.filter((a) => a.status === 'completed' && a.feedback)
 
@@ -19,11 +23,11 @@ export function StudentFeedbackPage() {
       <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader title="From your teacher" icon={<MessageSquareText className="size-5" aria-hidden />} />
-          {STUDENT_FEEDBACK.length === 0 ? (
+          {messages.length === 0 ? (
             <EmptyState icon={MessageSquareText} title="No messages yet" description="When your teacher sends feedback, it will appear here." />
           ) : (
             <ul className="divide-y divide-line">
-              {STUDENT_FEEDBACK.map((f) => (
+              {messages.map((f) => (
                 <li key={f.id} className="flex gap-3 px-5 py-4">
                   <Avatar initials={initialsFrom(f.from)} size="sm" />
                   <div className="min-w-0">

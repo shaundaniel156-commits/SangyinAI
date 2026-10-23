@@ -1,15 +1,14 @@
 import type { CompetencyLevel } from '../types'
 
 /**
- * DEMO display thresholds used to bucket mock mastery scores into levels.
- * The real diagnostic engine will supply levels directly; these thresholds exist
- * only so the prototype can render consistent mock data.
+ * Display thresholds that bucket mastery scores (0–100) into levels: 70+ strength, 50–69 developing,
+ * below 50 needs support.
  */
-export const DEMO_LEVEL_THRESHOLDS = { strength: 70, developing: 50 } as const
+export const LEVEL_THRESHOLDS = { strength: 70, developing: 50 } as const
 
 export function levelFromScore(score: number): CompetencyLevel {
-  if (score >= DEMO_LEVEL_THRESHOLDS.strength) return 'strength'
-  if (score >= DEMO_LEVEL_THRESHOLDS.developing) return 'developing'
+  if (score >= LEVEL_THRESHOLDS.strength) return 'strength'
+  if (score >= LEVEL_THRESHOLDS.developing) return 'developing'
   return 'needs_support'
 }
 

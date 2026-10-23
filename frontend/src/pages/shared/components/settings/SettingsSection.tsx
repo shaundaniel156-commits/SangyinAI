@@ -12,14 +12,17 @@ interface SettingsSectionProps {
   children: ReactNode
   /** Show a Save footer. The form submits to a preview-only toast. */
   saveLabel?: string | false
+  /** A real save. Without it, Save shows a preview-only message. */
+  onSave?: () => Promise<void> | void
 }
 
 /** Card wrapper for one settings section with an optional preview-only save action. */
-export function SettingsSection({ title, description, children, saveLabel = 'Save changes' }: SettingsSectionProps) {
+export function SettingsSection({ title, description, children, saveLabel = 'Save changes', onSave }: SettingsSectionProps) {
   const { notify } = useToast()
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    notify(`${title} saved`, { description: SAVE_MESSAGE })
+    if (onSave) void onSave()
+    else notify(`${title} saved`, { description: SAVE_MESSAGE })
   }
   return (
     <Card>

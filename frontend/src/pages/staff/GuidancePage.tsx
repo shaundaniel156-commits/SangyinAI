@@ -3,7 +3,6 @@ import { useMemo, useState } from 'react'
 import { GuidanceCard } from '../../components/domain/GuidanceCard'
 import { ButtonLink } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
-import { DemoNotice } from '../../components/ui/DemoNotice'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { FilterBar } from '../../components/ui/FilterBar'
 import { PageHeader } from '../../components/ui/PageHeader'
@@ -90,7 +89,6 @@ export function GuidancePage() {
           <EmptyState icon={Sparkles} title="No plans here" description="There are no guidance plans matching this view." />
         )}
       </Card>
-      <DemoNotice className="mt-6">Guidance plans are sample content for UI review. AI generation is not connected in this prototype.</DemoNotice>
     </>
   )
 }

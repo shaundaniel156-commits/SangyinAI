@@ -6,11 +6,12 @@
  * backend endpoint that calls the model, and return the same draft shape.
  * Never call a model API with a secret key directly from the browser.
  */
-import { AI_QUESTION_BANK, type BankQuestion } from '../data/aiQuestionBank'
+import { AI_QUESTION_BANK, type QuestionBank } from '../data/aiQuestionBank'
 import { getClass } from '../data/classes'
-import { getFramework } from '../data/curriculum'
-import { DEMO_COMPETENCIES, getStudentsByClass } from '../data/students'
+import { CURRICULUM_FRAMEWORKS, getFramework } from '../data/curriculum'
+import { COMPETENCIES, getStudentsByClass } from '../data/students'
 import type { AiAssessment, AiDifficulty, AiQuestion, AiQuestionType, Student, Subject } from '../types'
+import { API_URL, apiHeaders } from './api'
 
 export const DIFFICULTY_LABEL: Record<AiDifficulty | 'mixed', string> = {
   foundation: 'Foundation',
@@ -36,7 +37,7 @@ export interface CompetencyGap {
 /** Competency gaps for one class and subject, read from recorded results (worst first). */
 export function detectGaps(classId: string, subject: Subject): CompetencyGap[] {
   const students = getStudentsByClass(classId)
-  return DEMO_COMPETENCIES.filter((c) => c.subject === subject)
+  return COMPETENCIES.filter((c) => c.subject === subject)
     .map((c) => {
       const scores = students.flatMap((s) => s.competencies.filter((sc) => sc.competencyId === c.id))
       return {
@@ -73,9 +74,9 @@ export interface GenerateInput {
 export type AiDraft = Omit<AiAssessment, 'id' | 'createdOn' | 'status' | 'sentOn'>
 
 let questionSeq = 0
-const toQuestion = (competency: string, q: BankQuestion): AiQuestion => ({ ...q, id: `q-${Date.now().toString(36)}-${questionSeq++}`, competency })
+const toQuestion = (competency: string, q: QuestionBank): AiQuestion => ({ ...q, id: `q-${Date.now().toString(36)}-${questionSeq++}`, competency })
 
-const matches = (q: BankQuestion, difficulty: GenerateInput['difficulty'], types: AiQuestionType[]) =>
+const matches = (q: QuestionBank, difficulty: GenerateInput['difficulty'], types: AiQuestionType[]) =>
   (difficulty === 'mixed' || q.difficulty === difficulty) && types.includes(q.type)
 
 /** Picks questions round-robin across competencies, easiest first; relaxes difficulty if the bank runs short. */
@@ -102,15 +103,55 @@ function pickQuestions(input: GenerateInput): AiQuestion[] {
  * Curriculum references for a gap in this class's framework and level — objective codes when the
  * demo curriculum has the topic, otherwise a framework/level/topic reference.
  */
+/**
+ * The curriculum level a class follows: the one it is linked to (Manual feed), otherwise the level of its
+ * curriculum with the same name (class levels can be longer, e.g. "Lower Secondary · Stage 7" → "Stage 7").
+ */
+export function levelForClass(classId: string) {
+  const cls = getClass(classId)
+  if (!cls) return undefined
+  if (cls.curriculumLevelId) {
+    for (const f of CURRICULUM_FRAMEWORKS) {
+      const linked = f.levels.find((l) => l.id === cls.curriculumLevelId)
+      if (linked) return { framework: f, level: linked }
+    }
+  }
+  const framework = getFramework(cls.framework)
+  const level = framework.levels.find((l) => l.name === cls.level) ?? framework.levels.find((l) => cls.level.split(/\s*·\s*/).includes(l.name))
+  return level ? { framework, level } : undefined
+}
+
+/** A subject or course unit at the class's curriculum level, matched by name or code. */
+function curriculumSubjectFor(classId: string, subject: Subject) {
+  const found = levelForClass(classId)
+  return found?.level.subjects.find((s) => s.name === subject || (s.code && s.code === subject))
+}
+
+/** Topic names from the class's curriculum for a subject (used when no scores exist yet, e.g. a university cohort). */
+export function curriculumTopicsFor(classId: string, subject: Subject): string[] {
+  return curriculumSubjectFor(classId, subject)?.topics.map((t) => t.name) ?? []
+}
+
+/** Subjects or course units the class can be assessed in: its own list, plus those in its curriculum level. */
+export function subjectsForClass(classId: string): Subject[] {
+  const cls = getClass(classId)
+  const fromLevel = levelForClass(classId)?.level.subjects.map((s) => s.name) ?? []
+  return [...new Set([...(cls?.subjects ?? []), ...fromLevel])]
+}
+
 export function curriculumRefsFor(classId: string, subject: Subject, competency: string): string[] {
   const cls = getClass(classId)
   if (!cls) return []
-  const framework = getFramework(cls.framework)
-  const level = framework.levels.find((l) => l.name === cls.level)
-  const topic = level?.subjects.find((s) => s.name === subject)?.topics.find((t) => t.name === competency)
+  const found = levelForClass(classId)
+  const framework = found?.framework ?? getFramework(cls.framework)
+  const level = found?.level
+  const topic = curriculumSubjectFor(classId, subject)?.topics.find((t) => t.name === competency)
+  // Official objectives the school added come first; otherwise Sangyin's own outline statements for the topic.
   const objectives = topic?.competencies.flatMap((c) => c.objectives) ?? []
-  if (objectives.length === 0) return [`${framework.shortName} · ${cls.level} ${subject} · ${competency}`]
-  return objectives.map((o) => `${o.code} — ${o.text}`)
+  if (objectives.length) return objectives.map((o) => `${o.code} — ${o.text}`)
+  const where = `${framework.shortName} · ${level?.name ?? cls.level} ${subject} · ${competency}`
+  if (topic?.competencies.length) return topic.competencies.map((c) => `${where} — ${c.name}`)
+  return [where]
 }
 
 function buildRationale(input: GenerateInput, questions: AiQuestion[]): string[] {
@@ -136,9 +177,8 @@ export function availableQuestionCount(competencies: string[], types: AiQuestion
   return competencies.reduce((n, c) => n + (AI_QUESTION_BANK[c] ?? []).filter((q) => types.includes(q.type)).length, 0)
 }
 
-/** Simulated model call: resolves after a short delay with a draft for teacher review. */
-export async function generateAssessmentDraft(input: GenerateInput): Promise<AiDraft> {
-  await new Promise((r) => setTimeout(r, 2600))
+/** Offline fallback: builds a draft from the local question bank. */
+export async function generateLocalDraft(input: GenerateInput): Promise<AiDraft> {
   const questions = pickQuestions(input)
   const focus = input.competencies.length === 1 ? input.competencies[0]! : `${input.competencies.length} focus areas`
   return {
@@ -156,6 +196,75 @@ export async function generateAssessmentDraft(input: GenerateInput): Promise<AiD
     curriculumRefs: input.competencies.flatMap((c) => curriculumRefsFor(input.classId, input.subject, c)),
     parentNote: `This week your child is practising ${input.competencies.join(' and ')} with a short set of questions from school. You can help by asking them to show you one question they solved and explain how they worked it out. A few minutes is enough.`,
     shareWithParents: true,
+    source: 'offline',
+  }
+}
+ 
+/** The draft content the backend returns (written by Gemini, or by its offline bank). */
+interface ServerDraft {
+  title: string
+  messageToStudents: string
+  parentNote: string
+  rationale: string[]
+  questions: { competency: string; type: AiQuestionType; difficulty: AiDifficulty; prompt: string; options: string[]; answer: string; explanation: string }[]
+}
+ 
+/**
+ * Real AI: asks the backend (which asks Gemini). Falls back to the local bank if the server can't be reached,
+ * the teacher isn't signed in (401/403), or they have reached the hourly limit (429).
+ */
+export async function generateAssessmentDraft(input: GenerateInput): Promise<AiDraft> {
+  const cls = getClass(input.classId)
+  if (!cls) return generateLocalDraft(input)
+  const gaps = detectGaps(input.classId, input.subject).filter((g) => input.competencies.includes(g.competency))
+  const curriculumRefs = input.competencies.flatMap((c) => curriculumRefsFor(input.classId, input.subject, c))
+ 
+  // The anonymous request (no student names). Kept with the draft so an approved draft can become a fine-tuning example.
+  const request = {
+    classLevel: cls.level,
+    framework: cls.framework,
+    subject: input.subject,
+    competencies: input.competencies,
+    curriculumObjectives: curriculumRefs,
+    classSummary: [
+      ...gaps.map((g) => `${g.competency}: ${g.needsSupport} of ${cls.studentCount} students need support, ${g.developing} developing (class mastery ${g.average}%).`),
+      ...input.competencies.filter((c) => !gaps.some((g) => g.competency === c)).map((c) => `${c}: no scores recorded yet — write practice that checks the basics and builds up.`),
+    ],
+    questionCount: input.questionCount,
+    difficulty: input.difficulty,
+    types: input.types,
+    reportNotes: input.reportNotes,
+  }
+
+  try {
+    const res = await fetch(`${API_URL}/ai/assessments/generate`, { method: 'POST', headers: apiHeaders(), body: JSON.stringify(request) })
+    if (!res.ok) throw new Error(`Server replied ${res.status}`)
+    const { draft, source } = (await res.json()) as { draft: ServerDraft; source: 'gemini' | 'offline' }
+ 
+    return {
+      title: draft.title,
+      classId: input.classId,
+      subject: input.subject,
+      competencies: input.competencies,
+      studentIds: input.studentIds,
+      questions: draft.questions.map((q) => {
+        const n = questionSeq++
+        return { ...q, id: `q-${Date.now().toString(36)}-${n}`, sourceId: `ai-${n}`, options: q.type === 'multiple_choice' ? q.options : undefined }
+      }),
+      difficulty: input.difficulty,
+      dueDate: input.dueDate,
+      messageToStudents: draft.messageToStudents,
+      reportNotes: input.reportNotes,
+      rationale: draft.rationale,
+      curriculumRefs,
+      parentNote: draft.parentNote,
+      shareWithParents: true,
+      source,
+      requestSent: request,
+    }
+  } catch (error) {
+    console.warn('AI server unavailable — using the local question bank instead.', error)
+    return generateLocalDraft(input)
   }
 }
 

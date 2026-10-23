@@ -8,16 +8,20 @@ import { PageHeader } from '../../../components/ui/PageHeader'
 import { StatusBadge } from '../../../components/ui/StatusBadge'
 import { SegmentedControl } from '../../../components/ui/Tabs'
 import { useAiAssessments } from '../../../context/AiAssessmentsContext'
+import { useLiveData } from '../../../context/LiveDataContext'
 import { useSession } from '../../../context/SessionContext'
 import { useToast } from '../../../context/ToastContext'
+import { getStudentsByClass } from '../../../data/students'
 import { classesInScope } from '../../../data/selectors'
 import {
   DIFFICULTY_LABEL,
   QUESTION_TYPE_LABEL,
   availableQuestionCount,
+  curriculumTopicsFor,
   detectGaps,
   generateAssessmentDraft,
   studentsWithGaps,
+  subjectsForClass,
 } from '../../../lib/aiAssessment'
 import { cn } from '../../../lib/cn'
 import type { AiDifficulty, AiQuestionType, Subject } from '../../../types'
@@ -30,6 +34,12 @@ const TYPES: AiQuestionType[] = ['multiple_choice', 'short_answer']
 const GENERATION_STEPS = ['Reading report data', 'Mapping gaps to curriculum objectives', 'Writing questions and answer keys', 'Preparing the draft for your review']
 
 const inAWeek = () => new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10)
+
+/** The class's subjects or course units, or Mathematics and English when it lists none. */
+function subjectsFor(classId: string): Subject[] {
+  const own = subjectsForClass(classId)
+  return own.length ? own : SUBJECTS
+}
 
 /** Pre-select the worst gap (the one with most students needing support). */
 function defaultSelection(classId: string, subject: Subject): string[] {
@@ -45,8 +55,9 @@ export function AiAssessmentNewPage() {
   const classes = classesInScope(role)
 
   const [classId, setClassId] = useState(classes[0]?.id ?? '')
-  const [subject, setSubject] = useState<Subject>('Mathematics')
-  const [selected, setSelected] = useState<string[]>(() => defaultSelection(classes[0]?.id ?? '', 'Mathematics'))
+  const [subject, setSubject] = useState<Subject>(() => (subjectsFor(classes[0]?.id ?? '').includes('Mathematics') ? 'Mathematics' : subjectsFor(classes[0]?.id ?? '')[0] ?? 'Mathematics'))
+  const [selected, setSelected] = useState<string[]>(() => defaultSelection(classes[0]?.id ?? '', subject))
+  const { live } = useLiveData()
   const [includeDeveloping, setIncludeDeveloping] = useState(false)
   const [excluded, setExcluded] = useState<Set<string>>(new Set())
   const [count, setCount] = useState<(typeof COUNTS)[number]>('8')
@@ -59,11 +70,24 @@ export function AiAssessmentNewPage() {
   const [genStep, setGenStep] = useState(0)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const gaps = useMemo(() => detectGaps(classId, subject), [classId, subject])
-  const candidates = useMemo(() => studentsWithGaps(classId, selected, includeDeveloping), [classId, selected, includeDeveloping])
+  const scored = useMemo(() => detectGaps(classId, subject), [classId, subject])
+  const gaps = useMemo(
+    () => [
+      ...scored.map((g) => ({ ...g, untracked: false })),
+      ...curriculumTopicsFor(classId, subject).filter((t) => !scored.some((g) => g.competency === t)).map((t) => ({ competency: t, subject, needsSupport: 0, developing: 0, average: 0, untracked: true })),
+    ],
+    [scored, classId, subject],
+  )
+  // Topics without scores can't pick out students who need them, so the whole class is offered.
+  const anyUntracked = selected.some((c) => gaps.find((g) => g.competency === c)?.untracked)
+  const candidates = useMemo(
+    () => (anyUntracked ? getStudentsByClass(classId) : studentsWithGaps(classId, selected, includeDeveloping)),
+    [anyUntracked, classId, selected, includeDeveloping],
+  )
   const recipients = candidates.filter((s) => !excluded.has(s.id))
   const available = availableQuestionCount(selected, types)
-  const canGenerate = selected.length > 0 && recipients.length > 0 && types.length > 0 && available > 0
+  // Online, the AI writes the questions; the local bank only matters offline.
+  const canGenerate = selected.length > 0 && recipients.length > 0 && types.length > 0 && (live || available > 0)
 
   // Walk through the progress messages while the (simulated) model works.
   useEffect(() => {
@@ -73,9 +97,12 @@ export function AiAssessmentNewPage() {
   }, [generating])
 
   const changeScope = (nextClass: string, nextSubject: Subject) => {
+    // A class may not have the current subject (e.g. moving from P6 to a university cohort).
+    const options = subjectsFor(nextClass)
+    const subjectToUse = options.includes(nextSubject) ? nextSubject : (options[0] ?? nextSubject)
     setClassId(nextClass)
-    setSubject(nextSubject)
-    setSelected(defaultSelection(nextClass, nextSubject))
+    setSubject(subjectToUse)
+    setSelected(defaultSelection(nextClass, subjectToUse))
     setExcluded(new Set())
   }
 
@@ -104,9 +131,14 @@ export function AiAssessmentNewPage() {
       dueDate,
       reportNotes: notes.trim(),
     })
-    const saved = create(draft)
-    notify('Draft ready for your review', { description: `${saved.questions.length} questions for ${saved.studentIds.length} students.` })
-    navigate(`/ai-assessments/${saved.id}`)
+    try {
+      const saved = await create(draft)
+      notify('Draft ready for your review', { description: `${saved.questions.length} questions for ${saved.studentIds.length} students.` })
+      navigate(`/ai-assessments/${saved.id}`)
+    } catch (error) {
+      setGenerating(false)
+      notify('Draft not saved', { tone: 'info', description: (error as Error).message })
+    }
   }
 
   if (generating) return <GeneratingView step={genStep} />
@@ -133,15 +165,20 @@ export function AiAssessmentNewPage() {
                   options={classes.map((c) => ({ value: c.id, label: c.name }))}
                 />
                 <SelectField
-                  label="Subject"
+                  label="Subject or course unit"
                   value={subject}
                   onChange={(e) => changeScope(classId, e.target.value as Subject)}
-                  options={SUBJECTS.map((s) => ({ value: s, label: s }))}
+                  options={subjectsFor(classId).map((s) => ({ value: s, label: s }))}
                 />
               </div>
 
               <fieldset>
-                <legend className="mb-2 text-sm font-medium text-ink">Competency gaps found — choose which to target</legend>
+                <legend className="mb-2 text-sm font-medium text-ink">Competency gaps and topics — choose which to target</legend>
+                {gaps.length === 0 && (
+                  <p className="rounded-xl border border-dashed border-line px-4 py-3 text-sm text-ink-3">
+                    No scores or curriculum topics for {subject} yet. Add its topics in the Manual feed (Curriculum and courses), then come back.
+                  </p>
+                )}
                 <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line">
                   {gaps.map((g) => {
                     const on = selected.includes(g.competency)
@@ -159,6 +196,9 @@ export function AiAssessmentNewPage() {
                           />
                           <span className="min-w-0 flex-1">
                             <span className="block text-sm font-medium text-ink">{g.competency}</span>
+                            {g.untracked ? (
+                              <span className="mt-1 block text-xs text-ink-3">Curriculum topic · no scores yet</span>
+                            ) : (
                             <span className="mt-1.5 flex items-center gap-2">
                               <span className="h-1.5 w-28 overflow-hidden rounded-full bg-surface-3" aria-hidden>
                                 <span
@@ -168,11 +208,14 @@ export function AiAssessmentNewPage() {
                               </span>
                               <span className="tabular text-xs text-ink-3">Class mastery {g.average}%</span>
                             </span>
+                            )}
                           </span>
-                          <span className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-2">
-                            {g.needsSupport > 0 && <StatusBadge tone="bad">{g.needsSupport} need support</StatusBadge>}
-                            <StatusBadge tone="warn">{g.developing} developing</StatusBadge>
-                          </span>
+                          {!g.untracked && (
+                            <span className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-2">
+                              {g.needsSupport > 0 && <StatusBadge tone="bad">{g.needsSupport} need support</StatusBadge>}
+                              <StatusBadge tone="warn">{g.developing} developing</StatusBadge>
+                            </span>
+                          )}
                         </label>
                       </li>
                     )
@@ -288,11 +331,11 @@ export function AiAssessmentNewPage() {
               <ul className="space-y-2 text-sm text-ink-2">
                 <SummaryLine ok={selected.length > 0}>{selected.length ? `${selected.length} gap${selected.length > 1 ? 's' : ''}: ${selected.join(', ')}` : 'No gap selected'}</SummaryLine>
                 <SummaryLine ok={recipients.length > 0}>{recipients.length} student{recipients.length === 1 ? '' : 's'} selected</SummaryLine>
-                <SummaryLine ok={types.length > 0 && available > 0}>
-                  {Math.min(Number(count), available)} questions · {DIFFICULTY_LABEL[difficulty]}
+                <SummaryLine ok={types.length > 0 && (live || available > 0)}>
+                  {live ? Number(count) : Math.min(Number(count), available)} questions · {DIFFICULTY_LABEL[difficulty]}
                 </SummaryLine>
               </ul>
-              {selected.length > 0 && available < Number(count) && (
+              {!live && selected.length > 0 && available < Number(count) && (
                 <p className="rounded-lg bg-warn-soft px-3 py-2 text-xs text-warn-ink">
                   Only {available} questions are available for {selected.length === 1 ? 'this gap' : 'these gaps'}. Select another gap or question type for a longer assessment.
                 </p>
@@ -300,7 +343,7 @@ export function AiAssessmentNewPage() {
               <Button size="lg" className="w-full" disabled={!canGenerate} onClick={generate} icon={<Sparkles className="size-4" aria-hidden />}>
                 Generate draft
               </Button>
-              <p className="text-xs text-ink-3">Prototype: the AI is simulated with a demo question bank. You review every question before anything is sent.</p>
+              <p className="text-xs text-ink-3">Drafted by the AI (or the question bank when offline). You review every question before anything is sent.</p>
             </CardBody>
           </Card>
         </div>

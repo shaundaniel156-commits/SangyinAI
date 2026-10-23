@@ -7,13 +7,15 @@ import { DemoNotice } from '../../components/ui/DemoNotice'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { SelectField } from '../../components/ui/Field'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { useLiveData } from '../../context/LiveDataContext'
 import { useSession } from '../../context/SessionContext'
 import { useToast } from '../../context/ToastContext'
-import { CURRICULUM_DISCLAIMER, CURRICULUM_FRAMEWORKS, FRAMEWORK_LABEL, getFramework } from '../../data/curriculum'
-import { DEMO_SCHOOL } from '../../data/school'
+import { CURRICULUM_FRAMEWORKS, FRAMEWORK_LABEL, getFramework } from '../../data/curriculum'
+import { SCHOOL } from '../../data/school'
 import { classesInScope, studentsInScope } from '../../data/selectors'
-import type { CurriculumFramework } from '../../types'
-import { CurriculumTree } from './curriculum/CurriculumTree'
+import { api } from '../../lib/api'
+import type { CurriculumCompetency, CurriculumFramework, LearningObjective } from '../../types'
+import { CurriculumTree, type ObjectiveEditing } from './curriculum/CurriculumTree'
 import { FrameworkPicker } from './curriculum/FrameworkPicker'
 import { HierarchyPath } from './curriculum/HierarchyPath'
 import { PrerequisitesPanel, TopicSupportPanel } from './curriculum/TopicSupportPanel'
@@ -22,10 +24,41 @@ export function CurriculumPage() {
   const { role } = useSession()
   const { notify } = useToast()
   const isAdmin = role === 'admin'
+  const { live } = useLiveData()
+  // Bumped after adding or removing an objective, so the tree redraws without losing the selected level and topic.
+  const [, setRevision] = useState(0)
+
+  // Teachers and admins add their school's official objectives under the outline's statements (saved through the API).
+  const editing: ObjectiveEditing | undefined =
+    live && (role === 'teacher' || isAdmin)
+      ? {
+          onAdd: async (competency: CurriculumCompetency, code: string, text: string) => {
+            try {
+              const added = await api<LearningObjective>('/curriculum/objectives', { body: { competencyId: competency.id, code, text } })
+              competency.objectives.push(added)
+              setRevision((n) => n + 1)
+              notify('Objective added', { description: `${code} is now linked to this competency for your school.` })
+            } catch (error) {
+              notify('Objective not saved', { tone: 'info', description: (error as Error).message })
+              throw error
+            }
+          },
+          onRemove: async (competency: CurriculumCompetency, objectiveId: string) => {
+            try {
+              await api(`/curriculum/objectives/${objectiveId}`, { method: 'DELETE' })
+              competency.objectives.splice(competency.objectives.findIndex((o) => o.id === objectiveId), 1)
+              setRevision((n) => n + 1)
+              notify('Objective removed', { tone: 'info' })
+            } catch (error) {
+              notify('Objective not removed', { tone: 'info', description: (error as Error).message })
+            }
+          },
+        }
+      : undefined
 
   // Local preview state only — nothing is persisted.
-  const [primary, setPrimary] = useState<CurriculumFramework>(DEMO_SCHOOL.primaryFramework)
-  const [frameworkId, setFrameworkId] = useState<CurriculumFramework>(DEMO_SCHOOL.primaryFramework)
+  const [primary, setPrimary] = useState<CurriculumFramework>(SCHOOL.primaryFramework)
+  const [frameworkId, setFrameworkId] = useState<CurriculumFramework>(SCHOOL.primaryFramework)
   const framework = getFramework(frameworkId)
 
   const [levelId, setLevelId] = useState(framework.levels[0]?.id ?? '')
@@ -78,6 +111,7 @@ export function CurriculumPage() {
   const classCounts: Record<CurriculumFramework, number> = {
     uganda: scopedClasses.filter((c) => c.framework === 'uganda').length,
     cambridge: scopedClasses.filter((c) => c.framework === 'cambridge').length,
+    institution: scopedClasses.filter((c) => c.framework === 'institution').length,
   }
   const frameworkClasses = scopedClasses.filter((c) => c.framework === frameworkId)
   const levelClasses = frameworkClasses.filter((c) => level && c.level.includes(level.name))
@@ -111,8 +145,9 @@ export function CurriculumPage() {
       />
 
       <DemoNotice className="mb-6">
-        <strong className="font-semibold text-ink">{CURRICULUM_DISCLAIMER}</strong> Codes prefixed “DEMO-” are placeholders. The
-        expert-reviewed curriculum mapping will be loaded when the backend is connected.
+        <strong className="font-semibold text-ink">Sangyin curriculum outline.</strong> Topics and competencies are written by Sangyin in
+        plain words to guide practice and AI drafts; they are not copied from NCDC or Cambridge documents. Official learning objectives
+        appear here when your school adds them{editing ? ' — open a topic and choose “Add objective”' : ''}. Only your school sees them.
       </DemoNotice>
 
       <section aria-labelledby="framework-heading">
@@ -152,7 +187,7 @@ export function CurriculumPage() {
           <CardHeader
             icon={<Library className="size-5" aria-hidden />}
             title="Curriculum browser"
-            description={`${framework.name} · demo structure`}
+            description={`${framework.name} · Sangyin outline`}
           />
           <div className="space-y-4 border-b border-line px-5 py-4">
             <HierarchyPath
@@ -186,15 +221,15 @@ export function CurriculumPage() {
             </div>
           </div>
           {topics.length ? (
-            <CurriculumTree topics={topics} expanded={expanded} onToggle={toggleTopic} />
+            <CurriculumTree topics={topics} expanded={expanded} onToggle={toggleTopic} editing={editing} />
           ) : (
             <EmptyState
               icon={FolderOpen}
-              title="No demo content loaded for this level"
+              title={subject ? 'No topics for this subject yet' : 'No subjects for this level yet'}
               description={
                 subject
-                  ? `${subject.name} at ${level?.name} has no demo topics yet. Curriculum content will be loaded once it has been reviewed.`
-                  : `${level?.name ?? 'This level'} has no demo subjects yet. Curriculum content will be loaded once it has been reviewed.`
+                  ? `${subject.name} at ${level?.name} has no topics yet. Add them in the Manual feed.`
+                  : `${level?.name ?? 'This level'} has no subjects yet. Add them in the Manual feed, or load Sangyin’s outline on the server (npm run curriculum:outline).`
               }
             />
           )}

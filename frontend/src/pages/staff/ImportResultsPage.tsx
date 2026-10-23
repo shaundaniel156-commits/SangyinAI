@@ -1,18 +1,31 @@
 import { ArrowRight, Camera, Check, Download, FileSpreadsheet, Mic, Server, UploadCloud, X } from 'lucide-react'
 import { useRef, useState, type DragEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { Card, CardBody, CardHeader } from '../../components/ui/Card'
 import { DemoNotice } from '../../components/ui/DemoNotice'
 import { SelectField } from '../../components/ui/Field'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { useLiveData } from '../../context/LiveDataContext'
 import { useSession } from '../../context/SessionContext'
 import { useToast } from '../../context/ToastContext'
 import { assessmentsInScope } from '../../data/selectors'
+import { api } from '../../lib/api'
 import { cn } from '../../lib/cn'
 
 const STEPS = ['Upload file', 'Match columns', 'Review & confirm']
 
-/** Example column mapping shown for preview only — no file is read. */
+/** The server's reading of an uploaded file: which column means what, and each row matched to a student (or why not). */
+interface ImportPreview {
+  assessment: { id: string; title: string; maxScore: number }
+  columns: { name: string | null; studentId: string | null; score: string; remark: string | null }
+  rows: { row: number; name: string; studentId: string | null; score: number | null; remark?: string; problem: string | null }[]
+  ready: number
+  problems: number
+  saved: boolean
+}
+
+/** Example column mapping, shown until a file has been read. */
 const EXAMPLE_MAPPING = [
   { column: 'Learner Name', field: 'Student name' },
   { column: 'Class', field: 'Class' },
@@ -51,17 +64,71 @@ const OTHER_SOURCES = [
 export function ImportResultsPage() {
   const { role } = useSession()
   const { notify } = useToast()
+  const { live, refresh } = useLiveData()
+  const navigate = useNavigate()
   const inputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [dragging, setDragging] = useState(false)
   const assessments = assessmentsInScope(role).filter((a) => a.status !== 'completed')
+  const [assessmentId, setAssessmentId] = useState(assessments[0]?.id ?? '')
+  const [preview, setPreview] = useState<ImportPreview | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  // Sends the file to the server: without confirm it only reads and matches; with confirm it saves the matched rows.
+  const upload = (f: File, id: string, confirm = false) => {
+    const form = new FormData()
+    form.append('file', f, f.name)
+    return api<ImportPreview>(`/assessments/import?assessmentId=${encodeURIComponent(id)}${confirm ? '&confirm=true' : ''}`, { form })
+  }
+
+  const choose = async (f: File | null, id = assessmentId) => {
+    setFile(f)
+    setPreview(null)
+    if (!f || !live || !id) return
+    setBusy(true)
+    try {
+      setPreview(await upload(f, id))
+    } catch (error) {
+      notify('The file could not be read', { tone: 'info', description: (error as Error).message })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const confirmImport = async () => {
+    if (!live || !file || !preview) {
+      notify('Import preview only', { tone: 'info', description: 'Offline — sign in while connected to import results.' })
+      return
+    }
+    setBusy(true)
+    try {
+      const saved = await upload(file, assessmentId, true)
+      await refresh()
+      const skipped = saved.problems ? ` ${saved.problems} row(s) were skipped.` : ''
+      notify('Scores imported', { description: `${saved.ready} score${saved.ready === 1 ? '' : 's'} saved to “${saved.assessment.title}”.${skipped}` })
+      navigate(`/assessments/${saved.assessment.id}`)
+    } catch (error) {
+      notify('Scores not imported', { tone: 'info', description: (error as Error).message })
+      setBusy(false)
+    }
+  }
 
   const onDrop = (e: DragEvent) => {
     e.preventDefault()
     setDragging(false)
     const f = e.dataTransfer.files[0]
-    if (f) setFile(f)
+    if (f) void choose(f)
   }
+
+  // Column mapping from the file once read, otherwise the example.
+  const mapping = preview
+    ? [
+        ...(preview.columns.name ? [{ column: preview.columns.name, field: 'Student name' }] : []),
+        ...(preview.columns.studentId ? [{ column: preview.columns.studentId, field: 'Student ID' }] : []),
+        { column: preview.columns.score, field: 'Score' },
+        ...(preview.columns.remark ? [{ column: preview.columns.remark, field: 'Remark (optional)' }] : []),
+      ]
+    : EXAMPLE_MAPPING
 
   return (
     <>
@@ -82,8 +149,8 @@ export function ImportResultsPage() {
 
       <ol className="mb-6 flex flex-wrap items-center gap-2 text-sm" aria-label="Import steps">
         {STEPS.map((s, i) => {
-          const done = i === 0 && file !== null
-          const current = (i === 0 && !file) || (i === 1 && file !== null)
+          const done = (i === 0 && file !== null) || (i === 1 && preview !== null)
+          const current = (i === 0 && !file) || (i === 1 && file !== null && !preview) || (i === 2 && preview !== null)
           return (
             <li key={s} className="flex items-center gap-2">
               <span
@@ -110,9 +177,14 @@ export function ImportResultsPage() {
             <CardBody className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <SelectField
                 label="Assessment"
+                value={assessmentId}
+                onChange={(e) => {
+                  setAssessmentId(e.target.value)
+                  void choose(file, e.target.value)
+                }}
                 options={[
                   ...assessments.map((a) => ({ value: a.id, label: a.title })),
-                  { value: 'new', label: 'Create a new assessment from the file' },
+                  ...(live ? [] : [{ value: 'new', label: 'Create a new assessment from the file' }]),
                 ]}
               />
               <SelectField
@@ -133,9 +205,12 @@ export function ImportResultsPage() {
                   <FileSpreadsheet className="size-8 shrink-0 text-good" aria-hidden />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-ink">{file.name}</p>
-                    <p className="text-xs text-ink-3">{(file.size / 1024).toFixed(1)} KB · selected — not processed in this prototype</p>
+                    <p className="text-xs text-ink-3">
+                      {(file.size / 1024).toFixed(1)} KB ·{' '}
+                      {!live ? 'selected — offline, not processed' : busy ? 'reading…' : preview ? `${preview.ready} ready, ${preview.problems} to check` : 'selected'}
+                    </p>
                   </div>
-                  <button type="button" onClick={() => setFile(null)} className="rounded-md p-1 text-ink-3 hover:bg-surface-3 hover:text-ink" aria-label="Remove file">
+                  <button type="button" onClick={() => void choose(null)} className="rounded-md p-1 text-ink-3 hover:bg-surface-3 hover:text-ink" aria-label="Remove file">
                     <X className="size-5" aria-hidden />
                   </button>
                 </div>
@@ -165,7 +240,7 @@ export function ImportResultsPage() {
                     className="sr-only"
                     tabIndex={-1}
                     aria-label="Choose results file"
-                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                    onChange={(e) => void choose(e.target.files?.[0] ?? null)}
                   />
                 </div>
               )}
@@ -173,7 +248,10 @@ export function ImportResultsPage() {
           </Card>
 
           <Card className={cn(!file && 'opacity-60')}>
-            <CardHeader title="3. Match columns" description="Example of how spreadsheet columns will be matched to Sangyin AI fields." />
+            <CardHeader
+              title="3. Match columns"
+              description={preview ? 'The columns found in your file and what they were matched to.' : 'Example of how spreadsheet columns will be matched to Sangyin AI fields.'}
+            />
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -183,7 +261,7 @@ export function ImportResultsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
-                  {EXAMPLE_MAPPING.map((m) => (
+                  {mapping.map((m) => (
                     <tr key={m.column}>
                       <td className="px-5 py-3 font-mono text-[13px] text-ink-2">{m.column}</td>
                       <td className="px-5 py-3 text-ink">{m.field}</td>
@@ -193,6 +271,38 @@ export function ImportResultsPage() {
               </table>
             </div>
           </Card>
+
+          {preview && (
+            <Card>
+              <CardHeader
+                title="4. Review"
+                description={`${preview.ready} row${preview.ready === 1 ? '' : 's'} ready to save · ${preview.problems} to check · max score ${preview.assessment.maxScore}`}
+              />
+              <div className="max-h-105 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <caption className="sr-only">Rows read from the file</caption>
+                  <thead className="sticky top-0 bg-surface-2">
+                    <tr className="border-b border-line">
+                      <th scope="col" className="px-5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-ink-3">Row</th>
+                      <th scope="col" className="px-5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-ink-3">Student</th>
+                      <th scope="col" className="px-5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-ink-3">Score</th>
+                      <th scope="col" className="px-5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-ink-3">Result</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line">
+                    {preview.rows.map((p) => (
+                      <tr key={p.row}>
+                        <td className="tabular px-5 py-2.5 text-ink-3">{p.row}</td>
+                        <td className="px-5 py-2.5 text-ink">{p.name || p.studentId || '—'}</td>
+                        <td className="tabular px-5 py-2.5 text-right">{p.score ?? '—'}</td>
+                        <td className={cn('px-5 py-2.5', p.problem ? 'text-bad-ink' : 'text-good-ink')}>{p.problem ?? 'Ready'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
         </div>
 
         <div className="space-y-6">
@@ -237,19 +347,17 @@ export function ImportResultsPage() {
                   </li>
                 ))}
               </ul>
-              <Button
-                className="mt-6 w-full"
-                disabled={!file}
-                onClick={() => notify('Import preview only', { tone: 'info', description: 'File processing will be added when the backend is connected.' })}
-              >
-                Continue to review
+              <Button className="mt-6 w-full" disabled={!file || busy || (live && !preview?.ready)} onClick={confirmImport}>
+                {busy ? 'Working…' : preview ? `Save ${preview.ready} matched score${preview.ready === 1 ? '' : 's'}` : 'Continue to review'}
               </Button>
             </CardBody>
           </Card>
-          <DemoNotice>
-            <p className="font-medium text-ink">Import is a visual preview</p>
-            <p className="mt-0.5">No file is read, uploaded or processed yet. Excel/CSV import will be implemented with the backend.</p>
-          </DemoNotice>
+          {!live && (
+            <DemoNotice>
+              <p className="font-medium text-ink">Offline — import is a visual preview</p>
+              <p className="mt-0.5">Sign in while connected to read, check and save a CSV or Excel (.xlsx) file.</p>
+            </DemoNotice>
+          )}
         </div>
       </div>
     </>

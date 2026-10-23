@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { DEMO_SCHOOL } from '../../../data/school'
+import { schoolName } from '../../../data/school'
 import { cn } from '../../../lib/cn'
 
 interface ReportDocumentProps {
@@ -31,7 +31,7 @@ export function ReportDocument({ title, subtitle, term, period, children }: Repo
         </div>
         <dl className="grid shrink-0 grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs sm:text-right">
           <dt className="text-ink-3">School</dt>
-          <dd className="text-ink">{DEMO_SCHOOL.name}</dd>
+          <dd className="text-ink">{schoolName()}</dd>
           <dt className="text-ink-3">Term</dt>
           <dd className="text-ink">{term}</dd>
           {period && (
@@ -44,14 +44,10 @@ export function ReportDocument({ title, subtitle, term, period, children }: Repo
           <dd className="text-ink">{generated}</dd>
         </dl>
       </header>
-      <p className="mt-3 inline-flex items-center rounded border border-dashed border-line-strong px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-ink-3">
-        Demo data — not real learner records
-      </p>
       <div className="mt-6 space-y-7">{children}</div>
       <footer className="mt-8 border-t border-line pt-3 text-[11px] leading-relaxed text-ink-3">
-        Prepared with Sangyin AI (prototype). All figures are illustrative demo values for UI preview and do not describe real
-        learners. Competency levels use demo display thresholds. Curriculum references are illustrative, not official NCDC or
-        Cambridge International content.
+        Prepared with Sangyin AI from the school’s recorded results. Competency levels: 70% and above is a strength, 50–69% developing,
+        below 50% needs support. Curriculum references use Sangyin’s own-words outline, not official NCDC or Cambridge International text.
       </footer>
     </article>
   )

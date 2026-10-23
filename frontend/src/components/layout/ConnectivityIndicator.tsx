@@ -10,12 +10,9 @@ const STATES: Record<ConnectivityStatus, { label: string; icon: typeof Wifi; dot
   syncing: { label: 'Syncing…', icon: RefreshCw, dot: 'bg-brand-500', pill: 'text-brand-ink' },
 }
 
-/**
- * Offline-first status indicator (UI ONLY). The status can be previewed from
- * the menu; no network detection or synchronisation is performed.
- */
+/** Connection status: online/offline from the browser, and when the data was last loaded from the server. */
 export function ConnectivityIndicator({ compact = false, placement = 'down' }: { compact?: boolean; placement?: 'down' | 'up' }) {
-  const { status, lastSynced, pendingItems, setStatus } = useConnectivity()
+  const { status, lastSynced } = useConnectivity()
   const { open, setOpen, ref } = usePopover()
   const state = STATES[status]
   const Icon = state.icon
@@ -66,40 +63,16 @@ export function ConnectivityIndicator({ compact = false, placement = 'down' }: {
             <p className="text-sm font-semibold text-ink">{state.label}</p>
           </div>
           <p className="mt-1 text-sm text-ink-2">
-            {status === 'online' && 'All changes are saved and synchronised.'}
-            {status === 'offline' && 'You can keep working. Changes are kept on this device and will sync when a connection is available.'}
+            {status === 'online' && 'Connected. Changes are saved to the server as you make them.'}
+            {status === 'offline' && 'No connection. You can still view what was already loaded; reconnect to save changes.'}
             {status === 'syncing' && 'Sending changes saved on this device.'}
           </p>
           <dl className="mt-3 space-y-1.5 rounded-lg bg-surface-2 p-3 text-sm">
             <div className="flex justify-between gap-3">
-              <dt className="text-ink-3">Last synced</dt>
+              <dt className="text-ink-3">Data last loaded</dt>
               <dd className="text-ink">{lastSynced}</dd>
             </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-ink-3">Changes waiting to sync</dt>
-              <dd className="tabular text-ink">{pendingItems}</dd>
-            </div>
           </dl>
-          <fieldset className="mt-4">
-            <legend className="text-xs font-medium uppercase tracking-wide text-ink-3">Preview status (prototype)</legend>
-            <div className="mt-2 grid grid-cols-3 gap-1.5">
-              {(Object.keys(STATES) as ConnectivityStatus[]).map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setStatus(s)}
-                  aria-pressed={status === s}
-                  className={cn(
-                    'rounded-md border px-2 py-1.5 text-xs font-medium',
-                    status === s ? 'border-brand-500 bg-brand-soft text-brand-ink' : 'border-line text-ink-2 hover:bg-surface-2',
-                  )}
-                >
-                  {STATES[s].label}
-                </button>
-              ))}
-            </div>
-            <p className="mt-2 text-xs text-ink-3">Synchronisation is not connected in this prototype.</p>
-          </fieldset>
         </div>
       )}
     </div>

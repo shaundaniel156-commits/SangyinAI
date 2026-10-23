@@ -69,7 +69,6 @@ export function TeacherDetails({ teacher }: { teacher: Teacher }) {
           </ul>
         )}
       </section>
-      <p className="text-xs text-ink-3">Demo data for UI preview</p>
     </div>
   )
 }

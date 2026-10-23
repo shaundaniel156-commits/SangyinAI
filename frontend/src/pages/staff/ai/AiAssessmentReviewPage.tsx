@@ -12,7 +12,7 @@ import { useAiAssessments } from '../../../context/AiAssessmentsContext'
 import { useToast } from '../../../context/ToastContext'
 import { getClass } from '../../../data/classes'
 import { getStudent } from '../../../data/students'
-import { DEMO_USERS } from '../../../data/users'
+import { ROLE_USERS } from '../../../data/users'
 import { FrameworkBadge } from '../../../components/domain/FrameworkBadge'
 import { CURRICULUM_DISCLAIMER } from '../../../data/curriculum'
 import { DIFFICULTY_LABEL, curriculumRefsFor, extraQuestion, replacementQuestion, studentsWithGaps } from '../../../lib/aiAssessment'
@@ -243,7 +243,7 @@ function Review({ assessment: a }: { assessment: AiAssessment }) {
             />
             <ul className="max-h-80 divide-y divide-line overflow-y-auto">
               {(draft ? candidates : a.studentIds.map((sid) => getStudent(sid)).filter((s) => s !== undefined)).map((s) => {
-                const attempt = !draft && s.id === DEMO_USERS.student.id ? attempts[a.id] : undefined
+                const attempt = draft ? undefined : (a.attempts?.[s.id] ?? (s.id === ROLE_USERS.student.id ? attempts[a.id] : undefined))
                 return (
                   <li key={s.id}>
                     <label className="flex items-center gap-3 px-6 py-2.5 hover:bg-surface-2">
@@ -287,9 +287,10 @@ function Review({ assessment: a }: { assessment: AiAssessment }) {
             <Button
               icon={<SendHorizontal className="size-4" aria-hidden />}
               onClick={() => {
-                send(a.id)
                 setConfirmSend(false)
-                notify('Assessment sent to students', { description: `${a.studentIds.length} students can now start “${a.title}”.` })
+                send(a.id)
+                  .then(() => notify('Assessment sent to students', { description: `${a.studentIds.length} students can now start “${a.title}”.` }))
+                  .catch(() => { /* the store has already shown why */ })
               }}
             >
               Approve & send

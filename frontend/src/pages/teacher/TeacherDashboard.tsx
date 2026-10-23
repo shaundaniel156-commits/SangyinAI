@@ -17,7 +17,7 @@ import { useSession } from '../../context/SessionContext'
 import { TEACHER_ACTIVITY } from '../../data/activity'
 import { getGuidanceForStudent } from '../../data/guidance'
 import { getClassTrend } from '../../data/performance'
-import { DEMO_SCHOOL } from '../../data/school'
+import { SCHOOL } from '../../data/school'
 import { assessmentsInScope, classesInScope, commonGapsInScope, guidanceInScope, studentsInScope } from '../../data/selectors'
 
 const SERIES_COLORS = ['var(--color-series-1)', 'var(--color-series-2)', 'var(--color-series-3)']
@@ -43,7 +43,7 @@ export function TeacherDashboard() {
       <PageHeader
         hero
         title={`Welcome back, ${user.name}`}
-        description={`Here is an overview of your classes for ${DEMO_SCHOOL.currentTerm}, ${DEMO_SCHOOL.academicYear}.`}
+        description={`Here is an overview of your classes for ${SCHOOL.currentTerm}, ${SCHOOL.academicYear}.`}
         actions={
           <>
             <ButtonLink to="/guidance" variant="secondary" icon={<Sparkles className="size-4" aria-hidden />}>
@@ -73,7 +73,7 @@ export function TeacherDashboard() {
           description="Class average across recent assessments (%)"
           table={{
             headers: ['Month', ...classes.map((c) => c.name)],
-            rows: getClassTrend(classes[0]!.id).map((p, i) => [p.label, ...classes.map((c) => `${getClassTrend(c.id)[i]?.value ?? '—'}%`)]),
+            rows: (classes[0] ? getClassTrend(classes[0].id) : []).map((p, i) => [p.label, ...classes.map((c) => `${getClassTrend(c.id)[i]?.value ?? '—'}%`)]),
           }}
         >
           <LineChart
@@ -191,7 +191,7 @@ export function TeacherDashboard() {
               max={students.length}
               items={gaps.map((g) => ({ id: g.competency, label: g.competency, meta: g.subject, value: g.studentsAffected, tone: 'bad' }))}
             />
-            <p className="mt-4 text-xs text-ink-3">Number of students · demo data</p>
+            <p className="mt-4 text-xs text-ink-3">Number of students</p>
           </div>
         </Card>
 

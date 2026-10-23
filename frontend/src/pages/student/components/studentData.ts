@@ -3,12 +3,30 @@ import { getFramework } from '../../../data/curriculum'
 import { getGuidanceForStudent } from '../../../data/guidance'
 import { PRACTICE_ACTIVITIES } from '../../../data/practice'
 import { getStudent } from '../../../data/students'
-import { DEMO_USERS } from '../../../data/users'
+import { ROLE_USERS } from '../../../data/users'
 import type { PracticeActivity, PracticeStatus, Student } from '../../../types'
 
-/** The demo student account (DEMO_USERS.student). */
+/**
+ * The signed-in student's record. If their account isn't linked to a student record yet (or there is no data),
+ * an empty record is used so the pages show empty states instead of failing.
+ */
 export function getCurrentStudent(): Student {
-  return getStudent(DEMO_USERS.student.id)!
+  return (
+    getStudent(ROLE_USERS.student.id) ?? {
+      id: ROLE_USERS.student.id,
+      name: ROLE_USERS.student.name,
+      initials: ROLE_USERS.student.initials,
+      classId: '',
+      framework: 'uganda',
+      subjects: [],
+      average: 0,
+      trend: 0,
+      needsSupport: false,
+      currentFocus: '',
+      competencies: [],
+      guardianName: '',
+    }
+  )
 }
 
 export type StepState = 'completed' | 'current' | 'upcoming'
@@ -55,7 +73,7 @@ export interface Milestone {
 
 /**
  * Curriculum milestones for the student's level: the learning objectives under each topic they
- * are assessed on, marked reached / working on / coming up from their demo mastery level.
+ * are assessed on, marked reached / working on / coming up from their mastery level.
  */
 export function getCurriculumMilestones(student: Student): Milestone[] {
   const cls = getClass(student.classId)

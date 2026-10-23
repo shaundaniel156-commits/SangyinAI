@@ -13,7 +13,7 @@ import { StatusBadge } from '../../components/ui/StatusBadge'
 import { useSession } from '../../context/SessionContext'
 import { getClass } from '../../data/classes'
 import { classesInScope, studentsInScope } from '../../data/selectors'
-import { DEMO_COMPETENCIES } from '../../data/students'
+import { COMPETENCIES } from '../../data/students'
 import { formatSignedPoints } from '../../lib/format'
 import { cn } from '../../lib/cn'
 
@@ -90,7 +90,7 @@ export function StudentsPage() {
                 onChange: setFocus,
                 options: [
                   { value: 'all', label: 'Any learning focus' },
-                  ...DEMO_COMPETENCIES.filter((c) => c.subject === 'Mathematics').map((c) => ({ value: c.name, label: c.name })),
+                  ...COMPETENCIES.filter((c) => c.subject === 'Mathematics').map((c) => ({ value: c.name, label: c.name })),
                 ],
               },
             ]}

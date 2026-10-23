@@ -39,7 +39,7 @@ export function ClassReport({ cls, filters }: { cls: SchoolClass; filters: Repor
       <DocSection title="Class average trend" description="Class average across recent assessment periods (%)">
         <LineChart ariaLabel={`${cls.name} average trend`} series={[{ name: 'Class average', points: trend, color: 'var(--color-series-1)' }]} min={30} max={90} height={200} />
       </DocSection>
-      <DocSection title="Competency averages" description="Average demo mastery per competency">
+      <DocSection title="Competency averages" description="Average mastery per competency">
         {competencies.length ? (
           <BarList
             items={competencies.map((c) => ({

@@ -1,19 +1,19 @@
 import { Card, CardHeader } from '../../../components/ui/Card'
-import { DEMO_SCHOOL } from '../../../data/school'
+import { SCHOOL, schoolName } from '../../../data/school'
 
-/** Read-only summary of the (demo) school's configuration. */
+/** Read-only summary of the school's details. */
 export function SchoolInfoCard({ classCount, studentCount }: { classCount: number; studentCount: number }) {
   const rows: [string, string][] = [
-    ['School name', DEMO_SCHOOL.name],
-    ['Type', DEMO_SCHOOL.type],
-    ['Location', DEMO_SCHOOL.location],
-    ['Academic year', `${DEMO_SCHOOL.academicYear} · ${DEMO_SCHOOL.currentTerm}`],
-    ['Contact', DEMO_SCHOOL.contactEmail],
+    ['School name', schoolName()],
+    ['Type', SCHOOL.type],
+    ['Location', SCHOOL.location],
+    ['Academic year', `${SCHOOL.academicYear} · ${SCHOOL.currentTerm}`],
+    ['Contact', SCHOOL.contactEmail],
     ['Classes / students', `${classCount} / ${studentCount}`],
   ]
   return (
     <Card>
-      <CardHeader title="School information" description="Demo school — placeholder details" />
+      <CardHeader title="School information" description="As recorded for your school" />
       <dl className="grid grid-cols-1 gap-x-6 gap-y-4 p-5 sm:grid-cols-2 lg:grid-cols-3">
         {rows.map(([label, value]) => (
           <div key={label} className="min-w-0">

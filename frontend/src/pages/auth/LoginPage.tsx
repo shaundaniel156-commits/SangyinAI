@@ -5,7 +5,8 @@ import { Button } from '../../components/ui/Button'
 import { TextField } from '../../components/ui/Field'
 import { Modal } from '../../components/ui/Modal'
 import { useSession } from '../../context/SessionContext'
-import { DEMO_USERS, ROLE_HOME, ROLE_LABEL } from '../../data/users'
+import { api, ApiError } from '../../lib/api'
+import { ROLE_HOME, ROLE_LABEL } from '../../data/users'
 import { cn } from '../../lib/cn'
 import type { Role } from '../../types'
 import { ACCENT, AuthCanvas, AuthHeader, LOGO_BLUE, PhotoBackdrop } from './AuthChrome'
@@ -22,22 +23,30 @@ export function LoginPage() {
   const { signIn } = useSession()
   const navigate = useNavigate()
   const [role, setRole] = useState<Role>('teacher')
-  const [email, setEmail] = useState(DEMO_USERS.teacher.email)
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(true)
   const [forgotOpen, setForgotOpen] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
   const current = ROLE_OPTIONS.find((r) => r.role === role)!
 
   const chooseRole = (r: Role) => {
     setRole(r)
-    setEmail(DEMO_USERS[r].email)
+    setError(null)
   }
 
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    // Demo only: no credentials are checked. Selecting a role opens that interface.
-    signIn(role)
-    navigate(ROLE_HOME[role])
+    setError(null)
+    setBusy(true)
+    const result = await signIn({ email, password, remember })
+    setBusy(false)
+    if (!result.ok) {
+      setError(result.error)
+      return
+    }
+    navigate(ROLE_HOME[result.role])
   }
 
   return (
@@ -116,41 +125,86 @@ export function LoginPage() {
                 Forgot password?
               </button>
             </div>
+            {error && (
+              <p role="alert" className="rounded-md border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                {error}
+              </p>
+            )}
             <button
               type="submit"
-              className="inline-flex w-full items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              disabled={busy}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
               style={{ backgroundColor: LOGO_BLUE }}
             >
-              Sign in
+              {busy ? 'Signing in…' : 'Sign in'}
               <ArrowRight className="size-4" aria-hidden />
             </button>
           </form>
 
-          <p className="mt-6 rounded-lg border border-dashed border-white/15 px-3.5 py-2.5 text-center text-xs text-white/50">
-            Prototype demo — sign-in is not connected. Choose a role and select <span className="font-medium text-white/80">Sign in</span> to preview that interface.
-          </p>
           </div>
         </div>
       </main>
 
-      <Modal
-        open={forgotOpen}
-        onClose={() => setForgotOpen(false)}
-        title="Reset your password"
-        description="Enter the email linked to your account."
-        footer={
+      {forgotOpen && <ForgotPasswordModal initialEmail={email} onClose={() => setForgotOpen(false)} />}
+    </AuthCanvas>
+  )
+}
+
+/** Asks the server to email a reset link (valid 30 minutes). The reply is the same whether or not the email has an account. */
+function ForgotPasswordModal({ initialEmail, onClose }: { initialEmail: string; onClose: () => void }) {
+  const [address, setAddress] = useState(initialEmail.includes('@') ? initialEmail : '')
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const send = async () => {
+    setError(null)
+    if (!address.includes('@')) return setError('Enter the email linked to your account.')
+    setBusy(true)
+    try {
+      const res = await api<{ message: string }>('/auth/forgot-password', { method: 'POST', body: { email: address.trim() } })
+      setDone(res.message)
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not reach the server. Check your connection and try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Reset your password"
+      description={done ? undefined : 'Enter the email linked to your account and we will email you a reset link.'}
+      footer={
+        done ? (
+          <Button onClick={onClose}>Done</Button>
+        ) : (
           <>
-            <Button variant="secondary" onClick={() => setForgotOpen(false)}>
+            <Button variant="secondary" onClick={onClose}>
               Cancel
             </Button>
-            <Button onClick={() => setForgotOpen(false)}>Send reset link</Button>
+            <Button onClick={send} disabled={busy}>
+              {busy ? 'Sending…' : 'Send reset link'}
+            </Button>
           </>
-        }
-      >
-        <TextField label="Email" type="email" defaultValue={email} />
-        <p className="mt-3 text-xs text-ink-3">Prototype: password reset will be available once authentication is connected. No email is sent.</p>
-      </Modal>
-    </AuthCanvas>
+        )
+      }
+    >
+      {done ? (
+        <p className="text-sm text-ink-2">{done} Check your spam folder if it doesn&apos;t arrive in a few minutes.</p>
+      ) : (
+        <>
+          <TextField label="Email" type="email" autoComplete="email" value={address} onChange={(e) => setAddress(e.target.value)} />
+          {error && (
+            <p role="alert" className="mt-3 text-sm text-red-600">
+              {error}
+            </p>
+          )}
+        </>
+      )}
+    </Modal>
   )
 }
 

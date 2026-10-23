@@ -14,10 +14,12 @@ import { inputClasses } from '../../components/ui/Field'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { LevelBadge, StatusBadge } from '../../components/ui/StatusBadge'
 import { Tabs } from '../../components/ui/Tabs'
+import { useLiveData } from '../../context/LiveDataContext'
 import { useToast } from '../../context/ToastContext'
 import { getAssessment, getAssessmentResults } from '../../data/assessments'
 import { getClass } from '../../data/classes'
 import { getStudent } from '../../data/students'
+import { api } from '../../lib/api'
 import { levelFromScore } from '../../lib/competency'
 import { cn } from '../../lib/cn'
 import { formatDate } from '../../lib/format'
@@ -171,7 +173,37 @@ function ScoreEntry({ assessment }: { assessment: Assessment }) {
   const [scores, setScores] = useState<Record<string, string>>(() =>
     Object.fromEntries(initial.map((r) => [r.studentId, r.score === null ? '' : String(r.score)])),
   )
-  const [remarks, setRemarks] = useState<Record<string, string>>({})
+  const [remarks, setRemarks] = useState<Record<string, string>>(() =>
+    Object.fromEntries(initial.filter((r) => r.remark).map((r) => [r.studentId, r.remark!])),
+  )
+  const [saving, setSaving] = useState(false)
+  const { live, refresh } = useLiveData()
+
+  // Saves only the rows that changed (an emptied score clears it), then reloads so averages and status update.
+  const save = async () => {
+    if (!live) {
+      notify('Scores kept on this screen', { tone: 'info', description: 'Offline — not saved. Sign in while connected to save scores.' })
+      return
+    }
+    const changed = initial.filter((r) => {
+      const v = scores[r.studentId] ?? ''
+      return v !== (r.score === null ? '' : String(r.score)) || (remarks[r.studentId] ?? '') !== (r.remark ?? '')
+    })
+    if (!changed.length) return notify('No changes to save', { tone: 'info' })
+    setSaving(true)
+    try {
+      await api(`/assessments/${assessment.id}/results`, {
+        method: 'PUT',
+        body: { results: changed.map((r) => ({ studentId: r.studentId, score: scores[r.studentId] ? Number(scores[r.studentId]) : null, ...(remarks[r.studentId] ? { remark: remarks[r.studentId] } : {}) })) },
+      })
+      await refresh()
+      notify('Scores saved', { description: `${changed.length} student${changed.length === 1 ? '' : 's'} updated.` })
+    } catch (error) {
+      notify('Scores not saved', { tone: 'info', description: (error as Error).message })
+    } finally {
+      setSaving(false)
+    }
+  }
   const invalid = Object.values(scores).filter((v) => v !== '' && (Number(v) < 0 || Number(v) > assessment.maxScore || Number.isNaN(Number(v)))).length
   const entered = Object.values(scores).filter((v) => v !== '').length
 
@@ -185,10 +217,10 @@ function ScoreEntry({ assessment }: { assessment: Assessment }) {
         <Button
           size="sm"
           icon={<Save className="size-4" aria-hidden />}
-          disabled={invalid > 0}
-          onClick={() => notify('Scores saved for preview', { description: 'Not stored — score saving will be connected to the backend later.' })}
+          disabled={invalid > 0 || saving}
+          onClick={save}
         >
-          Save scores
+          {saving ? 'Saving…' : 'Save scores'}
         </Button>
       </div>
       <div className="max-h-[560px] overflow-y-auto">
@@ -242,7 +274,7 @@ function ScoreEntry({ assessment }: { assessment: Assessment }) {
         </table>
       </div>
       <div className="p-4">
-        <DemoNotice>Prototype — scores entered here are kept only on this screen and are not saved.</DemoNotice>
+        {!live && <DemoNotice>Offline — scores entered here are kept only on this screen and are not saved.</DemoNotice>}
       </div>
     </div>
   )

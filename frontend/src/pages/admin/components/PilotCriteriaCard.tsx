@@ -38,7 +38,6 @@ export function PilotCriteriaCard() {
           )
         })}
       </ul>
-      <p className="px-6 pb-4 text-xs text-ink-3">Demo data for UI preview</p>
     </Card>
   )
 }

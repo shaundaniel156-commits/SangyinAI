@@ -39,7 +39,7 @@ export function UsersPage() {
     <>
       <PageHeader
         title="Users"
-        description="Accounts for teachers, administrators, parents and students at the demo school."
+        description="Accounts for teachers, administrators, parents and students at your school."
         actions={
           <Button onClick={() => setInviteOpen(true)} icon={<UserPlus className="size-4" aria-hidden />}>
             Invite user
@@ -103,7 +103,6 @@ export function UsersPage() {
           ]}
         />
       </Card>
-      <p className="mt-3 text-xs text-ink-3">Demo accounts for UI preview only.</p>
 
       <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
     </>

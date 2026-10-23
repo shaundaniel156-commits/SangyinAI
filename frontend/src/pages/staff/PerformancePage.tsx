@@ -12,7 +12,7 @@ import { toneForScore } from '../../components/ui/ProgressBar'
 import { useSession } from '../../context/SessionContext'
 import { getClass, getClassCompetencyAverages } from '../../data/classes'
 import { getClassTrend } from '../../data/performance'
-import { DEMO_SCHOOL } from '../../data/school'
+import { SCHOOL } from '../../data/school'
 import { assessmentsInScope, classesInScope } from '../../data/selectors'
 import { getStudentsByClass } from '../../data/students'
 import { levelFromScore } from '../../lib/competency'
@@ -27,7 +27,7 @@ export function PerformancePage() {
   const classes = classesInScope(role)
   const [classId, setClassId] = useState(classes[0]?.id ?? '')
   const [subject, setSubject] = useState<Subject>('Mathematics')
-  const [term, setTerm] = useState(DEMO_SCHOOL.termOptions[DEMO_SCHOOL.termOptions.length - 1]!)
+  const [term, setTerm] = useState(SCHOOL.termOptions[SCHOOL.termOptions.length - 1]!)
 
   const cls = getClass(classId)
   const students = getStudentsByClass(classId)
@@ -69,7 +69,7 @@ export function PerformancePage() {
               { value: 'English', label: 'English' },
             ],
           },
-          { id: 'term', label: 'Term', value: term, onChange: setTerm, options: DEMO_SCHOOL.termOptions.map((t) => ({ value: t, label: t })) },
+          { id: 'term', label: 'Term', value: term, onChange: setTerm, options: SCHOOL.termOptions.map((t) => ({ value: t, label: t })) },
         ]}
       />
 
@@ -98,8 +98,7 @@ export function PerformancePage() {
           table={{ headers: ['Subject', 'Average'], rows: subjectAverages.map((s) => [s.subject, `${s.value}%`]) }}
         >
           <BarList items={subjectAverages.map((s) => ({ id: s.subject, label: s.subject, value: s.value }))} />
-          <p className="mt-4 text-xs text-ink-3">Science and Social Studies have no competency data in this demo.</p>
-        </ChartContainer>
+            </ChartContainer>
       </div>
 
       <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
@@ -161,7 +160,6 @@ export function PerformancePage() {
           ]}
         />
       </Card>
-      <p className="mt-4 text-xs text-ink-3">All figures are demo data for UI preview. Term selection is illustrative; historical terms are not loaded in this prototype.</p>
     </>
   )
 }

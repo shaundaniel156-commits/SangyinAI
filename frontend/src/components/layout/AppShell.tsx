@@ -1,6 +1,6 @@
 import { CloudOff } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useConnectivity } from '../../context/ConnectivityContext'
 import { useSession } from '../../context/SessionContext'
 import { cn } from '../../lib/cn'
@@ -14,13 +14,15 @@ import { TopNav } from './TopNav'
 export function AppShell() {
   const [navOpen, setNavOpen] = useState(false)
   const { pathname } = useLocation()
-  const { role } = useSession()
+  const { role, signedIn } = useSession()
   const { status, pendingItems } = useConnectivity()
   const portal = role === 'parent' || role === 'student'
 
   useEffect(() => {
     window.scrollTo(0, 0)
   }, [pathname])
+
+  if (!signedIn) return <Navigate to="/login" replace />
 
   return (
     <div className="min-h-dvh overflow-x-clip">

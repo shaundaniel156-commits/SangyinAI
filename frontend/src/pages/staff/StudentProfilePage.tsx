@@ -11,7 +11,6 @@ import { ButtonLink } from '../../components/ui/Button'
 import { Card, CardBody, CardHeader } from '../../components/ui/Card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { PageHeader } from '../../components/ui/PageHeader'
-import { StatusBadge } from '../../components/ui/StatusBadge'
 import { getStudentAssessmentHistory } from '../../data/assessments'
 import { getClass } from '../../data/classes'
 import { FRAMEWORK_LABEL } from '../../data/curriculum'
@@ -39,7 +38,7 @@ export function StudentProfilePage() {
         <EmptyState
           icon={UserRound}
           title="Student not found"
-          description="This student record does not exist in the demo data."
+          description="This student record does not exist, or you don’t have access to it."
           action={<ButtonLink to="/students">Back to students</ButtonLink>}
         />
       </Card>
@@ -51,7 +50,7 @@ export function StudentProfilePage() {
   const diagnostic = getDiagnosticForStudent(student.id)
   const guidance = getGuidanceForStudent(student.id)
   const history = getStudentAssessmentHistory(student.id, student.classId)
-  const trend = getStudentTrend(student.average, student.trend)
+  const trend = getStudentTrend(student.id, student.classId)
 
   return (
     <>
@@ -99,7 +98,7 @@ export function StudentProfilePage() {
           className="xl:col-span-2"
           title="Performance overview"
           description="Overall average across recent assessments (%)"
-          table={{ headers: ['Month', 'Average'], rows: trend.map((p) => [p.label, `${p.value}%`]) }}
+          table={{ headers: ['Date', 'Result'], rows: trend.map((p) => [p.label, `${p.value}%`]) }}
         >
           <LineChart ariaLabel={`${student.name} overall average trend`} series={[{ name: 'Overall average', points: trend, color: 'var(--color-series-1)' }]} min={20} max={100} />
         </ChartContainer>
@@ -141,7 +140,7 @@ export function StudentProfilePage() {
 
       <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Card>
-          <CardHeader title="Competency areas" description="Current mastery estimate per area (demo data)" />
+          <CardHeader title="Competency areas" description="Current mastery estimate per area" />
           <CardBody>
             {(['Mathematics', 'English'] as Subject[]).map((subject) => (
               <div key={subject} className="mb-6 last:mb-0">
@@ -186,9 +185,6 @@ export function StudentProfilePage() {
           )}
         </Card>
       </div>
-      <p className="mt-6 text-xs text-ink-3">
-        <StatusBadge>Demo record</StatusBadge> <span className="ml-1">This profile is generated sample data for UI review.</span>
-      </p>
     </>
   )
 }

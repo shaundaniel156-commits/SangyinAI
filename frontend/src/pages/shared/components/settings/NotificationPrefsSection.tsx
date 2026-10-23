@@ -1,10 +1,19 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { DemoNotice } from '../../../../components/ui/DemoNotice'
 import { Toggle } from '../../../../components/ui/Field'
 import { StatusBadge } from '../../../../components/ui/StatusBadge'
+import { useLiveData } from '../../../../context/LiveDataContext'
 import { useSession } from '../../../../context/SessionContext'
+import { useToast } from '../../../../context/ToastContext'
+import { api } from '../../../../lib/api'
 import type { Role } from '../../../../types'
 import { SettingsSection } from './SettingsSection'
+
+interface Delivery {
+  emailNotifications: boolean
+  smsNotifications: boolean
+  phone: string | null
+}
 
 interface Pref {
   id: string
@@ -38,7 +47,6 @@ const IN_APP: Record<Role, Pref[]> = {
 
 const CHANNELS: (Pref & { note?: string })[] = [
   { id: 'app', label: 'Mobile app', description: 'Updates in the Sangyin AI app.' },
-  { id: 'sms', label: 'SMS', description: 'Short text messages to your phone.', note: 'Not connected in this prototype' },
   {
     id: 'ussd',
     label: 'USSD',
@@ -52,14 +60,33 @@ export function NotificationPrefsSection() {
   const { role } = useSession()
   const prefs = IN_APP[role]
   const [enabled, setEnabled] = useState<Record<string, boolean>>(() => Object.fromEntries(prefs.map((p) => [p.id, true])))
-  const [channels, setChannels] = useState<Record<string, boolean>>({ app: true, sms: false, ussd: false, print: true })
+  const [channels, setChannels] = useState<Record<string, boolean>>({ app: true, ussd: false, print: true })
   const simple = role === 'parent' || role === 'student'
+  const { live } = useLiveData()
+  const { notify } = useToast()
+  // Email and SMS copies are real when signed in through the server (stored on your account).
+  const [delivery, setDelivery] = useState<Delivery | null>(null)
+  useEffect(() => {
+    if (!live) return
+    api<Delivery>('/auth/preferences').then(setDelivery).catch(() => setDelivery(null))
+  }, [live])
+
+  const save = async () => {
+    if (!delivery) return notify('Preferences saved', { description: 'Saved on this device for preview.' })
+    try {
+      setDelivery(await api<Delivery>('/auth/preferences', { method: 'PATCH', body: { emailNotifications: delivery.emailNotifications, smsNotifications: delivery.smsNotifications } }))
+      notify('Preferences saved', { description: 'Email and SMS choices apply from the next update.' })
+    } catch (error) {
+      notify('Preferences not saved', { tone: 'info', description: (error as Error).message })
+    }
+  }
 
   return (
     <SettingsSection
       title="Notification preferences"
       description={simple ? 'Choose what you want to hear about.' : 'Choose which in-app notifications you receive.'}
       saveLabel="Save preferences"
+      onSave={save}
     >
       <fieldset>
         <legend className="text-sm font-semibold text-ink">In-app notifications</legend>
@@ -75,6 +102,27 @@ export function NotificationPrefsSection() {
           ))}
         </div>
       </fieldset>
+
+      {delivery && (
+        <fieldset className="mt-6 border-t border-line pt-5">
+          <legend className="text-sm font-semibold text-ink">Email and SMS</legend>
+          <p className="mt-0.5 text-sm text-ink-3">Copies of updates, sent outside the app. Sign-in details and password resets are always emailed.</p>
+          <div className="divide-y divide-line">
+            <Toggle
+              label="Email"
+              description="A copy of new practice, home-support notes and other updates by email."
+              checked={delivery.emailNotifications}
+              onChange={(v) => setDelivery((d) => d && { ...d, emailNotifications: v })}
+            />
+            <Toggle
+              label="SMS"
+              description={delivery.phone ? `Short text messages to ${delivery.phone}.` : 'Short text messages. Ask your school to add your phone number.'}
+              checked={delivery.smsNotifications}
+              onChange={(v) => setDelivery((d) => d && { ...d, smsNotifications: v })}
+            />
+          </div>
+        </fieldset>
+      )}
 
       {role === 'parent' && (
         <fieldset className="mt-6 border-t border-line pt-5">
@@ -97,7 +145,7 @@ export function NotificationPrefsSection() {
               </div>
             ))}
           </div>
-          <DemoNotice className="mt-3">SMS and USSD delivery are not connected in this prototype. Channel choices are shown for layout only.</DemoNotice>
+          <DemoNotice className="mt-3">USSD and printed notes are not connected in this prototype. Channel choices are shown for layout only.</DemoNotice>
         </fieldset>
       )}
     </SettingsSection>

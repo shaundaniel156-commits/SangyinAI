@@ -35,7 +35,7 @@ export function SubjectPerformanceReport({ classes, assessments, filters }: Subj
           { label: 'Lowest subject', value: lowest ? `${lowest.value}%` : '—', hint: lowest?.subject },
         ]}
       />
-      <DocSection title="Subject averages" description="School-wide demo averages for the current term (%)">
+      <DocSection title="Subject averages" description="School-wide average mastery per subject (%)">
         <BarList items={SUBJECT_AVERAGES.map((s) => ({ id: s.subject, label: s.subject, value: s.value, tone: toneForScore(s.value) }))} />
       </DocSection>
       <DocSection title="Recorded assessments by subject" description="Classes in scope, within the selected date range">

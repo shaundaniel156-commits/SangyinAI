@@ -2,6 +2,7 @@ import {
   Bell,
   BookOpenCheck,
   Building2,
+  DatabaseZap,
   ClipboardList,
   FileBarChart2,
   GraduationCap,
@@ -68,6 +69,7 @@ export const NAVIGATION: Record<Role, NavGroup[]> = {
       label: 'Planning',
       items: [
         { label: 'Curriculum', to: '/curriculum', icon: Library },
+        { label: 'Manual feed', to: '/data', icon: DatabaseZap },
         { label: 'Reports', to: '/reports', icon: FileBarChart2 },
       ],
     },
@@ -89,6 +91,7 @@ export const NAVIGATION: Record<Role, NavGroup[]> = {
       label: 'Academics',
       items: [
         { label: 'Curriculum', to: '/curriculum', icon: Library },
+        { label: 'Manual feed', to: '/data', icon: DatabaseZap },
         { label: 'Reports', to: '/reports', icon: FileBarChart2 },
       ],
     },

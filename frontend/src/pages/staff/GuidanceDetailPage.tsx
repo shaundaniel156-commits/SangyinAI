@@ -22,7 +22,6 @@ import { GuidanceStatusBadge } from '../../components/domain/GuidanceStatusBadge
 import { Avatar } from '../../components/ui/Avatar'
 import { Button, ButtonLink } from '../../components/ui/Button'
 import { Card, CardBody, CardHeader } from '../../components/ui/Card'
-import { DemoNotice } from '../../components/ui/DemoNotice'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { StatusBadge } from '../../components/ui/StatusBadge'
@@ -235,7 +234,6 @@ export function GuidanceDetailPage() {
               </p>
             </CardBody>
           </Card>
-          <DemoNotice>Sample guidance content. AI generation and sharing are not connected in this prototype; decisions are kept only until the page is reloaded.</DemoNotice>
         </div>
       </div>
 

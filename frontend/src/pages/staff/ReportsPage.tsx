@@ -7,7 +7,7 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { useSession } from '../../context/SessionContext'
 import { useToast } from '../../context/ToastContext'
-import { DEMO_SCHOOL } from '../../data/school'
+import { SCHOOL } from '../../data/school'
 import { assessmentsInScope, classesInScope } from '../../data/selectors'
 import { getStudentsByClass } from '../../data/students'
 import { formatDate } from '../../lib/format'
@@ -20,7 +20,7 @@ import { StudentReport } from './reports/StudentReport'
 import { SubjectPerformanceReport } from './reports/SubjectReport'
 import { REPORT_TITLES, type ReportFilters, type ReportType } from './reports/types'
 
-const CURRENT_TERM = DEMO_SCHOOL.termOptions.find((t) => t.startsWith(DEMO_SCHOOL.currentTerm)) ?? DEMO_SCHOOL.termOptions[0]!
+const CURRENT_TERM = SCHOOL.termOptions.find((t) => t.startsWith(SCHOOL.currentTerm)) ?? SCHOOL.termOptions[0]!
 
 export function ReportsPage() {
   const { role } = useSession()
@@ -107,8 +107,8 @@ export function ReportsPage() {
           }
         />
         <DemoNotice className="mb-6">
-          Reports are generated in the browser from demo data. Printing uses your browser’s print dialog; PDF and spreadsheet export
-          will be available when the backend is connected. Demo data is not split by term — the term sets the report label.
+          Reports are made in the browser from your school’s recorded results. Printing uses your browser’s print dialog (choose
+          “Save as PDF” for a file). Results are not yet split by term — the term sets the report label.
         </DemoNotice>
       </div>
 

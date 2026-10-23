@@ -1,5 +1,5 @@
 import { SelectField, TextField } from '../../../components/ui/Field'
-import { DEMO_SCHOOL } from '../../../data/school'
+import { SCHOOL } from '../../../data/school'
 import type { SchoolClass, Student, Subject } from '../../../types'
 import type { ReportFilters, ReportType } from './types'
 
@@ -27,7 +27,7 @@ export function ReportFilterPanel({ type, filters, onChange, classes, students }
         label="Term"
         value={filters.term}
         onChange={(e) => onChange({ term: e.target.value })}
-        options={DEMO_SCHOOL.termOptions.map((t) => ({ value: t, label: t }))}
+        options={SCHOOL.termOptions.map((t) => ({ value: t, label: t }))}
       />
       <fieldset>
         <legend className="mb-1.5 text-sm font-medium text-ink">Assessment date range</legend>

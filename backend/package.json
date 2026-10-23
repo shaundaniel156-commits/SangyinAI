@@ -1,0 +1,61 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "node --env-file=.env src/server.ts",
+    "hello": "node --env-file=.env src/hello.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "quality": "node --env-file=.env scripts/qualityTest.ts",
+    "db:migrate": "prisma migrate dev",
+    "db:generate": "prisma generate",
+    "db:studio": "prisma studio",
+    "user": "node --env-file=.env scripts/createUser.ts",
+    "scrape:example": "node scripts/scrape/example.ts",
+    "curriculum:outline": "node --env-file=.env scripts/importCurriculumOutline.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@fastify/cors": "^11.3.0",
+    "@fastify/multipart": "^10.1.2",
+    "@fastify/rate-limit": "^11.2.1",
+    "@google/genai": "^2.29.1",
+    "@node-rs/argon2": "^2.2.2",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "africastalking": "^0.8.3",
+    "cheerio": "^1.2.0",
+    "csv-parse": "^7.0.3",
+    "dotenv": "^18.0.6",
+    "exceljs": "^4.4.0",
+    "fastify": "^5.12.5",
+    "jsonwebtoken": "^9.0.3",
+    "mammoth": "^1.13.0",
+    "pg": "^8.23.1",
+    "playwright": "^1.64.1",
+    "resend": "^6.34.1",
+    "unpdf": "^1.9.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^24.19.1",
+    "@types/pg": "^8.23.1",
+    "prisma": "^7.10.0",
+    "typescript": "~6.0.2"
+  },
+  "allowScripts": {
+    "@prisma/engines@7.10.0": true,
+    "prisma@7.10.0": true
+  },
+  "overrides": {
+    "axios": "^1.20.0",
+    "joi": "^18.3.0",
+    "uuid": "^11.1.1"
+  }
+}

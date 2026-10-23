@@ -55,7 +55,7 @@ export function FrameworkPicker({ frameworks, value, onChange, primary, classCou
               )}
               <span className="tabular">{f.levels.length} levels listed</span>
               <span aria-hidden>·</span>
-              <span className="tabular">{loaded} with demo content</span>
+              <span className="tabular">{loaded} with content</span>
               <span aria-hidden>·</span>
               <span className="tabular">
                 {classCounts[f.id]} {classCounts[f.id] === 1 ? 'class' : 'classes'} in your scope

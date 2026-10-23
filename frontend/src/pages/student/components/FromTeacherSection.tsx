@@ -3,15 +3,15 @@ import { useState } from 'react'
 import { Button, ButtonLink } from '../../../components/ui/Button'
 import { StatusBadge } from '../../../components/ui/StatusBadge'
 import { useAiAssessments } from '../../../context/AiAssessmentsContext'
-import { DEMO_USERS } from '../../../data/users'
+import { ROLE_USERS } from '../../../data/users'
 import { formatShortDate } from '../../../lib/format'
 import type { AiAssessment } from '../../../types'
 import { TakeAssessmentModal } from './TakeAssessmentModal'
 
-/** Teacher-approved assessments sent to the signed-in demo student. */
+/** Teacher-approved assessments sent to the signed-in student. */
 function useMyTeacherAssessments() {
   const { items, attempts } = useAiAssessments()
-  const mine = items.filter((a) => a.status === 'sent' && a.studentIds.includes(DEMO_USERS.student.id))
+  const mine = items.filter((a) => a.status === 'sent' && a.studentIds.includes(ROLE_USERS.student.id))
   return { mine, attempts }
 }
 

@@ -2,10 +2,10 @@ import { Link } from 'react-router-dom'
 import { Card, CardHeader } from '../../../components/ui/Card'
 import { StatusBadge } from '../../../components/ui/StatusBadge'
 import { FRAMEWORK_LABEL } from '../../../data/curriculum'
-import { DEMO_SCHOOL } from '../../../data/school'
+import { SCHOOL } from '../../../data/school'
 import type { CurriculumFramework, SchoolClass } from '../../../types'
 
-const FRAMEWORKS: CurriculumFramework[] = ['uganda', 'cambridge']
+const FRAMEWORKS: CurriculumFramework[] = ['uganda', 'cambridge', 'institution']
 
 /** Which curriculum framework the school and each class follows. */
 export function FrameworkSummaryCard({ classes }: { classes: SchoolClass[] }) {
@@ -23,7 +23,7 @@ export function FrameworkSummaryCard({ classes }: { classes: SchoolClass[] }) {
       <div className="space-y-4 p-5">
         <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-3.5 py-3">
           <span className="text-sm text-ink-2">School primary framework</span>
-          <StatusBadge tone="info">{FRAMEWORK_LABEL[DEMO_SCHOOL.primaryFramework]}</StatusBadge>
+          <StatusBadge tone="info">{FRAMEWORK_LABEL[SCHOOL.primaryFramework]}</StatusBadge>
         </div>
         {FRAMEWORKS.map((f) => {
           const list = classes.filter((c) => c.framework === f)

@@ -14,8 +14,8 @@ interface ChartContainerProps {
   footnote?: string
 }
 
-/** Card wrapper for charts with a chart/table toggle and a demo-data footnote. */
-export function ChartContainer({ title, description, children, table, action, className, footnote = 'Demo data for UI preview' }: ChartContainerProps) {
+/** Card wrapper for charts with a chart/table toggle and an optional footnote. */
+export function ChartContainer({ title, description, children, table, action, className, footnote }: ChartContainerProps) {
   const [view, setView] = useState<'chart' | 'table'>('chart')
   return (
     <Card className={cn('flex flex-col', className)}>

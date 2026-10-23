@@ -1,8 +1,6 @@
 import { CheckCircle2, CircleDot, Clock, ListOrdered, Play } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
-import { ProgressBar } from '../../../components/ui/ProgressBar'
 import { StatusBadge } from '../../../components/ui/StatusBadge'
-import { DEMO_IN_PROGRESS_ANSWERED } from '../../../data/practice'
 import { formatShortDate } from '../../../lib/format'
 import type { PracticeActivity } from '../../../types'
 import { PRACTICE_STATUS_LABEL } from './studentData'
@@ -47,21 +45,6 @@ export function PracticeActivityCard({ activity, onOpen }: PracticeActivityCardP
         </span>
         {activity.completedOn && <span>Finished {formatShortDate(activity.completedOn)}</span>}
       </p>
-
-      {status === 'in_progress' && (
-        <ProgressBar
-          className="mt-3"
-          size="sm"
-          value={DEMO_IN_PROGRESS_ANSWERED}
-          max={activity.questions}
-          srLabel={`${activity.title}: ${DEMO_IN_PROGRESS_ANSWERED} of ${activity.questions} questions done`}
-        />
-      )}
-      {status === 'in_progress' && (
-        <p className="mt-1.5 text-xs text-ink-3">
-          {DEMO_IN_PROGRESS_ANSWERED} of {activity.questions} questions done
-        </p>
-      )}
 
       {status !== 'completed' && onOpen && (
         <Button

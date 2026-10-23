@@ -1,3 +1,9 @@
 .vite/
 node_modules/
 .DS_Store
+
+# Secret settings (API keys, passwords) — never push these
+.env
+.env.*
+!.env.example
+

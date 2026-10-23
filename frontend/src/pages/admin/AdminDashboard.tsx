@@ -23,7 +23,7 @@ import { CLASSES } from '../../data/classes'
 import { FRAMEWORK_LABEL } from '../../data/curriculum'
 import { GUIDANCE_PLANS } from '../../data/guidance'
 import { SCHOOL_TREND, SUBJECT_AVERAGES, USAGE_INDICATORS } from '../../data/performance'
-import { DEMO_SCHOOL } from '../../data/school'
+import { SCHOOL, schoolName } from '../../data/school'
 import { STUDENTS } from '../../data/students'
 import { TEACHERS } from '../../data/teachers'
 import { DataQualityCard } from './components/DataQualityCard'
@@ -39,8 +39,8 @@ export function AdminDashboard() {
   const cambridgeClasses = CLASSES.filter((c) => c.framework === 'cambridge').length
   const needingSupport = STUDENTS.filter((s) => s.needsSupport)
   const usage = USAGE_INDICATORS
-  const last = SCHOOL_TREND[SCHOOL_TREND.length - 1]!.value
-  const prev = SCHOOL_TREND[SCHOOL_TREND.length - 2]?.value ?? last
+  const last = SCHOOL_TREND.at(-1)?.value
+  const prev = SCHOOL_TREND.at(-2)?.value
   const pendingPlans = GUIDANCE_PLANS.map(resolve).filter((p) => p.status === 'pending_review')
   const watchList = [...needingSupport].sort((a, b) => a.average - b.average).slice(0, 6)
   const recentAssessments = [...ASSESSMENTS].filter((a) => a.status !== 'draft').sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5)
@@ -50,8 +50,8 @@ export function AdminDashboard() {
       <PageHeader
         hero
         title={`Welcome back, ${user.name}`}
-        description={`School-wide overview for ${DEMO_SCHOOL.name} · ${DEMO_SCHOOL.currentTerm}, ${DEMO_SCHOOL.academicYear}.`}
-        meta={<StatusBadge tone="info">Primary framework: {FRAMEWORK_LABEL[DEMO_SCHOOL.primaryFramework]}</StatusBadge>}
+        description={`School-wide overview for ${schoolName()}${SCHOOL.currentTerm ? ` · ${SCHOOL.currentTerm}` : ''}, ${SCHOOL.academicYear}.`}
+        meta={<StatusBadge tone="info">Primary framework: {FRAMEWORK_LABEL[SCHOOL.primaryFramework]}</StatusBadge>}
         actions={
           <>
             <ButtonLink to="/admin/structure" variant="secondary" icon={<BookOpenCheck className="size-4" aria-hidden />}>
@@ -69,7 +69,7 @@ export function AdminDashboard() {
             value={STUDENTS.length}
             icon={GraduationCap}
             hint={`across ${CLASSES.length} classes`}
-            delta={{ value: `${Math.abs(last - prev)} pts avg`, direction: last >= prev ? 'up' : 'down', good: last >= prev }}
+            {...(last !== undefined && prev !== undefined ? { delta: { value: `${Math.abs(last - prev)} pts avg`, direction: last >= prev ? ('up' as const) : ('down' as const), good: last >= prev } } : {})}
             to="/students"
           />
           <StatCard label="Teachers" value={TEACHERS.length} icon={School} tone="accent" hint={`${activeTeachers} active · ${invitedTeachers} invited`} to="/admin/teachers" />
@@ -82,15 +82,15 @@ export function AdminDashboard() {
         <ChartContainer
           className="md:col-span-2 xl:col-span-8"
           title="Recent performance"
-          description="School-wide average across terms (%)"
-          table={{ headers: ['Term', 'Average'], rows: SCHOOL_TREND.map((p) => [p.label, `${p.value}%`]) }}
+          description="School-wide average by month (%)"
+          table={{ headers: ['Month', 'Average'], rows: SCHOOL_TREND.map((p) => [p.label, `${p.value}%`]) }}
         >
-          <LineChart ariaLabel="Line chart of the school-wide average by term" min={40} max={80} series={[{ name: 'School average', points: SCHOOL_TREND, color: 'var(--color-series-1)' }]} />
+          <LineChart ariaLabel="Line chart of the school-wide average by month" min={0} max={100} series={[{ name: 'School average', points: SCHOOL_TREND, color: 'var(--color-series-1)' }]} />
         </ChartContainer>
         <ChartContainer
           className="md:col-span-2 xl:col-span-4"
           title="Subject performance"
-          description="Current term, all classes"
+          description="Average mastery, all classes"
           table={{ headers: ['Subject', 'Average'], rows: SUBJECT_AVERAGES.map((s) => [s.subject, `${s.value}%`]) }}
         >
           <BarList items={SUBJECT_AVERAGES.map((s) => ({ id: s.subject, label: s.subject, value: s.value }))} />
@@ -150,18 +150,18 @@ export function AdminDashboard() {
         <SectionHeading id="usage-heading" title="System usage" description="Adoption across teachers, parents and students this week" />
         <div className="stagger grid grid-cols-1 gap-6 xl:grid-cols-12">
           <div className="grid grid-cols-2 gap-4 xl:col-span-5">
-            <StatCard size="sm" label="Active teachers" value={`${usage.weeklyActiveTeachers.value}/${usage.weeklyActiveTeachers.total}`} icon={UserCheck} hint="signed in this week" />
-            <StatCard size="sm" label="Parent views" value={usage.parentViews.value} icon={Eye} tone="accent" hint={`of ${usage.parentViews.total} learners`} />
+            <StatCard size="sm" label="Active teachers" value={`${usage.activeTeachers.value}/${usage.activeTeachers.total}`} icon={UserCheck} hint="signed in this week" />
+            <StatCard size="sm" label="Active parents" value={`${usage.activeParents.value}/${usage.activeParents.total}`} icon={Eye} tone="accent" hint="signed in this week" />
             <StatCard size="sm" label="Guidance reviewed" value={usage.guidanceReviewed} icon={Sparkles} tone="good" hint="by teachers" />
-            <StatCard size="sm" label="Practice completed" value={usage.practiceCompleted} icon={PencilRuler} tone="warn" hint="student activities" />
+            <StatCard size="sm" label="Assessments recorded" value={usage.assessmentsRecorded} icon={PencilRuler} tone="warn" hint="with scores entered" />
           </div>
           <ChartContainer
             className="xl:col-span-7"
-            title="Weekly activity"
-            description="Platform sessions per school day"
-            table={{ headers: ['Day', 'Sessions'], rows: usage.weeklyActivity.map((d) => [d.label, d.value]) }}
+            title="Recent sign-ins"
+            description="Accounts whose latest sign-in was on each of the last seven days"
+            table={{ headers: ['Day', 'Accounts'], rows: usage.signInsByDay.map((d) => [d.label, d.value]) }}
           >
-            <ColumnChart data={usage.weeklyActivity} ariaLabel="Column chart of sessions per weekday" height={180} />
+            <ColumnChart data={usage.signInsByDay} ariaLabel="Column chart of accounts by day of latest sign-in" height={180} />
           </ChartContainer>
         </div>
       </section>

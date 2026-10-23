@@ -1,32 +1,40 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
-import { DEMO_LAST_SYNCED, DEMO_PENDING_SYNC_ITEMS } from '../data/school'
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { liveState } from '../data/liveState'
 import type { ConnectivityStatus } from '../types'
 
 /**
- * UI-ONLY connectivity state for the offline-first indicators.
- * No real network detection or synchronisation happens here; the status can be
- * switched manually from the indicator menu to preview each state.
+ * Connection state for the status indicator: the browser's online/offline signal, and when the data was last
+ * loaded from the server. Data already loaded stays usable offline; changes need a connection to save.
  */
 interface ConnectivityValue {
   status: ConnectivityStatus
   lastSynced: string
   pendingItems: number
-  setStatus: (s: ConnectivityStatus) => void
 }
 
 const ConnectivityContext = createContext<ConnectivityValue | null>(null)
 
+const browserOnline = () => (typeof navigator === 'undefined' ? true : navigator.onLine)
+
+function syncedLabel(): string {
+  const at = liveState.loadedAt
+  if (!at) return 'Not yet'
+  const time = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  return at.toDateString() === new Date().toDateString() ? `Today, ${time}` : `${at.toLocaleDateString()}, ${time}`
+}
+
 export function ConnectivityProvider({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<ConnectivityStatus>('online')
-  const value = useMemo<ConnectivityValue>(
-    () => ({
-      status,
-      lastSynced: DEMO_LAST_SYNCED,
-      pendingItems: status === 'online' ? 0 : DEMO_PENDING_SYNC_ITEMS,
-      setStatus,
-    }),
-    [status],
-  )
+  const [online, setOnline] = useState(browserOnline)
+  useEffect(() => {
+    const update = () => setOnline(browserOnline())
+    window.addEventListener('online', update)
+    window.addEventListener('offline', update)
+    return () => {
+      window.removeEventListener('online', update)
+      window.removeEventListener('offline', update)
+    }
+  }, [])
+  const value = useMemo<ConnectivityValue>(() => ({ status: online ? 'online' : 'offline', lastSynced: syncedLabel(), pendingItems: 0 }), [online])
   return <ConnectivityContext.Provider value={value}>{children}</ConnectivityContext.Provider>
 }
 

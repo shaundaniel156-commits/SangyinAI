@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Button } from '../../../components/ui/Button'
 import { inputClasses } from '../../../components/ui/Field'
 import { Modal } from '../../../components/ui/Modal'
-import { useAiAssessments } from '../../../context/AiAssessmentsContext'
+import { useAiAssessments, type MarkedAttempt } from '../../../context/AiAssessmentsContext'
 import { cn } from '../../../lib/cn'
 import type { AiAssessment, AiQuestion } from '../../../types'
 
@@ -16,21 +16,50 @@ function isCorrect(q: AiQuestion, given: string): boolean {
   return q.answer.split('/').some((a) => normalise(a) === normalise(given)) || normalise(q.answer) === normalise(given)
 }
 
-/** Student view of a teacher-approved assessment, with instant marking and explanations. */
+/**
+ * Student view of a teacher-approved assessment, with marking and explanations. Signed in, the answers are
+ * marked and saved by the server (which also sends the answers and explanations back); offline, they are
+ * marked here.
+ */
 export function TakeAssessmentModal({ assessment: a, onClose }: { assessment: AiAssessment | null; onClose: () => void }) {
-  const { recordAttempt } = useAiAssessments()
+  const { recordAttempt, submitAnswers } = useAiAssessments()
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [checked, setChecked] = useState(false)
+  const [marked, setMarked] = useState<MarkedAttempt | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   if (!a) return null
 
-  const score = a.questions.filter((q) => isCorrect(q, answers[q.id] ?? '')).length
+  // After server marking, each question carries its answer and explanation from the server.
+  const questions = a.questions.map((q) => {
+    const m = marked?.questions.find((x) => x.id === q.id)
+    return m ? { ...q, answer: m.answer, explanation: m.explanation, correct: m.correct } : { ...q, correct: isCorrect(q, answers[q.id] ?? '') }
+  })
+  const score = marked ? marked.score : questions.filter((q) => q.correct).length
   const answered = a.questions.filter((q) => (answers[q.id] ?? '').trim()).length
 
   const close = () => {
     setAnswers({})
     setChecked(false)
+    setMarked(null)
+    setError(null)
     onClose()
+  }
+
+  const check = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await submitAnswers(a.id, answers)
+      if (result) setMarked(result)
+      else recordAttempt(a.id, { score, total: a.questions.length })
+      setChecked(true)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -46,19 +75,13 @@ export function TakeAssessmentModal({ assessment: a, onClose }: { assessment: Ai
         ) : (
           <>
             <span className="mr-auto self-center text-sm text-ink-3">
-              {answered} of {a.questions.length} answered
+              {error ? <span className="text-bad-ink">{error}</span> : <>{answered} of {a.questions.length} answered</>}
             </span>
             <Button variant="secondary" onClick={close}>
               Finish later
             </Button>
-            <Button
-              disabled={answered === 0}
-              onClick={() => {
-                setChecked(true)
-                recordAttempt(a.id, { score, total: a.questions.length })
-              }}
-            >
-              Check my answers
+            <Button disabled={answered === 0 || busy} onClick={check}>
+              {busy ? 'Checking…' : 'Check my answers'}
             </Button>
           </>
         )
@@ -73,9 +96,9 @@ export function TakeAssessmentModal({ assessment: a, onClose }: { assessment: Ai
         </div>
       )}
       <ol className="space-y-6">
-        {a.questions.map((q, i) => {
+        {questions.map((q, i) => {
           const given = answers[q.id] ?? ''
-          const right = checked && isCorrect(q, given)
+          const right = checked && q.correct
           return (
             <li key={q.id}>
               <p className="text-[15px] font-medium text-ink">

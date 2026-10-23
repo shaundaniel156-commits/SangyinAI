@@ -57,13 +57,13 @@ export function InviteModal({ open, onClose, fixedRole }: InviteModalProps) {
       }
     >
       <form id={formId} onSubmit={submit} className="space-y-4">
-        <TextField label="Full name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Demo Teacher 6" required />
+        <TextField label="Full name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Jane Akello" required />
         <TextField
           label="Email address"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="name@demo-school.example"
+          placeholder="name@yourschool.ac.ug"
           required
         />
         {!fixedRole && (

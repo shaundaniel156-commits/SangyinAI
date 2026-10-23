@@ -5,7 +5,6 @@ import { DiagnosticCard, LevelSplit } from '../../components/domain/DiagnosticCa
 import { Avatar } from '../../components/ui/Avatar'
 import { Card, CardHeader } from '../../components/ui/Card'
 import { DataTable } from '../../components/ui/DataTable'
-import { DemoNotice } from '../../components/ui/DemoNotice'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { FilterBar } from '../../components/ui/FilterBar'
 import { PageHeader } from '../../components/ui/PageHeader'
@@ -14,7 +13,7 @@ import { StatusBadge } from '../../components/ui/StatusBadge'
 import { useSession } from '../../context/SessionContext'
 import { getClass } from '../../data/classes'
 import { classesInScope, diagnosticsInScope } from '../../data/selectors'
-import { DEMO_COMPETENCIES, getStudent } from '../../data/students'
+import { COMPETENCIES, getStudent } from '../../data/students'
 import { formatShortDate } from '../../lib/format'
 
 export function DiagnosticsPage() {
@@ -131,7 +130,7 @@ export function DiagnosticsPage() {
                 onChange: setArea,
                 options: [
                   { value: 'all', label: 'Any learning area' },
-                  ...DEMO_COMPETENCIES.filter((c) => c.subject === 'Mathematics').map((c) => ({ value: c.name, label: c.name })),
+                  ...COMPETENCIES.filter((c) => c.subject === 'Mathematics').map((c) => ({ value: c.name, label: c.name })),
                 ],
               },
             ]}
@@ -196,7 +195,6 @@ export function DiagnosticsPage() {
           ]}
         />
       </Card>
-      <DemoNotice className="mt-6">Diagnostic results shown are sample data. The diagnostic engine is not connected in this prototype.</DemoNotice>
     </>
   )
 }

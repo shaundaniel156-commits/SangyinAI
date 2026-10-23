@@ -3,6 +3,7 @@ import { AppShell } from './components/layout/AppShell'
 import { SplashScreen } from './components/layout/SplashScreen'
 import { LandingPage } from './pages/auth/LandingPage'
 import { LoginPage } from './pages/auth/LoginPage'
+import { ResetPasswordPage } from './pages/auth/ResetPasswordPage'
 import { DashboardPage } from './pages/shared/DashboardPage'
 import { NotFoundPage } from './pages/shared/NotFoundPage'
 import { CurriculumPage } from './pages/staff/CurriculumPage'
@@ -16,6 +17,7 @@ import { DiagnosticDetailPage } from './pages/staff/DiagnosticDetailPage'
 import { GuidancePage } from './pages/staff/GuidancePage'
 import { GuidanceDetailPage } from './pages/staff/GuidanceDetailPage'
 import { AcademicStructurePage } from './pages/admin/AcademicStructurePage'
+import { ManualFeedPage } from './pages/admin/feed/ManualFeedPage'
 import { UsersPage } from './pages/admin/UsersPage'
 import { TeachersPage } from './pages/admin/TeachersPage'
 import { NotificationsPage } from './pages/shared/NotificationsPage'
@@ -40,8 +42,8 @@ import { StudentProfilePage } from './pages/staff/StudentProfilePage'
 import { StudentsPage } from './pages/staff/StudentsPage'
 
 /**
- * Application routes. No authentication guards exist yet (prototype phase);
- * the demo session only decides which role's navigation and dashboards show.
+ * Application routes. Pages inside AppShell need a signed-in account (AppShell sends others to /login);
+ * the account's role decides which navigation and dashboards show.
  */
 export default function App() {
   return (
@@ -51,6 +53,7 @@ export default function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/welcome" element={<Navigate to="/" replace />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route element={<AppShell />}>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/students" element={<StudentsPage />} />
@@ -72,6 +75,7 @@ export default function App() {
         <Route path="/guidance" element={<GuidancePage />} />
         <Route path="/guidance/:id" element={<GuidanceDetailPage />} />
         <Route path="/admin/structure" element={<AcademicStructurePage />} />
+        <Route path="/data" element={<ManualFeedPage />} />
         <Route path="/admin/users" element={<UsersPage />} />
         <Route path="/admin/teachers" element={<TeachersPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />

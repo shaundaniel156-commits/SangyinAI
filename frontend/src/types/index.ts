@@ -8,14 +8,16 @@
 
 export type Role = 'teacher' | 'admin' | 'parent' | 'student'
 
-export type CurriculumFramework = 'uganda' | 'cambridge'
+/** uganda / cambridge, or the institution's own curriculum (e.g. university programmes). */
+export type CurriculumFramework = 'uganda' | 'cambridge' | 'institution'
 
 /** Competency level as displayed in the UI. */
 export type CompetencyLevel = 'strength' | 'developing' | 'needs_support'
 
 export type ConnectivityStatus = 'online' | 'offline' | 'syncing'
 
-export type Subject = 'Mathematics' | 'English' | 'Science' | 'Social Studies'
+/** The usual school subjects, or any other subject / university course unit name. */
+export type Subject = 'Mathematics' | 'English' | 'Science' | 'Social Studies' | (string & {})
 
 export interface UserProfile {
   id: string
@@ -35,7 +37,7 @@ export interface CompetencyScore {
   name: string
   topic: string
   subject: Subject
-  /** Mastery estimate 0–100 (demo value). */
+  /** Mastery estimate 0–100. */
   score: number
   level: CompetencyLevel
 }
@@ -47,14 +49,16 @@ export interface Student {
   classId: string
   framework: CurriculumFramework
   subjects: Subject[]
-  /** Overall average across recent assessments, 0–100 (demo value). */
+  /** Overall average across recent assessments, 0–100. */
   average: number
-  /** Change vs. previous term in percentage points (demo value). */
+  /** Change vs. previous term in percentage points. */
   trend: number
   needsSupport: boolean
   currentFocus: string
   competencies: CompetencyScore[]
   guardianName: string
+  /** Registration or learner number. */
+  regNumber?: string
 }
 
 export interface SchoolClass {
@@ -63,11 +67,15 @@ export interface SchoolClass {
   level: string
   framework: CurriculumFramework
   teacherId: string
+  /** The class teacher's name, as loaded from the backend. */
+  teacherName?: string
   subjects: Subject[]
   studentCount: number
   average: number
   trend: number
   commonGaps: { competency: string; subject: Subject; studentsAffected: number }[]
+  /** The curriculum level the class follows (set in the Manual feed). */
+  curriculumLevelId?: string
 }
 
 export interface Teacher {
@@ -163,6 +171,9 @@ export interface GuidancePlan {
     studentSequence: string[]
   }
   teacherNote?: string
+  /** From the API: whether a teacher has edited the plan, and when the last decision was made. */
+  edited?: boolean
+  decidedAt?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -213,6 +224,14 @@ export interface AiAssessment {
   createdOn: string
   status: AiAssessmentStatus
   sentOn?: string
+  /** Who wrote the draft (the AI or the offline bank) and the anonymous request sent to the AI (kept for fine-tuning). */
+  source?: 'gemini' | 'offline'
+  requestSent?: Record<string, unknown>
+  /** From the API, for a student: their own copy to take, and their result once done. */
+  practiceId?: string
+  attempt?: { score: number; total: number; completedOn: string }
+  /** From the API, for a teacher: each student's result, keyed by student id. */
+  attempts?: Record<string, { score: number; total: number; completedOn: string }>
 }
 
 // ---------------------------------------------------------------------------
@@ -223,6 +242,8 @@ export interface LearningObjective {
   id: string
   code: string
   text: string
+  /** Added by the user's own school (only that school sees it). */
+  schoolAdded?: boolean
 }
 
 export interface CurriculumCompetency {
@@ -234,12 +255,18 @@ export interface CurriculumCompetency {
 export interface CurriculumTopic {
   id: string
   name: string
+  /** Sangyin's own short description of the topic. */
+  description?: string
   competencies: CurriculumCompetency[]
 }
 
 export interface CurriculumSubject {
   id: string
   name: Subject
+  /** University course units: code, semester and credit units. */
+  code?: string
+  term?: string
+  creditUnits?: number
   topics: CurriculumTopic[]
 }
 
@@ -247,6 +274,8 @@ export interface CurriculumLevel {
   id: string
   name: string
   stage: string
+  /** Set for a university year: the programme it belongs to. */
+  programme?: { id: string; code: string; name: string }
   subjects: CurriculumSubject[]
 }
 
@@ -305,6 +334,8 @@ export type PracticeStatus = 'not_started' | 'in_progress' | 'completed'
 
 export interface PracticeActivity {
   id: string
+  /** The teacher-approved assessment this practice comes from. */
+  aiAssessmentId?: string
   title: string
   focus: string
   subject: Subject

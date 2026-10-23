@@ -8,7 +8,7 @@ import { ProgressBar, toneForScore } from '../../components/ui/ProgressBar'
 import { StatCard } from '../../components/ui/StatCard'
 import { useAiAssessments } from '../../context/AiAssessmentsContext'
 import { useSession } from '../../context/SessionContext'
-import { LEARNING_STREAK_DAYS, RECENT_ACHIEVEMENTS } from '../../data/practice'
+import { practiceStreakDays, recentAchievements } from '../../data/practice'
 import { formatDate } from '../../lib/format'
 import { timeOfDayGreeting } from '../../lib/greeting'
 import { cn } from '../../lib/cn'
@@ -21,6 +21,8 @@ export function ParentDashboard() {
   const { user } = useSession()
   const { children, child, setChildId } = useSelectedChild()
   const summary = getChildSummary(child)
+  const streak = practiceStreakDays()
+  const achievements = recentAchievements()
   const firstTip = summary.tips[0]
   const { items } = useAiAssessments()
   const fromTeacher = items.filter((a) => a.status === 'sent' && a.shareWithParents && a.parentNote && a.studentIds.includes(child.id))
@@ -46,7 +48,7 @@ export function ParentDashboard() {
               to="/parent/progress"
             />
             <StatCard size="sm" label="Needs attention" value={needsAttention} icon={AlertTriangle} tone={needsAttention ? 'bad' : 'good'} hint={`areas for ${firstName}`} />
-            <StatCard size="sm" label="Learning streak" value={`${LEARNING_STREAK_DAYS} days`} icon={Flame} tone="warn" hint="of practice in a row" />
+            <StatCard size="sm" label="Learning streak" value={`${streak} ${streak === 1 ? 'day' : 'days'}`} icon={Flame} tone="warn" hint="of practice in a row" />
           </div>
         </div>
       </PageHeader>
@@ -103,7 +105,11 @@ export function ParentDashboard() {
 
         <Card className="md:col-span-2 xl:col-span-4">
           <CardHeader title="Recent achievements" description="Worth celebrating together" icon={<Sparkles aria-hidden />} />
-          <AchievementList items={RECENT_ACHIEVEMENTS} formatDate={formatDate} />
+          {achievements.length ? (
+            <AchievementList items={achievements} formatDate={formatDate} />
+          ) : (
+            <p className="p-5 text-sm text-ink-3 sm:p-6">Practice {firstName} finishes will show here.</p>
+          )}
         </Card>
 
         {fromTeacher.length > 0 && (

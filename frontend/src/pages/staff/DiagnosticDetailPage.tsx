@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, CircleDot, CircleMinus, MessageSquareText, Sparkles, Stethoscope, UserRound, XCircle, type LucideIcon } from 'lucide-react'
+import { AlertCircle, CheckCircle2, CircleDot, CircleMinus, Sparkles, Stethoscope, UserRound, XCircle, type LucideIcon } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { ProcessingBadge } from '../../components/domain/DiagnosticCard'
 import { CompetencyList } from '../../components/domain/CompetencyList'
@@ -10,9 +10,8 @@ import { Card, CardBody, CardHeader } from '../../components/ui/Card'
 import { DemoNotice } from '../../components/ui/DemoNotice'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { PageHeader } from '../../components/ui/PageHeader'
-import { LEVEL_TONE, StatusBadge } from '../../components/ui/StatusBadge'
+import { StatusBadge } from '../../components/ui/StatusBadge'
 import { getClass } from '../../data/classes'
-import { getStudentFeedbackSignals } from '../../data/studentFeedback'
 import { getDiagnostic } from '../../data/diagnostics'
 import { getGuidance } from '../../data/guidance'
 import { getStudent } from '../../data/students'
@@ -47,7 +46,6 @@ export function DiagnosticDetailPage() {
 
   const cls = getClass(student.classId)
   const guidance = report.guidanceId ? getGuidance(report.guidanceId) : undefined
-  const feedback = getStudentFeedbackSignals(student, report.subject)
 
   return (
     <>
@@ -146,7 +144,7 @@ export function DiagnosticDetailPage() {
 
       <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-5">
         <Card className="xl:col-span-3">
-          <CardHeader title="Competency map" description="Estimated mastery per competency area (demo data)" />
+          <CardHeader title="Competency map" description="Estimated mastery per competency area" />
           <CardBody>
             <CompetencyList competencies={[...report.competencies].sort((a, b) => a.score - b.score)} />
           </CardBody>
@@ -173,28 +171,6 @@ export function DiagnosticDetailPage() {
           </Card>
 
           <Card>
-            <CardHeader
-              title="Student feedback"
-              description="Difficulty and confidence the student reported after practice — used as a signal in this diagnosis"
-              icon={<MessageSquareText className="size-5" aria-hidden />}
-            />
-            <ul className="divide-y divide-line">
-              {feedback.map((f) => (
-                <li key={f.activity} className="px-5 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="min-w-0 truncate text-sm font-medium text-ink">{f.activity}</p>
-                    <span className="shrink-0 text-xs text-ink-3">{formatDate(f.date)}</span>
-                  </div>
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    <StatusBadge tone={LEVEL_TONE[f.level]}>{f.difficulty}</StatusBadge>
-                    <StatusBadge tone="neutral">{f.confidence}</StatusBadge>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </Card>
-
-          <Card>
             <CardHeader title="Next step" />
             <CardBody>
               {guidance ? (
@@ -217,9 +193,6 @@ export function DiagnosticDetailPage() {
         </div>
       </div>
 
-      <DemoNotice className="mt-6">
-        This diagnostic report is sample data for UI review. No diagnostic algorithm runs in this prototype; the diagnostic engine will be connected later.
-      </DemoNotice>
     </>
   )
 }

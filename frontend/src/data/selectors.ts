@@ -1,5 +1,5 @@
 /**
- * Scoped read helpers over the demo data. These mirror the queries the future
+ * Scoped read helpers over the loaded data. These mirror the queries the future
  * API will answer (e.g. "students taught by this teacher").
  */
 import type { Role } from '../types'
@@ -8,11 +8,13 @@ import { CLASSES } from './classes'
 import { DIAGNOSTIC_REPORTS } from './diagnostics'
 import { GUIDANCE_PLANS } from './guidance'
 import { STUDENTS } from './students'
-import { DEMO_USERS } from './users'
+import { liveState } from './liveState'
+import { ROLE_USERS } from './users'
 
-/** Classes visible to the signed-in demo user (teacher: own classes; admin: all). */
+/** Classes visible to the signed-in user (teacher: own classes; admin: all). Data from the backend is already scoped. */
 export function classesInScope(role: Role) {
-  return role === 'teacher' ? CLASSES.filter((c) => c.teacherId === DEMO_USERS.teacher.id) : CLASSES
+  if (liveState.active) return CLASSES
+  return role === 'teacher' ? CLASSES.filter((c) => c.teacherId === ROLE_USERS.teacher.id) : CLASSES
 }
 
 export function classIdsInScope(role: Role): Set<string> {

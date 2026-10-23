@@ -33,7 +33,7 @@ export function TopicSupportPanel({ topics, students }: TopicSupportPanelProps) 
       />
       <CardBody>
         {rows.length === 0 ? (
-          <p className="text-sm text-ink-3">No tracked demo competencies match topics at this level for students in your scope.</p>
+          <p className="text-sm text-ink-3">No tracked competencies match topics at this level for students in your scope.</p>
         ) : (
           <ul className="space-y-2">
             {rows.map((r) => (
@@ -47,7 +47,7 @@ export function TopicSupportPanel({ topics, students }: TopicSupportPanelProps) 
           </ul>
         )}
         <p className="mt-3 text-xs text-ink-3">
-          Based on demo mastery estimates for {students.length} students on this framework. Matched by competency name only.
+          Based on mastery estimates for {students.length} students on this framework. Matched by competency name only.
         </p>
       </CardBody>
     </Card>
@@ -81,7 +81,7 @@ export function PrerequisitesPanel({ topics }: { topics: CurriculumTopic[] }) {
             </li>
           ))}
         </ul>
-        <p className="mt-3 text-xs text-ink-3">Illustrative demo links, not the reviewed curriculum graph.</p>
+        <p className="mt-3 text-xs text-ink-3">Starter prerequisite links, not yet expert-reviewed.</p>
       </CardBody>
     </Card>
   )

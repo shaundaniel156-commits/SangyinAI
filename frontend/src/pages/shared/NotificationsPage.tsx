@@ -80,7 +80,6 @@ export function NotificationsPage() {
           </ul>
         )}
       </Card>
-      <p className="mx-auto mt-3 max-w-3xl text-xs text-ink-3">Demo notifications for UI preview.</p>
     </>
   )
 }

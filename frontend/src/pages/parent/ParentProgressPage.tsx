@@ -17,7 +17,7 @@ const LEVEL_BAR = { strength: 'good', developing: 'warn', needs_support: 'bad' }
 export function ParentProgressPage() {
   const { children, child, setChildId } = useSelectedChild()
   const summary = getChildSummary(child)
-  const trend = getStudentTrend(child.average, child.trend)
+  const trend = getStudentTrend(child.id, child.classId)
   const values = trend.map((p) => p.value)
   const min = Math.max(0, Math.floor((Math.min(...values) - 10) / 10) * 10)
   const max = Math.min(100, Math.ceil((Math.max(...values) + 10) / 10) * 10)
@@ -46,7 +46,7 @@ export function ParentProgressPage() {
           className="lg:col-span-2"
           title="Progress over time"
           description="Average of recent school work"
-          table={{ headers: ['Month', 'Average'], rows: trend.map((p) => [p.label, `${p.value}%`]) }}
+          table={{ headers: ['Date', 'Result'], rows: trend.map((p) => [p.label, `${p.value}%`]) }}
         >
           <LineChart
             ariaLabel={`Line chart of ${child.name}'s average over recent months`}
@@ -93,7 +93,6 @@ export function ParentProgressPage() {
           </Card>
         ))}
       </div>
-      <p className="mt-4 text-xs text-ink-3">Demo data for UI preview.</p>
     </>
   )
 }

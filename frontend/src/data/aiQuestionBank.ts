@@ -5,9 +5,9 @@
  */
 import type { AiQuestion } from '../types'
 
-export type BankQuestion = Omit<AiQuestion, 'id' | 'competency'>
+export type QuestionBank = Omit<AiQuestion, 'id' | 'competency'>
 
-const mc = (sourceId: string, difficulty: BankQuestion['difficulty'], prompt: string, options: string[], answer: string, explanation: string): BankQuestion => ({
+const mc = (sourceId: string, difficulty: QuestionBank['difficulty'], prompt: string, options: string[], answer: string, explanation: string): QuestionBank => ({
   sourceId,
   type: 'multiple_choice',
   difficulty,
@@ -17,7 +17,7 @@ const mc = (sourceId: string, difficulty: BankQuestion['difficulty'], prompt: st
   explanation,
 })
 
-const sa = (sourceId: string, difficulty: BankQuestion['difficulty'], prompt: string, answer: string, explanation: string): BankQuestion => ({
+const sa = (sourceId: string, difficulty: QuestionBank['difficulty'], prompt: string, answer: string, explanation: string): QuestionBank => ({
   sourceId,
   type: 'short_answer',
   difficulty,
@@ -26,7 +26,7 @@ const sa = (sourceId: string, difficulty: BankQuestion['difficulty'], prompt: st
   explanation,
 })
 
-export const AI_QUESTION_BANK: Record<string, BankQuestion[]> = {
+export const AI_QUESTION_BANK: Record<string, QuestionBank[]> = {
   'Ratio and Proportion': [
     mc('rp-1', 'foundation', 'In a bag there are 2 red beads for every 3 blue beads. What is the ratio of red to blue beads?', ['2 : 3', '3 : 2', '2 : 5', '5 : 2'], '2 : 3', 'The ratio keeps the order given: red first (2), then blue (3).'),
     mc('rp-2', 'foundation', 'Which ratio is the same as 4 : 8 in its simplest form?', ['1 : 2', '2 : 1', '4 : 2', '1 : 4'], '1 : 2', 'Divide both parts by 4, the highest common factor.'),

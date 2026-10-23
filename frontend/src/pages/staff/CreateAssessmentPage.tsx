@@ -6,12 +6,14 @@ import { Card, CardBody, CardHeader } from '../../components/ui/Card'
 import { DemoNotice } from '../../components/ui/DemoNotice'
 import { SelectField, TextArea, TextField } from '../../components/ui/Field'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { useLiveData } from '../../context/LiveDataContext'
 import { useSession } from '../../context/SessionContext'
 import { useToast } from '../../context/ToastContext'
 import { getClass } from '../../data/classes'
 import { FRAMEWORK_LABEL } from '../../data/curriculum'
 import { classesInScope } from '../../data/selectors'
-import { DEMO_COMPETENCIES } from '../../data/students'
+import { COMPETENCIES } from '../../data/students'
+import { api } from '../../lib/api'
 import { cn } from '../../lib/cn'
 import type { AssessmentType, Subject } from '../../types'
 
@@ -28,18 +30,38 @@ export function CreateAssessmentPage() {
   const [subject, setSubject] = useState<Subject>('Mathematics')
   const [classId, setClassId] = useState(classes[0]?.id ?? '')
   const [topics, setTopics] = useState<string[]>([])
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [maxScore, setMaxScore] = useState('')
+  const [saving, setSaving] = useState(false)
+  const { live, refresh } = useLiveData()
+  const max = Number(maxScore || (type === 'Teacher Observation' ? 10 : 20))
 
   const cls = getClass(classId)
-  const availableTopics = DEMO_COMPETENCIES.filter((c) => c.subject === subject)
+  const availableTopics = COMPETENCIES.filter((c) => c.subject === subject)
 
   const toggleTopic = (name: string) => setTopics((t) => (t.includes(name) ? t.filter((x) => x !== name) : [...t, name]))
 
-  const submit = (e: FormEvent, draft = false) => {
+  const submit = async (e: FormEvent, draft = false) => {
     e.preventDefault()
-    notify(draft ? 'Draft saved for preview' : 'Assessment created for preview', {
-      description: 'Not saved — assessment storage will be added when the backend is connected.',
-    })
-    navigate('/assessments')
+    if (!live) {
+      notify(draft ? 'Draft saved for preview' : 'Assessment created for preview', {
+        description: 'Offline — not saved. Sign in while connected to save assessments.',
+      })
+      navigate('/assessments')
+      return
+    }
+    if (!title.trim()) return notify('Add a title first', { tone: 'info' })
+    setSaving(true)
+    try {
+      await api('/assessments', { body: { title: title.trim(), type, subject, classId, date, maxScore: max, topics, status: draft ? 'draft' : 'scheduled' } })
+      await refresh()
+      notify(draft ? 'Draft saved' : 'Assessment created', { description: `${title.trim()} · ${cls?.name ?? ''}` })
+      navigate('/assessments')
+    } catch (error) {
+      notify('Assessment not saved', { tone: 'info', description: (error as Error).message })
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -92,8 +114,8 @@ export function CreateAssessmentPage() {
                 }}
                 options={SUBJECTS.map((s) => ({ value: s, label: s }))}
               />
-              <TextField label="Date" type="date" defaultValue="2026-09-30" />
-              <TextField label={type === 'Teacher Observation' ? 'Rating scale (max)' : 'Maximum score'} type="number" min={1} defaultValue={type === 'Teacher Observation' ? 10 : 20} />
+              <TextField label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+              <TextField label={type === 'Teacher Observation' ? 'Rating scale (max)' : 'Maximum score'} type="number" min={1} max={1000} value={maxScore || String(max)} onChange={(e) => setMaxScore(e.target.value)} />
               <TextArea label="Instructions (optional)" className="sm:col-span-2" rows={3} placeholder="Notes for learners or for recording results…" />
             </CardBody>
           </Card>
@@ -125,7 +147,7 @@ export function CreateAssessmentPage() {
                   )
                 })}
               </div>
-              <p className="mt-3 text-xs text-ink-3">Demo competency list — the full curriculum mapping will come from the curriculum module.</p>
+              <p className="mt-3 text-xs text-ink-3">Competencies found in your students’ records.</p>
             </CardBody>
           </Card>
         </div>
@@ -146,12 +168,12 @@ export function CreateAssessmentPage() {
                 <p>Once scores are entered, results update each student’s competency profile and may produce new teaching guidance for your review.</p>
               </div>
               <div className="mt-5 flex flex-col gap-2">
-                <Button type="submit">Create assessment</Button>
+                <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Create assessment'}</Button>
                 <Button variant="secondary" onClick={(e) => submit(e, true)}>
                   Save as draft
                 </Button>
               </div>
-              <DemoNotice className="mt-4">Prototype — assessments are not saved yet.</DemoNotice>
+              {!live && <DemoNotice className="mt-4">Offline — assessments are not saved. Sign in while connected to save them.</DemoNotice>}
             </CardBody>
           </Card>
         </div>

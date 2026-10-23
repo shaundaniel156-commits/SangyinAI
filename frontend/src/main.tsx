@@ -5,6 +5,7 @@ import App from './App'
 import { AiAssessmentsProvider } from './context/AiAssessmentsContext'
 import { ConnectivityProvider } from './context/ConnectivityContext'
 import { GuidanceReviewProvider } from './context/GuidanceReviewContext'
+import { LiveDataProvider } from './context/LiveDataContext'
 import { NotificationsProvider } from './context/NotificationsContext'
 import { SessionProvider } from './context/SessionContext'
 import { ThemeProvider } from './context/ThemeContext'
@@ -17,15 +18,17 @@ createRoot(document.getElementById('root')!).render(
       <ThemeProvider>
         <SessionProvider>
           <ConnectivityProvider>
-            <NotificationsProvider>
-              <GuidanceReviewProvider>
-                <AiAssessmentsProvider>
-                  <ToastProvider>
-                    <App />
-                  </ToastProvider>
-                </AiAssessmentsProvider>
-              </GuidanceReviewProvider>
-            </NotificationsProvider>
+            <LiveDataProvider>
+              <ToastProvider>
+                <NotificationsProvider>
+                  <GuidanceReviewProvider>
+                    <AiAssessmentsProvider>
+                      <App />
+                    </AiAssessmentsProvider>
+                  </GuidanceReviewProvider>
+                </NotificationsProvider>
+              </ToastProvider>
+            </LiveDataProvider>
           </ConnectivityProvider>
         </SessionProvider>
       </ThemeProvider>

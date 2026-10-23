@@ -1,0 +1,536 @@
+// Sangyin AI database schema. See the Database Development Guide (Sangyin-AI-Database-Guide.docx).
+// Tables mirror the frontend types in frontend/src/types/index.ts, so API responses match what the pages expect.
+// After changing it, run: npx prisma migrate dev --name what-changed
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  importFileExtension = "ts"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  teacher
+  admin
+  parent
+  student
+}
+
+enum Framework {
+  uganda
+  cambridge
+  // The school's or university's own curriculum (e.g. university programmes and course units).
+  institution
+}
+
+enum InstitutionType {
+  primary
+  secondary
+  university
+  mixed
+}
+
+enum ReferenceKind {
+  notes
+  scheme_of_work
+  lesson_plan
+  course_outline
+  past_paper
+  other
+}
+
+enum AccountStatus {
+  active
+  invited
+  inactive
+}
+
+// Shown in the frontend as "Test", "Quiz", "Assignment" and "Teacher Observation".
+enum AssessmentType {
+  test
+  quiz
+  assignment
+  observation
+}
+
+enum AssessmentStatus {
+  draft
+  scheduled
+  awaiting_scores
+  completed
+}
+
+enum CompetencyLevel {
+  strength
+  developing
+  needs_support
+}
+
+enum GuidanceStatus {
+  pending_review
+  approved
+  revision_requested
+  overridden
+}
+
+enum AiAssessmentStatus {
+  draft
+  sent
+}
+
+enum QuestionType {
+  multiple_choice
+  short_answer
+}
+
+enum Difficulty {
+  foundation
+  core
+  stretch
+}
+
+enum PracticeStatus {
+  not_started
+  in_progress
+  completed
+}
+
+enum AiSource {
+  gemini
+  offline
+}
+
+// One school using Sangyin. Every other record belongs to a school.
+// One school, college or university using Sangyin. Every other record belongs to one.
+model School {
+  id            String              @id @default(cuid())
+  name          String
+  district      String?
+  type          InstitutionType     @default(primary)
+  createdAt     DateTime            @default(now())
+  users         User[]
+  classes       SchoolClass[]
+  students      Student[]
+  objectives    LearningObjective[]
+  programmes    Programme[]
+  levels        CurriculumLevel[]
+  documents     ReferenceDocument[]
+  bankQuestions BankQuestion[]
+}
+
+// A university programme (or a school's own course of study), e.g. BSc Computer Science.
+model Programme {
+  id        String            @id @default(cuid())
+  schoolId  String
+  school    School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  code      String
+  name      String
+  // Certificate, Diploma, Bachelor's, Master's…
+  award     String?
+  years     Int               @default(3)
+  createdAt DateTime          @default(now())
+  levels    CurriculumLevel[]
+
+  @@unique([schoolId, code])
+}
+
+// Anyone who signs in: teachers, admins, parents and students.
+model User {
+  id                 String              @id @default(cuid())
+  schoolId           String
+  school             School              @relation(fields: [schoolId], references: [id])
+  name               String
+  email              String              @unique
+  phone              String?
+  passwordHash       String?
+  role               Role
+  status             AccountStatus       @default(invited)
+  // Subjects a teacher teaches (frontend Teacher.subjects).
+  subjects           String[]
+  lastActiveAt       DateTime?
+  // Whether this person wants copies by email and short messages by SMS (they can turn these off in Settings).
+  emailNotifications Boolean             @default(true)
+  smsNotifications   Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  // Classes where this user is the class teacher.
+  classesLed         SchoolClass[]       @relation("ClassTeacher")
+  // Every class this teacher teaches, including as a subject teacher (frontend Teacher.classIds).
+  classesTaught      SchoolClass[]       @relation("SubjectTeachers")
+  studentProfile     Student?
+  children           StudentGuardian[]
+  notifications      Notification[]
+  aiAssessments      AiAssessment[]
+  assessments        Assessment[]
+  guidanceDecided    GuidancePlan[]
+  objectivesAdded    LearningObjective[]
+  documents          ReferenceDocument[]
+  bankQuestions      BankQuestion[]
+  passwordResets     PasswordReset[]
+}
+
+model SchoolClass {
+  id                String           @id @default(cuid())
+  schoolId          String
+  school            School           @relation(fields: [schoolId], references: [id])
+  name              String
+  level             String
+  framework         Framework
+  academicYear      Int
+  teacherId         String?
+  teacher           User?            @relation("ClassTeacher", fields: [teacherId], references: [id])
+  teachers          User[]           @relation("SubjectTeachers")
+  subjects          String[]
+  // Change in class average since last term, in percentage points.
+  trend             Int              @default(0)
+  // The curriculum level this class follows (e.g. Primary 6, or BSc CS Year 1).
+  curriculumLevelId String?
+  curriculumLevel   CurriculumLevel? @relation(fields: [curriculumLevelId], references: [id], onDelete: SetNull)
+  students          Student[]
+  assessments       Assessment[]
+  aiAssessments     AiAssessment[]
+
+  @@unique([schoolId, name, academicYear])
+}
+
+// A learner. A student only gets a User (a login) when they use the student portal.
+model Student {
+  id               String               @id @default(cuid())
+  schoolId         String
+  school           School               @relation(fields: [schoolId], references: [id])
+  classId          String
+  class            SchoolClass          @relation(fields: [classId], references: [id])
+  name             String
+  userId           String?              @unique
+  user             User?                @relation(fields: [userId], references: [id])
+  // Registration number (university) or learner number (school), unique within the institution.
+  regNumber        String?
+  // Shown on the profile even when the guardian has no Sangyin account.
+  guardianName     String?
+  // Change in average since last term, in percentage points.
+  trend            Int                  @default(0)
+  createdAt        DateTime             @default(now())
+  guardians        StudentGuardian[]
+  results          AssessmentResult[]
+  competencyScores CompetencyScore[]
+  diagnostics      DiagnosticReport[]
+  guidancePlans    GuidancePlan[]
+  practice         PracticeAssignment[]
+
+  @@unique([schoolId, regNumber])
+}
+
+// Links parents to their children (a child can have several guardians, a parent several children).
+model StudentGuardian {
+  studentId    String
+  student      Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  guardianId   String
+  guardian     User    @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+  relationship String?
+
+  @@id([studentId, guardianId])
+}
+
+// A skill students are scored on, e.g. "Ratio and Proportion" (frontend CompetencyScore / DEMO_COMPETENCIES).
+// These are the names the AI features use for gaps.
+model Competency {
+  id       String            @id @default(cuid())
+  name     String
+  topic    String
+  subject  String
+  // Display order (the frontend lists competencies in a fixed catalogue order).
+  position Int               @default(0)
+  scores   CompetencyScore[]
+
+  @@unique([subject, name])
+}
+
+// The curriculum, as in frontend/src/data/curriculum.ts: level → topics (per subject) → competency statements → objectives.
+// Shared levels (no school, e.g. the Sangyin outline for P6) or an institution's own (e.g. BSc CS Year 1).
+model CurriculumLevel {
+  id          String              @id @default(cuid())
+  framework   Framework
+  name        String
+  stage       String
+  position    Int                 @default(0)
+  schoolId    String?
+  school      School?             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  programmeId String?
+  programme   Programme?          @relation(fields: [programmeId], references: [id], onDelete: Cascade)
+  subjects    CurriculumSubject[]
+  topics      CurriculumTopic[]
+  classes     SchoolClass[]
+}
+
+// A subject at a school level, or a course unit at a university year (e.g. CSC1101 Programming, Semester 1, 4 CU).
+model CurriculumSubject {
+  id          String            @id @default(cuid())
+  levelId     String
+  level       CurriculumLevel   @relation(fields: [levelId], references: [id], onDelete: Cascade)
+  name        String
+  code        String?
+  term        String?
+  creditUnits Int?
+  position    Int               @default(0)
+  topics      CurriculumTopic[]
+}
+
+model CurriculumTopic {
+  id           String                 @id @default(cuid())
+  levelId      String
+  level        CurriculumLevel        @relation(fields: [levelId], references: [id], onDelete: Cascade)
+  // The subject or course unit this topic sits in.
+  subjectId    String
+  subject      CurriculumSubject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  name         String
+  // A short plain-words description written by Sangyin (not copied from any syllabus).
+  description  String?
+  position     Int                    @default(0)
+  competencies CurriculumCompetency[]
+}
+
+model CurriculumCompetency {
+  id         String              @id @default(cuid())
+  topicId    String
+  topic      CurriculumTopic     @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  name       String
+  position   Int                 @default(0)
+  objectives LearningObjective[]
+}
+
+// An official learning objective (code + text). Shared ones (schoolId empty) need the publisher's permission;
+// a school can add its own, which only that school sees.
+model LearningObjective {
+  id           String               @id @default(cuid())
+  competencyId String
+  competency   CurriculumCompetency @relation(fields: [competencyId], references: [id], onDelete: Cascade)
+  code         String
+  text         String
+  position     Int                  @default(0)
+  schoolId     String?
+  school       School?              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdById  String?
+  createdBy    User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt    DateTime             @default(now())
+}
+
+model Assessment {
+  id          String             @id @default(cuid())
+  classId     String
+  class       SchoolClass        @relation(fields: [classId], references: [id])
+  createdById String
+  createdBy   User               @relation(fields: [createdById], references: [id])
+  title       String
+  type        AssessmentType
+  subject     String
+  date        DateTime           @db.Date
+  maxScore    Int
+  status      AssessmentStatus   @default(draft)
+  topics      String[]
+  createdAt   DateTime           @default(now())
+  results     AssessmentResult[]
+}
+
+// Only scores that have been entered are stored; students without a row have no score yet.
+model AssessmentResult {
+  id           String     @id @default(cuid())
+  assessmentId String
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  studentId    String
+  student      Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  score        Float
+  remark       String?
+
+  @@unique([assessmentId, studentId])
+}
+
+// A student's current mastery of one competency, updated as results come in.
+model CompetencyScore {
+  id           String          @id @default(cuid())
+  studentId    String
+  student      Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  competencyId String
+  competency   Competency      @relation(fields: [competencyId], references: [id])
+  score        Int
+  level        CompetencyLevel
+  updatedAt    DateTime        @updatedAt
+
+  @@unique([studentId, competencyId])
+}
+
+// Strengths, gaps and evidence for one student and subject. The report body (areas, evidence, processing) is JSON.
+model DiagnosticReport {
+  id          String   @id @default(cuid())
+  studentId   String
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject     String
+  summary     Json
+  generatedAt DateTime @default(now())
+}
+
+// An AI teaching plan for one gap. The plan as written (approach, steps, pacing, practice, outputs) is JSON;
+// the teacher's changes are kept separately in `edits`, so the original stays visible.
+model GuidancePlan {
+  id                  String         @id @default(cuid())
+  studentId           String
+  student             Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject             String
+  competencyGap       String
+  curriculumReference String
+  plan                Json
+  // gemini or offline; empty for sample plans.
+  source              AiSource?
+  status              GuidanceStatus @default(pending_review)
+  edits               Json?
+  teacherNote         String?
+  decidedById         String?
+  decidedBy           User?          @relation(fields: [decidedById], references: [id])
+  decidedAt           DateTime?
+  createdAt           DateTime       @default(now())
+}
+
+// An AI-drafted practice assessment: a draft, then reviewed and sent by the teacher (frontend AiAssessment).
+model AiAssessment {
+  id                String               @id @default(cuid())
+  classId           String
+  class             SchoolClass          @relation(fields: [classId], references: [id])
+  createdById       String
+  createdBy         User                 @relation(fields: [createdById], references: [id])
+  title             String
+  subject           String
+  competencies      String[]
+  studentIds        String[]
+  difficulty        String
+  dueDate           DateTime?            @db.Date
+  messageToStudents String
+  reportNotes       String
+  rationale         String[]
+  curriculumRefs    String[]
+  parentNote        String?
+  shareWithParents  Boolean              @default(true)
+  // gemini or offline, when known; and the anonymous request sent to the AI (kept for fine-tuning).
+  source            AiSource?
+  requestSent       Json?
+  status            AiAssessmentStatus   @default(draft)
+  createdAt         DateTime             @default(now())
+  sentAt            DateTime?
+  questions         AiQuestion[]
+  assignments       PracticeAssignment[]
+}
+
+model AiQuestion {
+  id             String       @id @default(cuid())
+  aiAssessmentId String
+  aiAssessment   AiAssessment @relation(fields: [aiAssessmentId], references: [id], onDelete: Cascade)
+  position       Int
+  // Question-bank entry or AI draft it came from, so "regenerate" can pick a different one.
+  sourceId       String
+  competency     String
+  type           QuestionType
+  difficulty     Difficulty
+  prompt         String
+  options        String[]
+  answer         String
+  explanation    String
+}
+
+// One student's copy of a sent AI assessment, and how they did.
+model PracticeAssignment {
+  id             String         @id @default(cuid())
+  aiAssessmentId String
+  aiAssessment   AiAssessment   @relation(fields: [aiAssessmentId], references: [id], onDelete: Cascade)
+  studentId      String
+  student        Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  status         PracticeStatus @default(not_started)
+  answers        Json?
+  score          Float?
+  // How the student found it: easy, okay or difficult.
+  feedback       String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+
+  @@unique([aiAssessmentId, studentId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String
+  title     String
+  body      String
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+// Teacher-approved AI output, kept for fine-tuning (see the fine-tuning guide). No student names.
+model TrainingExample {
+  id        String   @id @default(cuid())
+  task      String
+  request   Json
+  approved  Json
+  createdAt DateTime @default(now())
+}
+
+// The institution's own reference material (notes, schemes of work, course outlines…), split into passages.
+// The AI reads the passages relevant to a request as background information, never as instructions.
+model ReferenceDocument {
+  id              String           @id @default(cuid())
+  schoolId        String
+  school          School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdById     String?
+  createdBy       User?            @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  title           String
+  kind            ReferenceKind    @default(notes)
+  // Free text, matched against requests: e.g. "Mathematics" or "CSC1101", "Primary 6" or "Year 1".
+  subject         String?
+  level           String?
+  filename        String?
+  // The person adding it confirmed the institution has the right to use this material.
+  rightsConfirmed Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  chunks          ReferenceChunk[]
+}
+
+model ReferenceChunk {
+  id         String            @id @default(cuid())
+  documentId String
+  document   ReferenceDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  position   Int
+  text       String
+}
+
+// Reviewed questions written or approved by the institution. Used offline, for "Regenerate", and as style examples for the AI.
+model BankQuestion {
+  id          String       @id @default(cuid())
+  schoolId    String
+  school      School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdById String?
+  createdBy   User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  subject     String
+  level       String?
+  // The skill or topic it tests, e.g. "Ratio and Proportion" (matches the gaps the AI targets).
+  competency  String
+  type        QuestionType
+  difficulty  Difficulty
+  prompt      String
+  options     String[]
+  answer      String
+  explanation String
+  createdAt   DateTime     @default(now())
+}
+
+// A "forgot password" link. Only a SHA-256 fingerprint of the token is stored; links expire after 30 minutes and work once.
+model PasswordReset {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}

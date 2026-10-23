@@ -29,7 +29,7 @@ export function StudentReport({ student, cls, filters }: { student: Student; cls
       <DocSection title="Current learning focus">
         <p className="text-sm text-ink">{student.currentFocus}</p>
       </DocSection>
-      <DocSection title="Competencies" description="Demo mastery estimates with competency level">
+      <DocSection title="Competencies" description="Mastery estimates with competency level">
         <DocTable
           caption="Student competencies"
           rows={competencies}

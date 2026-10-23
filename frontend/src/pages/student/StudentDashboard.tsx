@@ -10,13 +10,13 @@ import { SectionHeading } from '../../components/ui/SectionHeading'
 import { StatCard } from '../../components/ui/StatCard'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { useAiAssessments } from '../../context/AiAssessmentsContext'
-import { DEMO_IN_PROGRESS_ANSWERED, LEARNING_STREAK_DAYS, PRACTICE_ACTIVITIES, RECENT_ACHIEVEMENTS, STUDENT_FEEDBACK } from '../../data/practice'
-import { DEMO_USERS } from '../../data/users'
+import { PRACTICE_ACTIVITIES, practiceStreakDays, recentAchievements, teacherMessages } from '../../data/practice'
+import { ROLE_USERS } from '../../data/users'
 import { formatShortDate } from '../../lib/format'
 import type { PracticeActivity } from '../../types'
 import { FeedbackControl } from './components/FeedbackControl'
 import { PracticeActivityCard } from './components/PracticeActivityCard'
-import { SamplePracticeModal } from './components/SamplePracticeModal'
+import { PracticeModal } from './components/PracticeModal'
 import { getCurrentStudent, getLearningSequence } from './components/studentData'
 
 /** Student home: the next thing to do first, then focus, progress and motivation. */
@@ -30,15 +30,17 @@ export function StudentDashboard() {
   const upNext = PRACTICE_ACTIVITIES.filter((a) => a.status === 'not_started').slice(0, 3)
   const completed = PRACTICE_ACTIVITIES.filter((a) => a.status === 'completed')
   const lastCompleted = [...completed].sort((a, b) => (b.completedOn ?? '').localeCompare(a.completedOn ?? ''))[0]
-  const latestMessage = STUDENT_FEEDBACK[0]
+  const latestMessage = teacherMessages(items, ROLE_USERS.student.id)[0]
+  const streak = practiceStreakDays()
+  const achievements = recentAchievements()
   const focusScore = student.competencies.find((c) => c.name === student.currentFocus)
 
   // Teacher-approved assessments come first; otherwise continue or start regular practice.
-  const mine = items.filter((a) => a.status === 'sent' && a.studentIds.includes(DEMO_USERS.student.id))
+  const mine = items.filter((a) => a.status === 'sent' && a.studentIds.includes(ROLE_USERS.student.id))
   const pendingFromTeacher = mine.find((a) => !attempts[a.id])
   const nextActivity = current ?? upNext[0]
   const teacherAnswered = mine.reduce((n, a) => n + (attempts[a.id]?.total ?? 0), 0)
-  const questionsAnswered = completed.reduce((n, a) => n + a.questions, 0) + (current ? DEMO_IN_PROGRESS_ANSWERED : 0) + teacherAnswered
+  const questionsAnswered = completed.reduce((n, a) => n + a.questions, 0) + teacherAnswered
   const minutes = completed.reduce((n, a) => n + a.estimatedMinutes, 0)
 
   return (
@@ -94,14 +96,6 @@ export function StudentDashboard() {
                     {nextActivity.estimatedMinutes} min
                   </span>
                 </p>
-                {nextActivity.status === 'in_progress' && (
-                  <div className="mt-4 max-w-md">
-                    <ProgressBar value={DEMO_IN_PROGRESS_ANSWERED} max={nextActivity.questions} srLabel="Questions done in this activity" />
-                    <p className="mt-1.5 text-xs text-ink-3">
-                      {DEMO_IN_PROGRESS_ANSWERED} of {nextActivity.questions} questions done
-                    </p>
-                  </div>
-                )}
                 <div className="mt-auto pt-6">
                   <Button size="lg" icon={<Play className="size-4" aria-hidden />} onClick={() => setOpen(nextActivity)}>
                     {nextActivity.status === 'in_progress' ? 'Continue Practice' : 'Start Practice'} <ArrowRight className="size-4" aria-hidden />
@@ -182,12 +176,18 @@ export function StudentDashboard() {
             title="What I did"
             icon={<Award aria-hidden />}
             action={
-              <StatusBadge tone="warn" icon={Flame}>
-                {LEARNING_STREAK_DAYS}-day streak
-              </StatusBadge>
+              streak > 0 ? (
+                <StatusBadge tone="warn" icon={Flame}>
+                  {streak}-day streak
+                </StatusBadge>
+              ) : undefined
             }
           />
-          <AchievementList items={RECENT_ACHIEVEMENTS} formatDate={formatShortDate} />
+          {achievements.length ? (
+            <AchievementList items={achievements} formatDate={formatShortDate} />
+          ) : (
+            <p className="p-5 text-sm text-ink-3 sm:p-6">Finished practice will show here.</p>
+          )}
         </Card>
 
         {lastCompleted && (
@@ -221,7 +221,7 @@ export function StudentDashboard() {
         )}
       </div>
 
-      <SamplePracticeModal activity={open} onClose={() => setOpen(null)} />
+      <PracticeModal activity={open} onClose={() => setOpen(null)} />
     </>
   )
 }
