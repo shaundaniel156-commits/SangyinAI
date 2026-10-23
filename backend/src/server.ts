@@ -19,7 +19,8 @@ import { notificationRoutes } from './routes/notifications.ts'
 import { practiceRoutes } from './routes/practice.ts'
 import { studentRoutes } from './routes/students.ts'
 
-const app = Fastify({ logger: true })
+// trustProxy: behind Railway's proxy, use the visitor's real address (rate limits are per visitor, not shared).
+const app = Fastify({ logger: true, trustProxy: true })
 
 // Allow the frontend to call this server. Several addresses can be listed, separated by commas.
 const origins = (process.env.FRONTEND_ORIGIN ?? 'http://localhost:5173').split(',').map((o) => o.trim())
@@ -89,4 +90,5 @@ app.post('/ai/guidance/generate', aiRoute, async (request, reply) => {
   return generateGuidance(parsed.data, request.user?.schoolId)
 })
 
-await app.listen({ port: Number(process.env.PORT ?? 4000) })
+// 0.0.0.0 = accept connections from outside this machine (needed on Railway, which sets PORT).
+await app.listen({ port: Number(process.env.PORT ?? 4000), host: '0.0.0.0' })
