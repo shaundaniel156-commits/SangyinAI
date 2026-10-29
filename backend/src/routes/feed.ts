@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify'
+import { hash } from '@node-rs/argon2'
 import { z } from 'zod'
 import { requireRole } from '../auth/session.ts'
 import { prisma } from '../db/client.ts'
@@ -223,6 +224,17 @@ export async function feedRoutes(app: FastifyInstance) {
         : 'Administrator',
       lastActiveAt: u.lastActiveAt?.toISOString() ?? null,
     }))
+  })
+
+  // Sets a new password for an account in the school (e.g. a forgotten or never-received one-time password).
+  app.patch<{ Params: { id: string } }>('/feed/users/:id/password', adminOnly, async (request, reply) => {
+    const parsed = z.object({ password: z.string().min(8).max(200) }).safeParse(request.body)
+    if (!parsed.success) return reply.code(400).send({ error: 'The password must be at least 8 characters.' })
+    const user = await prisma.user.findFirst({ where: { id: request.params.id, schoolId: request.user!.schoolId } })
+    if (!user) return reply.code(404).send({ error: 'User not found.' })
+    await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hash(parsed.data.password), status: 'active' } })
+    request.log.info({ user: user.id, by: request.user!.sub }, 'password set by admin')
+    return reply.code(204).send()
   })
 
   // Deletes an account. Work they made (assessments, AI drafts) is kept and moves to the administrator

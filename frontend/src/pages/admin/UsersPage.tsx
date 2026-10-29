@@ -1,4 +1,4 @@
-import { Trash2, UserPlus, UserX } from 'lucide-react'
+import { KeyRound, Trash2, UserPlus, UserX } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Avatar } from '../../components/ui/Avatar'
 import { Button } from '../../components/ui/Button'
@@ -15,6 +15,7 @@ import type { Role } from '../../types'
 import { ACCOUNT_STATUS_LABEL, AccountStatusBadge } from './components/AccountStatusBadge'
 import { DeleteUserModal } from './components/DeleteUserModal'
 import { InviteModal } from './components/InviteModal'
+import { SetPasswordModal } from './components/SetPasswordModal'
 import { useSession } from '../../context/SessionContext'
 
 const ROLES: Role[] = ['teacher', 'admin', 'parent', 'student']
@@ -25,6 +26,7 @@ export function UsersPage() {
   const [status, setStatus] = useState('all')
   const [inviteOpen, setInviteOpen] = useState(false)
   const [toDelete, setToDelete] = useState<UserAccount | null>(null)
+  const [toReset, setToReset] = useState<UserAccount | null>(null)
   const { user: me } = useSession()
 
   const rows = useMemo(() => {
@@ -108,12 +110,18 @@ export function UsersPage() {
               id: 'actions',
               header: '',
               align: 'right',
-              cell: (u) =>
-                u.id === me.id ? null : (
-                  <Button variant="ghost" size="sm" onClick={() => setToDelete(u)} icon={<Trash2 className="size-4" aria-hidden />} aria-label={`Delete ${u.name}`}>
-                    <span className="hidden sm:inline">Delete</span>
+              cell: (u) => (
+                <div className="flex justify-end gap-1">
+                  <Button variant="ghost" size="sm" onClick={() => setToReset(u)} icon={<KeyRound className="size-4" aria-hidden />} aria-label={`Set password for ${u.name}`}>
+                    <span className="hidden sm:inline">Password</span>
                   </Button>
-                ),
+                  {u.id !== me.id && (
+                    <Button variant="ghost" size="sm" onClick={() => setToDelete(u)} icon={<Trash2 className="size-4" aria-hidden />} aria-label={`Delete ${u.name}`}>
+                      <span className="hidden sm:inline">Delete</span>
+                    </Button>
+                  )}
+                </div>
+              ),
             },
           ]}
         />
@@ -121,6 +129,7 @@ export function UsersPage() {
 
       <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
       <DeleteUserModal user={toDelete} onClose={() => setToDelete(null)} />
+      <SetPasswordModal user={toReset} onClose={() => setToReset(null)} />
     </>
   )
 }

@@ -113,7 +113,7 @@ export function InviteModal({ open, onClose, fixedRole }: InviteModalProps) {
             {handover.emailed ? 'Their sign-in details were emailed to them.' : <>The email did not go out: {handover.reason} Pass on this password yourself.</>}
           </p>
           <p>
-            {password.trim() ? 'The password you chose' : 'One-time password'} (shown only now, it can’t be looked up later). They should change it in Settings after signing in.
+            Their password (shown only now, it can’t be looked up later). They should change it in Settings after signing in.
           </p>
           <p className="rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 font-mono text-base text-ink select-all">{handover.password}</p>
         </div>
