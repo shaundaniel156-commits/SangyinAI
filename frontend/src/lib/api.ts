@@ -1,5 +1,7 @@
 /** Where the backend lives, and the sign-in token sent with every request to it. */
-export const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000'
+// The live site always goes through its own /api address (vercel.json forwards it to the backend),
+// because some networks block the backend's own address. Only local development calls it directly.
+export const API_URL = import.meta.env.DEV ? (import.meta.env.VITE_API_URL ?? 'http://localhost:4000') : '/api'
 
 const TOKEN_KEY = 'sangyin.auth.token'
 const PROFILE_KEY = 'sangyin.auth.profile'
