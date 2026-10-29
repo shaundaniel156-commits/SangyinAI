@@ -38,6 +38,7 @@ export function InviteModal({ open, onClose, fixedRole }: InviteModalProps) {
   const [role, setRole] = useState<Role>(fixedRole ?? 'teacher')
   const [classId, setClassId] = useState('')
   const [phone, setPhone] = useState('')
+  const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   // The new account's one-time password, shown once so the administrator can pass it on (reason: why the email failed).
@@ -50,6 +51,7 @@ export function InviteModal({ open, onClose, fixedRole }: InviteModalProps) {
     setName('')
     setEmail('')
     setPhone('')
+    setPassword('')
     setClassId('')
     setError('')
     setHandover(null)
@@ -64,7 +66,7 @@ export function InviteModal({ open, onClose, fixedRole }: InviteModalProps) {
     try {
       const className = CLASSES.find((c) => c.id === classId)?.name ?? ''
       const result = await api<CommitResult>('/feed/staff/commit', {
-        body: { rows: [{ name: name.trim(), email: email.trim(), role: activeRole, classes: className, phone: phone.trim() }] },
+        body: { rows: [{ name: name.trim(), email: email.trim(), role: activeRole, classes: className, phone: phone.trim(), password: password.trim() }] },
       })
       await refresh()
       const account = result.accounts?.[0]
@@ -111,7 +113,7 @@ export function InviteModal({ open, onClose, fixedRole }: InviteModalProps) {
             {handover.emailed ? 'Their sign-in details were emailed to them.' : <>The email did not go out: {handover.reason} Pass on this password yourself.</>}
           </p>
           <p>
-            One-time password (shown only now, it can’t be looked up later). They should change it in Settings after signing in.
+            {password.trim() ? 'The password you chose' : 'One-time password'} (shown only now, it can’t be looked up later). They should change it in Settings after signing in.
           </p>
           <p className="rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 font-mono text-base text-ink select-all">{handover.password}</p>
         </div>
@@ -135,6 +137,16 @@ export function InviteModal({ open, onClose, fixedRole }: InviteModalProps) {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@yourschool.ac.ug"
                 required
+              />
+              <TextField
+                label="Password (optional)"
+                type="text"
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                minLength={8}
+                placeholder="Leave empty for a random one-time password"
+                hint="At least 8 characters. They should change it in Settings after signing in."
               />
               <TextField label="Phone (optional)" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+256700000000" />
               {activeRole === 'teacher' && (

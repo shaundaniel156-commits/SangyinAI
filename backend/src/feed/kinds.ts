@@ -405,6 +405,7 @@ const staff: FeedKind = {
         ...required(r, staffColumns),
         ...(v(r, 'email') && !isEmail(v(r, 'email')) ? ['Email is not a valid email address'] : []),
         ...(staffRole(v(r, 'role')) ? [] : ['Role must be teacher (lecturer) or admin']),
+        ...(v(r, 'password') && (v(r, 'password').length < 8 || v(r, 'password').length > 200) ? ['The password must be at least 8 characters'] : []),
         ...(other && (other.schoolId !== user.schoolId || !['teacher', 'admin'].includes(other.role)) ? ['This email belongs to another account'] : []),
         ...missing.filter(Boolean).map((c) => `No class called ${c}`),
       ]
@@ -423,7 +424,8 @@ const staff: FeedKind = {
         await prisma.user.update({ where: { id: existing.id }, data: { ...fields, ...(classIds.length ? { classesTaught: { set: classIds } } : {}) } })
         updated++
       } else {
-        const password = tempPassword()
+        // A password the administrator chose (the Invite form; not a template column), otherwise a random one.
+        const password = v(r, 'password') || tempPassword()
         await prisma.user.create({ data: { schoolId: user.schoolId, email, status: 'active', passwordHash: await hash(password), ...fields, ...(classIds.length ? { classesTaught: { connect: classIds } } : {}) } })
         accounts.push({ name: fields.name, email, role: fields.role, tempPassword: password, phone: fields.phone ?? null })
         created++
