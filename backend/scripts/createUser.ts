@@ -54,10 +54,16 @@ if (password.length < 8) {
   process.exit(1)
 }
 
-const school = await prisma.school.findFirst({ orderBy: { createdAt: 'asc' } })
+// A brand-new database has no school yet: the first account creates it.
+let school = await prisma.school.findFirst({ orderBy: { createdAt: 'asc' } })
 if (!school) {
-  console.log('No school in the database yet. Run `npx prisma db seed` first.')
-  process.exit(1)
+  const schoolName = (await ask('No school in the database yet. School name: ')).trim()
+  if (!schoolName) {
+    console.log('A school name is needed for the first account. Nothing was changed.')
+    process.exit(1)
+  }
+  school = await prisma.school.create({ data: { name: schoolName } })
+  console.log(`Created the school ${school.name}.`)
 }
 const found = new Set((await prisma.schoolClass.findMany({ where: { id: { in: classIds }, schoolId: school.id }, select: { id: true } })).map((c) => c.id))
 const unknownClasses = classIds.filter((id) => !found.has(id))

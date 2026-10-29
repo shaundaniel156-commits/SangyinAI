@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "node --env-file=.env src/server.ts",
-    "build": "prisma generate",
+    "build": "prisma generate && prisma migrate deploy",
     "start": "node src/server.ts",
     "hello": "node --env-file=.env src/hello.ts",
     "typecheck": "tsc -p tsconfig.json",
