@@ -15,10 +15,16 @@ interface OverlayProps {
 /** Shared overlay behaviour: Escape to close, focus the panel, lock page scroll. */
 function useOverlay(open: boolean, onClose: () => void) {
   const panelRef = useRef<HTMLDivElement>(null)
+  // Callers often pass a new onClose on every render (e.g. each keystroke in a form). Keep the latest in a ref
+  // so the effect below runs only when the overlay opens or closes; re-running it would pull focus out of the field.
+  const onCloseRef = useRef(onClose)
+  useEffect(() => {
+    onCloseRef.current = onClose
+  })
   useEffect(() => {
     if (!open) return
     const previous = document.activeElement as HTMLElement | null
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onCloseRef.current()
     document.addEventListener('keydown', onKey)
     const overflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -28,7 +34,7 @@ function useOverlay(open: boolean, onClose: () => void) {
       document.body.style.overflow = overflow
       previous?.focus()
     }
-  }, [open, onClose])
+  }, [open])
   return panelRef
 }
 
