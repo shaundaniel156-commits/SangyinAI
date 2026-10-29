@@ -225,6 +225,28 @@ export async function feedRoutes(app: FastifyInstance) {
     }))
   })
 
+  // Deletes an account. Work they made (assessments, AI drafts) is kept and moves to the administrator
+  // deleting them; a student's record and results stay, only the sign-in goes. Admins can't delete themselves.
+  app.delete<{ Params: { id: string } }>('/feed/users/:id', adminOnly, async (request, reply) => {
+    const me = request.user!
+    if (request.params.id === me.sub) return reply.code(400).send({ error: 'You cannot delete your own account.' })
+    const user = await prisma.user.findFirst({ where: { id: request.params.id, schoolId: me.schoolId } })
+    if (!user) return reply.code(404).send({ error: 'User not found.' })
+    if (user.role === 'admin' && (await prisma.user.count({ where: { schoolId: me.schoolId, role: 'admin', status: 'active' } })) <= 1) {
+      return reply.code(400).send({ error: 'The school needs at least one administrator.' })
+    }
+    await prisma.$transaction([
+      prisma.assessment.updateMany({ where: { createdById: user.id }, data: { createdById: me.sub } }),
+      prisma.aiAssessment.updateMany({ where: { createdById: user.id }, data: { createdById: me.sub } }),
+      prisma.schoolClass.updateMany({ where: { teacherId: user.id }, data: { teacherId: null } }),
+      prisma.student.updateMany({ where: { userId: user.id }, data: { userId: null } }),
+      prisma.guidancePlan.updateMany({ where: { decidedById: user.id }, data: { decidedById: null } }),
+      prisma.user.delete({ where: { id: user.id } }),
+    ])
+    request.log.info({ deletedUser: user.id, by: me.sub }, 'user deleted')
+    return reply.code(204).send()
+  })
+
   // --- The institution itself ---
   app.get('/feed/institution', staffOnly, async (request) => {
     const s = await prisma.school.findUniqueOrThrow({ where: { id: request.user!.schoolId } })

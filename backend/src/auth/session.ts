@@ -1,5 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import jwt from 'jsonwebtoken'
+import { prisma } from '../db/client.ts'
 
 export type Role = 'teacher' | 'admin' | 'parent' | 'student'
 
@@ -37,6 +38,9 @@ export function requireRole(...roles: Role[]) {
     } catch {
       return reply.code(401).send({ error: 'Please sign in again.' })
     }
+    // A deleted or deactivated account loses access at once, not when its token expires.
+    const account = await prisma.user.findUnique({ where: { id: user.sub }, select: { status: true } })
+    if (!account || account.status !== 'active') return reply.code(401).send({ error: 'Please sign in again.' })
     if (!roles.includes(user.role)) {
       return reply.code(403).send({ error: 'Your account cannot use this feature.' })
     }
