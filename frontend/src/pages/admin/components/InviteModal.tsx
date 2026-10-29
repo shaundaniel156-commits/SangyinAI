@@ -2,7 +2,7 @@ import { Send } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '../../../components/ui/Button'
-import { SelectField, TextField } from '../../../components/ui/Field'
+import { PasswordField, SelectField, TextField } from '../../../components/ui/Field'
 import { Modal } from '../../../components/ui/Modal'
 import { useLiveData } from '../../../context/LiveDataContext'
 import { useToast } from '../../../context/ToastContext'
@@ -138,9 +138,8 @@ export function InviteModal({ open, onClose, fixedRole }: InviteModalProps) {
                 placeholder="name@yourschool.ac.ug"
                 required
               />
-              <TextField
+              <PasswordField
                 label="Password (optional)"
-                type="text"
                 autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

@@ -1,7 +1,7 @@
 import { KeyRound } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Button } from '../../../components/ui/Button'
-import { TextField } from '../../../components/ui/Field'
+import { PasswordField } from '../../../components/ui/Field'
 import { Modal } from '../../../components/ui/Modal'
 import type { UserAccount } from '../../../data/adminUsers'
 import { useToast } from '../../../context/ToastContext'
@@ -54,15 +54,14 @@ export function SetPasswordModal({ user, onClose }: { user: UserAccount | null; 
       }
     >
       <form id="set-password-form" onSubmit={save} className="space-y-3">
-        <TextField
+        <PasswordField
           label="New password"
-          type="text"
           autoComplete="new-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           minLength={8}
           required
-          hint="At least 8 characters. Shown as you type so you can pass it on exactly."
+          hint="At least 8 characters. Use the eye to check what you typed before passing it on."
         />
         {error && <p className="text-sm text-bad-ink" role="alert">{error}</p>}
       </form>

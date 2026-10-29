@@ -4,7 +4,7 @@ import { useLiveData } from '../../../../context/LiveDataContext'
 import { useToast } from '../../../../context/ToastContext'
 import { api } from '../../../../lib/api'
 import { DemoNotice } from '../../../../components/ui/DemoNotice'
-import { TextField } from '../../../../components/ui/Field'
+import { PasswordField } from '../../../../components/ui/Field'
 import { Card, CardHeader } from '../../../../components/ui/Card'
 import { StatusBadge } from '../../../../components/ui/StatusBadge'
 import { SettingsSection } from './SettingsSection'
@@ -37,9 +37,9 @@ export function SecuritySection() {
     <div className="space-y-6">
       <SettingsSection title="Change password" description="Use at least 8 characters." saveLabel="Update password" onSave={changePassword}>
         <div className="grid max-w-md grid-cols-1 gap-4">
-          <TextField label="Current password" type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} required />
-          <TextField label="New password" type="password" autoComplete="new-password" minLength={8} value={next} onChange={(e) => setNext(e.target.value)} required />
-          <TextField label="Confirm new password" type="password" autoComplete="new-password" minLength={8} value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
+          <PasswordField label="Current password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} required />
+          <PasswordField label="New password" autoComplete="new-password" minLength={8} value={next} onChange={(e) => setNext(e.target.value)} required />
+          <PasswordField label="Confirm new password" autoComplete="new-password" minLength={8} value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
         </div>
         {!live && <DemoNotice className="mt-4">Offline — sign in while connected to change your password.</DemoNotice>}
       </SettingsSection>

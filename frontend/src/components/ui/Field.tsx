@@ -1,5 +1,6 @@
+import { Eye, EyeOff } from 'lucide-react'
 import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
-import { useId } from 'react'
+import { useId, useState } from 'react'
 import { cn } from '../../lib/cn'
 
 export const inputClasses =
@@ -33,6 +34,37 @@ export function TextField({ label, hint, className, hideLabel, ...rest }: TextFi
     <FieldWrapper label={label} hint={hint} className={className} hideLabel={hideLabel}>
       {(id) => <input id={id} className={cn(inputClasses, 'h-10')} {...rest} />}
     </FieldWrapper>
+  )
+}
+
+/** A password input with an eye button that shows or hides what was typed. */
+export function PasswordField({ label, hint, className, hideLabel, ...rest }: Omit<TextFieldProps, 'type'>) {
+  const [shown, setShown] = useState(false)
+  return (
+    <FieldWrapper label={label} hint={hint} className={className} hideLabel={hideLabel}>
+      {(id) => (
+        <div className="relative">
+          <input id={id} type={shown ? 'text' : 'password'} className={cn(inputClasses, 'h-10 pr-10')} {...rest} />
+          <RevealButton shown={shown} onToggle={() => setShown((s) => !s)} className="text-ink-3 hover:text-ink" />
+        </div>
+      )}
+    </FieldWrapper>
+  )
+}
+
+/** The eye button inside a password input (also used by the dark sign-in fields). */
+export function RevealButton({ shown, onToggle, className }: { shown: boolean; onToggle: () => void; className?: string }) {
+  const Icon = shown ? EyeOff : Eye
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={shown ? 'Hide password' : 'Show password'}
+      aria-pressed={shown}
+      className={cn('absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-lg', className)}
+    >
+      <Icon className="size-4" aria-hidden />
+    </button>
   )
 }
 

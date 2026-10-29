@@ -2,7 +2,7 @@ import { ArrowLeft, ArrowRight, GraduationCap, HeartHandshake, Presentation, Sch
 import { useId, useState, type FormEvent, type InputHTMLAttributes } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
-import { TextField } from '../../components/ui/Field'
+import { RevealButton, TextField } from '../../components/ui/Field'
 import { Modal } from '../../components/ui/Modal'
 import { useSession } from '../../context/SessionContext'
 import { api, ApiError } from '../../lib/api'
@@ -208,18 +208,24 @@ function ForgotPasswordModal({ initialEmail, onClose }: { initialEmail: string; 
   )
 }
 
-function DarkField({ label, ...props }: { label: string } & InputHTMLAttributes<HTMLInputElement>) {
+function DarkField({ label, type, ...props }: { label: string } & InputHTMLAttributes<HTMLInputElement>) {
   const id = useId()
+  const [shown, setShown] = useState(false)
+  const isPassword = type === 'password'
   return (
     <div>
       <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-white/85">
         {label}
       </label>
-      <input
-        id={id}
-        {...props}
-        className="w-full rounded-md border border-white/15 bg-black/40 px-3 py-2.5 text-sm text-white placeholder:text-white/30 outline-none transition-colors focus:border-[#5b93e6] focus:ring-1 focus:ring-[#5b93e6]"
-      />
+      <div className="relative">
+        <input
+          id={id}
+          type={isPassword && shown ? 'text' : type}
+          {...props}
+          className={`w-full rounded-md border border-white/15 bg-black/40 px-3 py-2.5 text-sm text-white placeholder:text-white/30 outline-none transition-colors focus:border-[#5b93e6] focus:ring-1 focus:ring-[#5b93e6] ${isPassword ? 'pr-10' : ''}`}
+        />
+        {isPassword && <RevealButton shown={shown} onToggle={() => setShown((s) => !s)} className="text-white/50 hover:text-white" />}
+      </div>
     </div>
   )
 }

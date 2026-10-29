@@ -1,5 +1,6 @@
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { useId, useState, type FormEvent, type InputHTMLAttributes } from 'react'
+import { RevealButton } from '../../components/ui/Field'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { AuthCanvas, AuthHeader, LOGO_BLUE, PhotoBackdrop } from './AuthChrome'
@@ -84,18 +85,24 @@ export function ResetPasswordPage() {
   )
 }
 
-function DarkField({ label, ...props }: { label: string } & InputHTMLAttributes<HTMLInputElement>) {
+function DarkField({ label, type, ...props }: { label: string } & InputHTMLAttributes<HTMLInputElement>) {
   const id = useId()
+  const [shown, setShown] = useState(false)
+  const isPassword = type === 'password'
   return (
     <div>
       <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-white/85">
         {label}
       </label>
-      <input
-        id={id}
-        {...props}
-        className="w-full rounded-md border border-white/15 bg-black/40 px-3 py-2.5 text-sm text-white placeholder:text-white/30 outline-none transition-colors focus:border-[#5b93e6] focus:ring-1 focus:ring-[#5b93e6]"
-      />
+      <div className="relative">
+        <input
+          id={id}
+          type={isPassword && shown ? 'text' : type}
+          {...props}
+          className={`w-full rounded-md border border-white/15 bg-black/40 px-3 py-2.5 text-sm text-white placeholder:text-white/30 outline-none transition-colors focus:border-[#5b93e6] focus:ring-1 focus:ring-[#5b93e6] ${isPassword ? 'pr-10' : ''}`}
+        />
+        {isPassword && <RevealButton shown={shown} onToggle={() => setShown((s) => !s)} className="text-white/50 hover:text-white" />}
+      </div>
     </div>
   )
 }
