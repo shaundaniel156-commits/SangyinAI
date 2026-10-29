@@ -40,8 +40,8 @@ export function InviteModal({ open, onClose, fixedRole }: InviteModalProps) {
   const [phone, setPhone] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  // Shown when the email could not be delivered, so the administrator can pass the password on themselves.
-  const [handover, setHandover] = useState<{ email: string; password: string; reason: string } | null>(null)
+  // The new account's one-time password, shown once so the administrator can pass it on (reason: why the email failed).
+  const [handover, setHandover] = useState<{ email: string; password: string; emailed: boolean; reason: string } | null>(null)
   const formId = fixedRole ? 'invite-teacher-form' : 'invite-user-form'
   const activeRole = fixedRole ?? role
   const isStaff = activeRole === 'teacher' || activeRole === 'admin'
@@ -71,11 +71,8 @@ export function InviteModal({ open, onClose, fixedRole }: InviteModalProps) {
       if (!account) {
         notify(`${name} already had an account`, { description: 'Their details were updated; their password was not changed.' })
         close()
-      } else if (account.emailSent) {
-        notify(`Account created for ${name}`, { description: `Sign-in details were emailed to ${account.email}.` })
-        close()
       } else {
-        setHandover({ email: account.email, password: account.tempPassword, reason: account.deliveryError ?? 'The email could not be sent.' })
+        setHandover({ email: account.email, password: account.tempPassword, emailed: Boolean(account.emailSent), reason: account.deliveryError ?? 'The email could not be sent.' })
       }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.')
@@ -110,9 +107,12 @@ export function InviteModal({ open, onClose, fixedRole }: InviteModalProps) {
       {handover ? (
         <div className="space-y-3 text-sm text-ink-2">
           <p>
-            The account for <strong className="text-ink">{handover.email}</strong> was created, but the email did not go out: {handover.reason}
+            The account for <strong className="text-ink">{handover.email}</strong> was created.{' '}
+            {handover.emailed ? 'Their sign-in details were emailed to them.' : <>The email did not go out: {handover.reason} Pass on this password yourself.</>}
           </p>
-          <p>Pass on this one-time password yourself. They should change it in Settings after signing in.</p>
+          <p>
+            One-time password (shown only now, it can’t be looked up later). They should change it in Settings after signing in.
+          </p>
           <p className="rounded-lg border border-line bg-surface-2 px-3.5 py-2.5 font-mono text-base text-ink select-all">{handover.password}</p>
         </div>
       ) : (
