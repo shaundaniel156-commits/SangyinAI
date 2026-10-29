@@ -77,7 +77,8 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
   try {
     res = await fetch(`${API_URL}${path}`, {
       method: init.method ?? (init.body !== undefined || init.form ? 'POST' : 'GET'),
-      headers: init.form ? { ...(getAuthToken() ? { Authorization: `Bearer ${getAuthToken()}` } : {}) } : apiHeaders(),
+      // Content-Type only goes with a JSON body: the server rejects an empty body labelled as JSON (e.g. a DELETE).
+      headers: init.body !== undefined ? apiHeaders() : { ...(getAuthToken() ? { Authorization: `Bearer ${getAuthToken()}` } : {}) },
       body: init.form ?? (init.body !== undefined ? JSON.stringify(init.body) : undefined),
     })
   } catch {
