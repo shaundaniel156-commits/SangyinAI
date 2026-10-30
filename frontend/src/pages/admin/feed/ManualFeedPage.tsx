@@ -11,6 +11,7 @@ import { Tabs } from '../../../components/ui/Tabs'
 import { useLiveData } from '../../../context/LiveDataContext'
 import { useSession } from '../../../context/SessionContext'
 import { useToast } from '../../../context/ToastContext'
+import { CLASSES } from '../../../data/classes'
 import { api } from '../../../lib/api'
 import { BulkUpload } from './BulkUpload'
 import { RowForm } from './RowForm'
@@ -33,7 +34,8 @@ export function ManualFeedPage() {
     ...(isAdmin ? [{ id: 'curriculum' as const, label: 'Curriculum and courses' }] : []),
     { id: 'references', label: 'Reference material' },
     { id: 'questions', label: 'Question bank' },
-    ...(isAdmin ? [{ id: 'people' as const, label: 'People and classes' }] : []),
+    // Admins add staff and classes; teachers add the students (and their parents) in their own classes.
+    { id: 'people' as const, label: isAdmin ? 'Staff and classes' : 'Students and parents' },
   ]
   const tab = (tabs.find((t) => t.id === params.get('tab'))?.id ?? tabs[0]!.id) as TabId
 
@@ -61,7 +63,7 @@ export function ManualFeedPage() {
           {tab === 'curriculum' && kinds.curriculum && <CurriculumTab kind={kinds.curriculum} onChanged={markChanged} />}
           {tab === 'references' && <ReferencesTab onChanged={markChanged} />}
           {tab === 'questions' && kinds.questions && <QuestionsTab kind={kinds.questions} onChanged={markChanged} canDeleteAll={isAdmin} />}
-          {tab === 'people' && <PeopleTab kinds={kinds} onChanged={markChanged} />}
+          {tab === 'people' && (isAdmin ? <PeopleTab kinds={kinds} onChanged={markChanged} /> : <StudentsTab kinds={kinds} onChanged={markChanged} />)}
         </>
       )}
     </>
@@ -413,9 +415,24 @@ const INSTITUTION_TYPES = [
   { value: 'university', label: 'University or college' },
 ]
 
+/** A teacher's students, with each student's and parent's account: only into classes the teacher teaches. */
+function StudentsTab({ kinds, onChanged }: { kinds: Partial<Record<FeedKindKey, FeedKindInfo>>; onChanged: () => void }) {
+  const kind = kinds.students
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-ink-2">
+        {CLASSES.length
+          ? <>Your classes: <strong className="text-ink">{CLASSES.map((c) => c.name).join(', ')}</strong>. Give a student email to create the student’s sign-in, and a parent email to create the parent’s; each gets a one-time password.</>
+          : 'You aren’t assigned to any class yet. Ask your administrator to add you to a class, then add its students here.'}
+      </p>
+      {kind && CLASSES.length > 0 && <AddPanels kind={kind} onSaved={onChanged} formTitle="Add a student" />}
+    </div>
+  )
+}
+
 function PeopleTab({ kinds, onChanged }: { kinds: Partial<Record<FeedKindKey, FeedKindInfo>>; onChanged: () => void }) {
   const { notify } = useToast()
-  const [section, setSection] = useState<'staff' | 'classes' | 'students'>('staff')
+  const [section, setSection] = useState<'staff' | 'classes'>('staff')
   const [institution, setInstitution] = useState<{ name: string; district: string | null; type: string } | null>(null)
   const [staff, setStaff] = useState<StaffMember[] | null>(null)
   const loadStaff = useCallback(() => { api<StaffMember[]>('/feed/staff').then(setStaff).catch(() => setStaff([])) }, [])
@@ -452,14 +469,14 @@ function PeopleTab({ kinds, onChanged }: { kinds: Partial<Record<FeedKindKey, Fe
       )}
 
       <div className="flex flex-wrap gap-2 text-sm" role="group" aria-label="What to add">
-        {(['staff', 'classes', 'students'] as const).map((s) => (
+        {(['staff', 'classes'] as const).map((s) => (
           <button key={s} type="button" onClick={() => setSection(s)} className={`rounded-md px-3 py-1.5 ${section === s ? 'bg-brand-soft font-medium text-brand-ink' : 'text-ink-2 hover:bg-surface-2'}`}>
-            {s === 'staff' ? '1. Staff (teachers, lecturers)' : s === 'classes' ? '2. Classes and cohorts' : '3. Students'}
+            {s === 'staff' ? '1. Staff (teachers, lecturers)' : '2. Classes and cohorts'}
           </button>
         ))}
       </div>
-      <p className="text-xs text-ink-3">Add in this order: staff first (so classes can name their teacher), then classes, then students.</p>
-      {kind && <AddPanels key={section} kind={kind} onSaved={saved} formTitle={section === 'staff' ? 'Add a staff member' : section === 'classes' ? 'Add a class or cohort' : 'Add a student'} />}
+      <p className="text-xs text-ink-3">Add staff first (so classes can name their teacher), then classes. Teachers then add the students and parents in their own classes.</p>
+      {kind && <AddPanels key={section} kind={kind} onSaved={saved} formTitle={section === 'staff' ? 'Add a staff member' : 'Add a class or cohort'} />}
 
       {section === 'staff' && (
         <Card>

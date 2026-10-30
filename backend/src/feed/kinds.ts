@@ -2,6 +2,7 @@ import { hash } from '@node-rs/argon2'
 import { randomInt } from 'node:crypto'
 import type { Role, SessionUser } from '../auth/session.ts'
 import { prisma } from '../db/client.ts'
+import { classScope } from '../routes/access.ts'
 
 /**
  * The Manual feed: everything an institution can add by form or spreadsheet. Each kind lists its columns
@@ -315,28 +316,52 @@ const classes: FeedKind = {
 
 const studentColumns: Column[] = [
   { key: 'name', header: 'Student name', aliases: ['Name', 'Full name', 'Learner name'], required: true, example: 'Amina Nakato', help: 'Full name.' },
-  { key: 'className', header: 'Class', aliases: ['Class name', 'Cohort', 'Stream'], required: true, example: 'BCS Year 1 (2026)', help: 'Must match a class name. Add classes first.' },
+  { key: 'className', header: 'Class', aliases: ['Class name', 'Cohort', 'Stream'], required: true, example: 'BCS Year 1 (2026)', help: 'One of the classes you teach.' },
   { key: 'regNumber', header: 'Registration number', aliases: ['Reg number', 'Reg no', 'Student number', 'LIN', 'Learner number'], example: '26/U/12345', help: 'Optional but recommended: used to update the same student next time.' },
+  { key: 'studentEmail', header: 'Student email', aliases: ['Learner email'], example: 'amina@example.com', help: 'Optional: creates the student’s own sign-in for the student portal.' },
   { key: 'guardianName', header: 'Parent or guardian name', aliases: ['Guardian name', 'Parent name', 'Guardian'], example: 'Joseph Nakato', help: 'Optional.' },
   { key: 'guardianEmail', header: 'Parent or guardian email', aliases: ['Guardian email', 'Parent email'], example: 'parent@example.com', help: 'Optional: creates (or links) a parent account for the parent portal.' },
   { key: 'guardianPhone', header: 'Parent or guardian phone', aliases: ['Guardian phone', 'Parent phone', 'Phone'], example: '+256700000000', help: 'Optional.' },
 ]
 
+// A class the teacher leads or teaches a subject in, by name. Teachers only add students to their own classes.
+function findOwnClass(user: SessionUser, name: string) {
+  return prisma.schoolClass.findFirst({ where: { ...classScope(user), name: { equals: name, mode: 'insensitive' } }, orderBy: { academicYear: 'desc' } })
+}
+
+// The student a row updates: the same registration number, or the same name in the same class.
+function findExistingStudent(schoolId: string, classId: string | undefined, r: Row) {
+  if (v(r, 'regNumber')) return prisma.student.findUnique({ where: { schoolId_regNumber: { schoolId, regNumber: v(r, 'regNumber') } } })
+  if (!classId) return Promise.resolve(null)
+  return prisma.student.findFirst({ where: { schoolId, classId, name: { equals: v(r, 'name'), mode: 'insensitive' } } })
+}
+
 const students: FeedKind = {
   key: 'students',
   label: 'Students',
-  description: 'Students in each class or cohort, with registration numbers and (optionally) parent accounts.',
-  roles: ['admin'],
+  description: 'Students in your classes, with registration numbers and (optionally) their own and their parents’ accounts.',
+  roles: ['teacher'],
   columns: studentColumns,
   async check(rows, user) {
     const seen = new Map<string, number>()
     for (const r of rows) if (v(r, 'regNumber')) seen.set(v(r, 'regNumber'), (seen.get(v(r, 'regNumber')) ?? 0) + 1)
-    return Promise.all(rows.map(async (r) => [
-      ...required(r, studentColumns),
-      ...(v(r, 'className') && !(await findClass(user.schoolId, v(r, 'className'))) ? [`No class called ${v(r, 'className')}: add it first`] : []),
-      ...((seen.get(v(r, 'regNumber')) ?? 0) > 1 ? ['The same registration number appears more than once'] : []),
-      ...(v(r, 'guardianEmail') && !isEmail(v(r, 'guardianEmail')) ? ['Parent email is not a valid email address'] : []),
-    ]))
+    return Promise.all(rows.map(async (r) => {
+      const cls = v(r, 'className') ? await findOwnClass(user, v(r, 'className')) : null
+      const existing = await findExistingStudent(user.schoolId, cls?.id, r)
+      // A registration number already used in someone else's class can't be moved or renamed from here.
+      const otherClass = existing && !(await prisma.schoolClass.findFirst({ where: { ...classScope(user), id: existing.classId }, select: { id: true } }))
+      const studentEmail = v(r, 'studentEmail').toLowerCase()
+      const emailOwner = isEmail(studentEmail) ? await prisma.user.findUnique({ where: { email: studentEmail } }) : null
+      return [
+        ...required(r, studentColumns),
+        ...(v(r, 'className') && !cls ? [`You don't teach a class called ${v(r, 'className')}`] : []),
+        ...(otherClass ? ['This registration number belongs to a student in a class you don’t teach'] : []),
+        ...((seen.get(v(r, 'regNumber')) ?? 0) > 1 ? ['The same registration number appears more than once'] : []),
+        ...(studentEmail && !isEmail(studentEmail) ? ['Student email is not a valid email address'] : []),
+        ...(emailOwner && emailOwner.id !== existing?.userId ? ['The student email already belongs to another account'] : []),
+        ...(v(r, 'guardianEmail') && !isEmail(v(r, 'guardianEmail')) ? ['Parent email is not a valid email address'] : []),
+      ]
+    }))
   },
   async apply(rows, user) {
     let created = 0
@@ -344,16 +369,23 @@ const students: FeedKind = {
     const accounts: NonNullable<ApplyResult['accounts']> = []
     const notes: string[] = []
     for (const r of rows) {
-      const cls = (await findClass(user.schoolId, v(r, 'className')))!
+      const cls = (await findOwnClass(user, v(r, 'className')))!
       const fields = { name: v(r, 'name'), classId: cls.id, ...(v(r, 'guardianName') ? { guardianName: v(r, 'guardianName') } : {}) }
-      const existing = v(r, 'regNumber')
-        ? await prisma.student.findUnique({ where: { schoolId_regNumber: { schoolId: user.schoolId, regNumber: v(r, 'regNumber') } } })
-        : await prisma.student.findFirst({ where: { schoolId: user.schoolId, classId: cls.id, name: { equals: v(r, 'name'), mode: 'insensitive' } } })
+      const existing = await findExistingStudent(user.schoolId, cls.id, r)
       const student = existing
         ? await prisma.student.update({ where: { id: existing.id }, data: fields })
         : await prisma.student.create({ data: { schoolId: user.schoolId, regNumber: v(r, 'regNumber') || null, ...fields } })
       if (existing) updated++
       else created++
+
+      // The student's own sign-in, the first time an email is given for them.
+      const studentEmail = v(r, 'studentEmail').toLowerCase()
+      if (studentEmail && !student.userId) {
+        const password = tempPassword()
+        const account = await prisma.user.create({ data: { schoolId: user.schoolId, email: studentEmail, name: student.name, role: 'student', status: 'active', passwordHash: await hash(password) } })
+        await prisma.student.update({ where: { id: student.id }, data: { userId: account.id } })
+        accounts.push({ name: account.name, email: studentEmail, role: 'student', tempPassword: password })
+      }
 
       const email = v(r, 'guardianEmail').toLowerCase()
       if (!email) continue

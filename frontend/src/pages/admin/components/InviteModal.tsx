@@ -28,7 +28,7 @@ interface CommitResult {
 
 /**
  * Creates a teacher or administrator account through the staff feed; the server emails the one-time password.
- * Students and parents are added on the Data page (students with their class, parents linked to their children).
+ * Student and parent accounts are made by teachers on the Manual feed, for the classes they teach.
  */
 export function InviteModal({ open, onClose, fixedRole }: InviteModalProps) {
   const { notify } = useToast()
@@ -160,11 +160,13 @@ export function InviteModal({ open, onClose, fixedRole }: InviteModalProps) {
             </>
           ) : (
             <p className="text-sm text-ink-2">
-              {activeRole === 'student' ? 'Students' : 'Parents'} are added on the{' '}
+              {activeRole === 'student' ? 'Student' : 'Parent'} accounts are made by teachers, for the classes they teach: in{' '}
+              <strong>Manual feed → Students and parents</strong>, a teacher adds each student with the student’s and parent’s emails. Make sure each
+              teacher is assigned to their classes (on the{' '}
               <Link to="/data" onClick={close} className="font-medium text-brand-ink underline">
-                Data page
+                Manual feed
               </Link>{' '}
-              under <strong>Students</strong>: each student goes into a class, and giving a parent's email there creates the parent's account and links it to their child.
+              under <strong>Classes</strong>, or when inviting them).
             </p>
           )}
         </form>
