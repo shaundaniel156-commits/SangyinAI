@@ -198,10 +198,12 @@ export async function feedRoutes(app: FastifyInstance) {
   app.get('/feed/staff', adminOnly, async (request) => {
     const users = await prisma.user.findMany({
       where: { schoolId: request.user!.schoolId, role: { in: ['teacher', 'admin'] } },
-      include: { classesTaught: { select: { name: true } } },
+      include: { classesTaught: { select: { name: true } }, classesLed: { select: { name: true } } },
       orderBy: { name: 'asc' },
     })
-    return users.map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role, status: u.status, subjects: u.subjects, classes: u.classesTaught.map((c) => c.name), lastActiveAt: u.lastActiveAt?.toISOString() ?? null }))
+    // Classes they lead (class teacher) or teach a subject in.
+    const classes = (u: (typeof users)[number]) => [...new Set([...u.classesLed, ...u.classesTaught].map((c) => c.name))]
+    return users.map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role, status: u.status, subjects: u.subjects, classes: classes(u), lastActiveAt: u.lastActiveAt?.toISOString() ?? null }))
   })
 
   // Every account in the school, for the administrator's Users page.

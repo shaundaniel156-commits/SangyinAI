@@ -1,3 +1,6 @@
+import { CLASSES } from '../data/classes'
+import { SCHOOL } from '../data/school'
+
 // The standard class names for a school's level and curriculum, offered when assigning a teacher to a class.
 // Keep in step with backend/src/feed/classLevels.ts.
 
@@ -14,6 +17,12 @@ export function classLevels(type: string, framework: string): string[] {
   if (type === 'secondary') return set.secondary
   if (type === 'mixed') return [...set.primary, ...set.secondary]
   return []
+}
+
+/** Class names to choose from: the school's standard classes (made on first use), then any other classes it has. */
+export function classChoices(): string[] {
+  const levels = classLevels(SCHOOL.level, SCHOOL.primaryFramework)
+  return [...levels, ...CLASSES.map((c) => c.name).filter((n) => !levels.some((l) => l.toLowerCase() === n.toLowerCase()))]
 }
 
 /** The school level and curriculum chosen on the "Your school" step before signing in. */

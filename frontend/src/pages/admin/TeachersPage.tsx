@@ -1,4 +1,4 @@
-import { Mail, UserPlus, UserX } from 'lucide-react'
+import { Mail, Plus, UserPlus, UserX } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Avatar } from '../../components/ui/Avatar'
 import { Button, buttonClasses } from '../../components/ui/Button'
@@ -14,6 +14,7 @@ import { getClass } from '../../data/classes'
 import { TEACHERS } from '../../data/teachers'
 import type { Subject, Teacher } from '../../types'
 import { ACCOUNT_STATUS_LABEL, AccountStatusBadge } from './components/AccountStatusBadge'
+import { AssignClassModal } from './components/AssignClassModal'
 import { InviteModal } from './components/InviteModal'
 import { TeacherDetails } from './components/TeacherDetails'
 
@@ -25,6 +26,7 @@ export function TeachersPage() {
   const [status, setStatus] = useState('all')
   const [selected, setSelected] = useState<Teacher | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
+  const [assigning, setAssigning] = useState<Teacher | null>(null)
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -109,7 +111,22 @@ export function TeachersPage() {
               id: 'classes',
               header: 'Classes',
               hideBelow: 'lg',
-              cell: (t) => <span className="text-ink-2">{t.classIds.map((id) => getClass(id)?.name).join(', ')}</span>,
+              cell: (t) => (
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  {t.classIds.length > 0 && <span className="text-ink-2">{t.classIds.map((id) => getClass(id)?.name).join(', ')}</span>}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setAssigning(t)
+                    }}
+                    className="inline-flex items-center gap-1 whitespace-nowrap text-sm font-medium text-brand-ink hover:underline"
+                  >
+                    <Plus className="size-3.5" aria-hidden />
+                    {t.classIds.length ? 'Add' : 'Assign class'}
+                  </button>
+                </div>
+              ),
             },
             { id: 'status', header: 'Status', cell: (t) => <AccountStatusBadge status={t.status} /> },
             { id: 'last', header: 'Last active', hideBelow: 'sm', className: 'whitespace-nowrap text-ink-2', cell: (t) => t.lastActive },
@@ -134,6 +151,7 @@ export function TeachersPage() {
         {selected && <TeacherDetails teacher={selected} />}
       </Drawer>
 
+      <AssignClassModal teacher={assigning} onClose={() => setAssigning(null)} />
       <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} fixedRole="teacher" />
     </>
   )
