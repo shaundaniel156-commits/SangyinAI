@@ -1,15 +1,14 @@
 import { ChevronDown, Menu, Search } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
-import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import { useSession } from '../../context/SessionContext'
 import { cn } from '../../lib/cn'
 import { NAVIGATION, type NavGroup, type NavItem } from '../../routes/navigation'
 import { Logo } from './Logo'
 import { NotificationMenu } from './NotificationMenu'
 import { UserMenu } from './UserMenu'
+import { useActiveNav } from './useActiveNav'
 import { usePopover } from './usePopover'
-
-const isActivePath = (pathname: string, to: string) => pathname === to || pathname.startsWith(to + '/')
 
 /**
  * Horizontal primary navigation. Always dark (the `dark` class scopes the dark tokens to this bar),
@@ -87,9 +86,9 @@ function TopLink({ item }: { item: NavItem }) {
 }
 
 function NavDropdown({ group }: { group: NavGroup }) {
-  const { pathname } = useLocation()
   const { open, setOpen, ref } = usePopover()
-  const active = group.items.some((i) => isActivePath(pathname, i.to))
+  const activeTo = useActiveNav()
+  const active = group.items.some((i) => i.to === activeTo)
 
   return (
     <div ref={ref} className="relative">
@@ -114,12 +113,10 @@ function NavDropdown({ group }: { group: NavGroup }) {
               to={item.to}
               role="menuitem"
               onClick={() => setOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium',
-                  isActive ? 'bg-brand-soft text-brand-ink' : 'text-ink-2 hover:bg-surface-3 hover:text-ink',
-                )
-              }
+              className={cn(
+                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium',
+                item.to === activeTo ? 'bg-brand-soft text-brand-ink' : 'text-ink-2 hover:bg-surface-3 hover:text-ink',
+              )}
             >
               <item.icon className="size-4 shrink-0" aria-hidden />
               {item.label}
