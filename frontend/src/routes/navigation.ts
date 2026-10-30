@@ -21,6 +21,7 @@ import {
   Target,
   TrendingUp,
   UserCog,
+  UserPlus,
   Users,
   Wand2,
 } from 'lucide-react'
@@ -53,6 +54,7 @@ export const NAVIGATION: Record<Role, NavGroup[]> = {
       items: [
         { label: 'Students', to: '/students', icon: GraduationCap },
         { label: 'Classes', to: '/classes', icon: Users },
+        { label: 'Add students & parents', to: '/data?tab=people', icon: UserPlus },
       ],
     },
     {

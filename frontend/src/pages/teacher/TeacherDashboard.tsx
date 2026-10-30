@@ -1,4 +1,4 @@
-import { AlertTriangle, BookOpen, Bot, ClipboardList, GraduationCap, Plus, Sparkles, Users, Wand2 } from 'lucide-react'
+import { AlertTriangle, BookOpen, Bot, ClipboardList, GraduationCap, Plus, Sparkles, UserPlus, Users, Wand2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { BarList } from '../../components/charts/BarList'
 import { ChartContainer } from '../../components/charts/ChartContainer'
@@ -43,9 +43,12 @@ export function TeacherDashboard() {
       <PageHeader
         hero
         title={`Welcome back, ${user.name}`}
-        description={`Here is an overview of your classes for ${SCHOOL.currentTerm}, ${SCHOOL.academicYear}.`}
+        description={`Here is an overview of your classes for ${[SCHOOL.currentTerm, SCHOOL.academicYear].filter(Boolean).join(', ')}.`}
         actions={
           <>
+            <ButtonLink to="/data?tab=people" variant="secondary" icon={<UserPlus className="size-4" aria-hidden />}>
+              Add students
+            </ButtonLink>
             <ButtonLink to="/guidance" variant="secondary" icon={<Sparkles className="size-4" aria-hidden />}>
               Review guidance
             </ButtonLink>
