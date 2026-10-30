@@ -9,6 +9,8 @@ import { authConfigured, requireUser, signToken } from './session.ts'
 const LoginSchema = z.object({
   email: z.string().trim().min(1).max(200),
   password: z.string().min(1).max(200),
+  // The school level and curriculum picked before signing in. Only an administrator's choice is saved to the school.
+  school: z.object({ type: z.enum(['primary', 'secondary']), framework: z.enum(['uganda', 'cambridge']) }).optional(),
 })
 
 export async function authRoutes(app: FastifyInstance) {
@@ -30,6 +32,7 @@ export async function authRoutes(app: FastifyInstance) {
     if (!user || !ok) return reply.code(401).send({ error: 'Wrong email or password.' })
 
     await prisma.user.update({ where: { id: user.id }, data: { lastActiveAt: new Date() } })
+    if (user.role === 'admin' && parsed.data.school) await prisma.school.update({ where: { id: user.schoolId }, data: parsed.data.school })
     return {
       token: signToken(user),
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
@@ -96,7 +99,7 @@ export async function authRoutes(app: FastifyInstance) {
   // The signed-in person's school (name shown in the sidebar, reports and settings).
   app.get('/school', { onRequest: requireUser }, async (request) => {
     const s = await prisma.school.findUniqueOrThrow({ where: { id: request.user!.schoolId } })
-    return { id: s.id, name: s.name, district: s.district, type: s.type }
+    return { id: s.id, name: s.name, district: s.district, type: s.type, framework: s.framework }
   })
 
   // Who am I? Lets the frontend check that a saved token is still valid.

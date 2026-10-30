@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, GraduationCap, HeartHandshake, Presentation, School } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BookOpen, Building2, Globe2, GraduationCap, HeartHandshake, Landmark, Presentation, School } from 'lucide-react'
 import { useId, useState, type FormEvent, type InputHTMLAttributes } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
@@ -6,6 +6,8 @@ import { RevealButton, TextField } from '../../components/ui/Field'
 import { Modal } from '../../components/ui/Modal'
 import { useSession } from '../../context/SessionContext'
 import { api, ApiError } from '../../lib/api'
+import { classLevels, CURRICULUM_LABEL, SCHOOL_TYPE_LABEL, type SchoolSetup } from '../../lib/classLevels'
+import { readStorage, writeStorage } from '../../lib/storage'
 import { ROLE_HOME, ROLE_LABEL } from '../../data/users'
 import { cn } from '../../lib/cn'
 import type { Role } from '../../types'
@@ -18,10 +20,32 @@ const ROLE_OPTIONS: { role: Role; icon: typeof School; heading: string; blurb: s
   { role: 'student', icon: GraduationCap, heading: 'Hi there! Ready to learn?', blurb: 'Continue your practice and see your progress.' },
 ]
 
-/** Standalone sign-in page, reached from the landing page at /. */
+const SETUP_KEY = 'sangyin.schoolSetup'
+
+function savedSetup(): SchoolSetup | null {
+  try {
+    const s = JSON.parse(readStorage(SETUP_KEY) ?? 'null') as SchoolSetup | null
+    return s && SCHOOL_TYPE_LABEL[s.type] && CURRICULUM_LABEL[s.framework] ? s : null
+  } catch {
+    return null
+  }
+}
+
+/** "Primary 1 to Primary 7" */
+const levelSpan = (s: SchoolSetup) => {
+  const l = classLevels(s.type, s.framework)
+  return `${l[0]} to ${l.at(-1)}`
+}
+
+/**
+ * Standalone sign-in page, reached from the landing page at /. It first asks for the school's level and curriculum
+ * (remembered on this device); an administrator signing in saves that choice to the school, which sets the classes offered.
+ */
 export function LoginPage() {
   const { signIn } = useSession()
   const navigate = useNavigate()
+  const [setup, setSetup] = useState<SchoolSetup | null>(savedSetup)
+  const [choosing, setChoosing] = useState(setup === null)
   const [role, setRole] = useState<Role>('teacher')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -40,7 +64,7 @@ export function LoginPage() {
     e.preventDefault()
     setError(null)
     setBusy(true)
-    const result = await signIn({ email, password, remember })
+    const result = await signIn({ email, password, remember, school: setup })
     setBusy(false)
     if (!result.ok) {
       setError(result.error)
@@ -67,6 +91,27 @@ export function LoginPage() {
             aria-hidden
           />
           <div className="relative rounded-2xl border border-white/10 bg-[#070b14]/85 p-6 shadow-2xl backdrop-blur transition duration-300 group-hover:border-[#5b93e6]/60 group-hover:shadow-[0_0_40px_rgba(91,147,230,0.35)] motion-safe:group-hover:-translate-y-1 sm:p-8">
+          {choosing ? (
+            <SchoolStep
+              initial={setup}
+              onDone={(s) => {
+                writeStorage(SETUP_KEY, JSON.stringify(s))
+                setSetup(s)
+                setChoosing(false)
+              }}
+            />
+          ) : (
+          <>
+          {setup && (
+            <p className="mb-5 flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/3 px-3 py-2 text-xs text-white/70">
+              <span>
+                {SCHOOL_TYPE_LABEL[setup.type]} · {CURRICULUM_LABEL[setup.framework]}
+              </span>
+              <button type="button" onClick={() => setChoosing(true)} className="font-medium hover:underline" style={{ color: ACCENT }}>
+                Change
+              </button>
+            </p>
+          )}
           <h1 className="text-2xl font-semibold tracking-tight">{current.heading}</h1>
           <p className="mt-1.5 text-sm text-white/60">{current.blurb}</p>
 
@@ -140,13 +185,99 @@ export function LoginPage() {
               <ArrowRight className="size-4" aria-hidden />
             </button>
           </form>
-
+          </>
+          )}
           </div>
         </div>
       </main>
 
       {forgotOpen && <ForgotPasswordModal initialEmail={email} onClose={() => setForgotOpen(false)} />}
     </AuthCanvas>
+  )
+}
+
+/** The step before signing in: the type of school and its curriculum. */
+function SchoolStep({ initial, onDone }: { initial: SchoolSetup | null; onDone: (s: SchoolSetup) => void }) {
+  const [type, setType] = useState<SchoolSetup['type'] | null>(initial?.type ?? null)
+  const [framework, setFramework] = useState<SchoolSetup['framework'] | null>(initial?.framework ?? null)
+  const ready = type && framework
+
+  return (
+    <div>
+      <h1 className="text-2xl font-semibold tracking-tight">Tell us about your school</h1>
+      <p className="mt-1.5 text-sm text-white/60">This sets up the classes you choose from, for example Primary 1 to Primary 7.</p>
+
+      <ChoiceGroup
+        legend="Type of school"
+        value={type}
+        onChange={setType}
+        options={[
+          { value: 'primary', icon: School, label: 'Primary school', detail: framework === 'cambridge' ? 'Grade 1 to 6' : 'Primary 1 to 7' },
+          { value: 'secondary', icon: Building2, label: 'Secondary school', detail: framework === 'cambridge' ? 'Grade 7 to 12' : 'Senior 1 to 6' },
+        ]}
+      />
+      <ChoiceGroup
+        legend="Curriculum"
+        value={framework}
+        onChange={setFramework}
+        options={[
+          { value: 'uganda', icon: Landmark, label: 'National', detail: 'Uganda national curriculum' },
+          { value: 'cambridge', icon: Globe2, label: 'Cambridge', detail: type === 'secondary' ? 'Cambridge Secondary' : 'Cambridge Primary' },
+        ]}
+      />
+
+      {ready && (
+        <p className="mt-5 flex items-start gap-2 text-sm text-white/70">
+          <BookOpen className="mt-0.5 size-4 shrink-0" style={{ color: ACCENT }} aria-hidden />
+          Classes: {levelSpan({ type, framework })}.
+        </p>
+      )}
+      <button
+        type="button"
+        disabled={!ready}
+        onClick={() => ready && onDone({ type, framework })}
+        className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+        style={{ backgroundColor: LOGO_BLUE }}
+      >
+        Continue to sign in
+        <ArrowRight className="size-4" aria-hidden />
+      </button>
+    </div>
+  )
+}
+
+function ChoiceGroup<T extends string>({ legend, value, onChange, options }: {
+  legend: string
+  value: T | null
+  onChange: (v: T) => void
+  options: { value: T; icon: typeof School; label: string; detail: string }[]
+}) {
+  return (
+    <fieldset className="mt-6">
+      <legend className="mb-2 text-sm font-medium">{legend}</legend>
+      <div className="grid grid-cols-2 gap-2">
+        {options.map((o) => {
+          const active = o.value === value
+          return (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => onChange(o.value)}
+              aria-pressed={active}
+              className={cn(
+                'flex flex-col items-center gap-1 rounded-xl border px-2 py-3 text-center text-sm font-medium transition-colors',
+                active ? 'bg-[#5b93e6]/10' : 'border-white/10 bg-white/2 text-white/70 hover:border-white/25 hover:text-white/90',
+              )}
+              style={active ? { borderColor: ACCENT, color: ACCENT } : undefined}
+            >
+              <o.icon className="size-5" aria-hidden />
+              {o.label}
+              <span className="text-xs font-normal text-white/50">{o.detail}</span>
+            </button>
+          )
+        })}
+      </div>
+    </fieldset>
   )
 }
 

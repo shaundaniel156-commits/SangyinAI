@@ -7,8 +7,10 @@ import { Modal } from '../../../components/ui/Modal'
 import { useLiveData } from '../../../context/LiveDataContext'
 import { useToast } from '../../../context/ToastContext'
 import { CLASSES } from '../../../data/classes'
+import { SCHOOL } from '../../../data/school'
 import { ROLE_LABEL } from '../../../data/users'
 import { api, ApiError } from '../../../lib/api'
+import { classLevels } from '../../../lib/classLevels'
 import type { Role } from '../../../types'
 
 interface InviteModalProps {
@@ -36,7 +38,7 @@ export function InviteModal({ open, onClose, fixedRole }: InviteModalProps) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<Role>(fixedRole ?? 'teacher')
-  const [classId, setClassId] = useState('')
+  const [className, setClassName] = useState('')
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -46,13 +48,16 @@ export function InviteModal({ open, onClose, fixedRole }: InviteModalProps) {
   const formId = fixedRole ? 'invite-teacher-form' : 'invite-user-form'
   const activeRole = fixedRole ?? role
   const isStaff = activeRole === 'teacher' || activeRole === 'admin'
+  // The school's standard classes (Primary 1–7, Senior 1–6, Grade 1–6 or 7–12; made on first use), then any other classes it has.
+  const levels = classLevels(SCHOOL.level, SCHOOL.primaryFramework)
+  const classNames = [...levels, ...CLASSES.map((c) => c.name).filter((n) => !levels.some((l) => l.toLowerCase() === n.toLowerCase()))]
 
   const close = () => {
     setName('')
     setEmail('')
     setPhone('')
     setPassword('')
-    setClassId('')
+    setClassName('')
     setError('')
     setHandover(null)
     onClose()
@@ -64,7 +69,6 @@ export function InviteModal({ open, onClose, fixedRole }: InviteModalProps) {
     setBusy(true)
     setError('')
     try {
-      const className = CLASSES.find((c) => c.id === classId)?.name ?? ''
       const result = await api<CommitResult>('/feed/staff/commit', {
         body: { rows: [{ name: name.trim(), email: email.trim(), role: activeRole, classes: className, phone: phone.trim(), password: password.trim() }] },
       })
@@ -151,9 +155,9 @@ export function InviteModal({ open, onClose, fixedRole }: InviteModalProps) {
               {activeRole === 'teacher' && (
                 <SelectField
                   label="Assign to class (optional)"
-                  value={classId}
-                  onChange={(e) => setClassId(e.target.value)}
-                  options={[{ value: '', label: 'Select later' }, ...CLASSES.map((c) => ({ value: c.id, label: c.name }))]}
+                  value={className}
+                  onChange={(e) => setClassName(e.target.value)}
+                  options={[{ value: '', label: 'Select later' }, ...classNames.map((n) => ({ value: n, label: n }))]}
                 />
               )}
               {error && <p className="text-sm text-bad-ink" role="alert">{error}</p>}

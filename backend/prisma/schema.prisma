@@ -110,6 +110,8 @@ model School {
   name          String
   district      String?
   type          InstitutionType     @default(primary)
+  // National (uganda) or Cambridge: decides the class names offered, e.g. Primary 1–7 or Grade 1–6.
+  framework     Framework           @default(uganda)
   createdAt     DateTime            @default(now())
   users         User[]
   classes       SchoolClass[]

@@ -4,6 +4,8 @@ import type { CurriculumFramework } from '../types'
 export const SCHOOL = {
   name: '',
   type: '',
+  /** primary, secondary, university or mixed: with primaryFramework, decides the class names offered (lib/classLevels.ts). */
+  level: '',
   location: '',
   primaryFramework: 'uganda' as CurriculumFramework,
   academicYear: String(new Date().getFullYear()),

@@ -18,7 +18,7 @@ import { SCHOOL } from '../data/school'
 import { COMPETENCIES, PARENT_CHILD_IDS, STUDENTS } from '../data/students'
 import { TEACHERS } from '../data/teachers'
 import { ROLE_USERS } from '../data/users'
-import type { AiAssessment, AppNotification, CurriculumFrameworkData, Assessment, AssessmentResult, DiagnosticReport, GuidancePlan, PracticeActivity, Role, SchoolClass, Student, Teacher } from '../types'
+import type { AiAssessment, AppNotification, CurriculumFramework, CurriculumFrameworkData, Assessment, AssessmentResult, DiagnosticReport, GuidancePlan, PracticeActivity, Role, SchoolClass, Student, Teacher } from '../types'
 import { api, getAuthProfile } from './api'
 
 /** AI assessments loaded for the signed-in user; AiAssessmentsContext starts from these. */
@@ -48,7 +48,7 @@ const lastActive = (iso: string | null) => {
 export async function loadLiveData(role: Role): Promise<void> {
   const staff = role === 'teacher' || role === 'admin'
   const [school, classes, students, assessments, guidance, notifications, aiAssessments, curriculum, diagnostics] = await Promise.all([
-    api<{ name: string; district: string | null; type: string }>('/school'),
+    api<{ name: string; district: string | null; type: string; framework: CurriculumFramework }>('/school'),
     api<SchoolClass[]>('/classes'),
     api<Student[]>('/students'),
     api<Assessment[]>('/assessments'),
@@ -71,7 +71,13 @@ export async function loadLiveData(role: Role): Promise<void> {
     : null
 
   // Everything loaded: swap it in.
-  Object.assign(SCHOOL, { name: school.name, location: school.district ?? '', type: SCHOOL_TYPE[school.type] ?? school.type })
+  Object.assign(SCHOOL, {
+    name: school.name,
+    location: school.district ?? '',
+    type: SCHOOL_TYPE[school.type] ?? school.type,
+    level: school.type,
+    primaryFramework: school.framework,
+  })
   replace(CLASSES, classes)
   replace(STUDENTS, students)
   replace(ASSESSMENTS, assessments)

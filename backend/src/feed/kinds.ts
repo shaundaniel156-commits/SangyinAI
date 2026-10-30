@@ -3,6 +3,7 @@ import { randomInt } from 'node:crypto'
 import type { Role, SessionUser } from '../auth/session.ts'
 import { prisma } from '../db/client.ts'
 import { classScope } from '../routes/access.ts'
+import { classLevels } from './classLevels.ts'
 
 /**
  * The Manual feed: everything an institution can add by form or spreadsheet. Each kind lists its columns
@@ -416,6 +417,12 @@ const staffColumns: Column[] = [
   { key: 'phone', header: 'Phone', example: '+256700000000', help: 'Optional.' },
 ]
 
+// The school's standard class name (e.g. "Primary 3", "Grade 8") matching this one, if any: such classes are made on first use.
+async function standardClassName(schoolId: string, name: string) {
+  const school = await prisma.school.findUniqueOrThrow({ where: { id: schoolId } })
+  return classLevels(school.type, school.framework).find((l) => same(l, name)) ?? null
+}
+
 function staffRole(raw: string): 'teacher' | 'admin' | null {
   const s = raw.toLowerCase().trim()
   if (!s || ['teacher', 'lecturer', 'tutor', 'instructor', 'professor', 'teaching assistant'].includes(s)) return 'teacher'
@@ -432,7 +439,7 @@ const staff: FeedKind = {
   async check(rows, user) {
     return Promise.all(rows.map(async (r) => {
       const other = isEmail(v(r, 'email')) ? await prisma.user.findUnique({ where: { email: v(r, 'email').toLowerCase() } }) : null
-      const missing = await Promise.all(list(v(r, 'classes')).map(async (c) => ((await findClass(user.schoolId, c)) ? null : c)))
+      const missing = await Promise.all(list(v(r, 'classes')).map(async (c) => ((await findClass(user.schoolId, c)) || (await standardClassName(user.schoolId, c)) ? null : c)))
       return [
         ...required(r, staffColumns),
         ...(v(r, 'email') && !isEmail(v(r, 'email')) ? ['Email is not a valid email address'] : []),
@@ -449,6 +456,15 @@ const staff: FeedKind = {
     const accounts: NonNullable<ApplyResult['accounts']> = []
     for (const r of rows) {
       const email = v(r, 'email').toLowerCase()
+      // Standard classes not made yet (e.g. "Primary 3") are added now; the first teacher assigned leads them.
+      const newClassIds: string[] = []
+      for (const c of list(v(r, 'classes'))) {
+        const name = !(await findClass(user.schoolId, c)) && (await standardClassName(user.schoolId, c))
+        if (!name) continue
+        const school = await prisma.school.findUniqueOrThrow({ where: { id: user.schoolId } })
+        const made = await prisma.schoolClass.create({ data: { schoolId: user.schoolId, name, level: name, framework: school.framework, academicYear: new Date().getFullYear(), subjects: [] } })
+        newClassIds.push(made.id)
+      }
       const classIds = (await Promise.all(list(v(r, 'classes')).map((c) => findClass(user.schoolId, c)))).filter(Boolean).map((c) => ({ id: c!.id }))
       const fields = { name: v(r, 'name'), role: staffRole(v(r, 'role'))!, ...(v(r, 'subjects') ? { subjects: list(v(r, 'subjects')) } : {}), ...(v(r, 'phone') ? { phone: v(r, 'phone') } : {}) }
       const existing = await prisma.user.findUnique({ where: { email } })
@@ -461,6 +477,10 @@ const staff: FeedKind = {
         await prisma.user.create({ data: { schoolId: user.schoolId, email, status: 'active', passwordHash: await hash(password), ...fields, ...(classIds.length ? { classesTaught: { connect: classIds } } : {}) } })
         accounts.push({ name: fields.name, email, role: fields.role, tempPassword: password, phone: fields.phone ?? null })
         created++
+      }
+      if (newClassIds.length) {
+        const teacher = await prisma.user.findUniqueOrThrow({ where: { email } })
+        await prisma.schoolClass.updateMany({ where: { id: { in: newClassIds } }, data: { teacherId: teacher.id } })
       }
     }
     return { created, updated, skipped: 0, notes: [`${created} account${created === 1 ? '' : 's'} created, ${updated} updated.`], accounts }

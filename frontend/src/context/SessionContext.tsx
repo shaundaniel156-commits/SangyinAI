@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import { ROLE_USERS } from '../data/users'
 import { API_URL, apiHeaders, getAuthProfile, setAuthToken, type AuthProfile } from '../lib/api'
 import { readStorage, writeStorage } from '../lib/storage'
+import type { SchoolSetup } from '../lib/classLevels'
 import type { Role, UserProfile } from '../types'
 
 /**
@@ -13,6 +14,8 @@ export interface SignInDetails {
   email: string
   password: string
   remember: boolean
+  /** The school level and curriculum picked before signing in (saved to the school for administrators). */
+  school?: SchoolSetup | null
 }
 
 export type SignInResult = { ok: true; role: Role } | { ok: false; error: string }
@@ -47,10 +50,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role | null>(initialRole)
   const [profile, setProfile] = useState<AuthProfile | null>(getAuthProfile)
 
-  const signIn = useCallback<SessionValue['signIn']>(async ({ email, password, remember }) => {
+  const signIn = useCallback<SessionValue['signIn']>(async ({ email, password, remember, school }) => {
     let res: Response
     try {
-      res = await fetch(`${API_URL}/auth/login`, { method: 'POST', headers: apiHeaders(), body: JSON.stringify({ email, password }) })
+      res = await fetch(`${API_URL}/auth/login`, { method: 'POST', headers: apiHeaders(), body: JSON.stringify({ email, password, ...(school ? { school } : {}) }) })
     } catch {
       return { ok: false, error: 'Can’t reach the Sangyin server. Check your connection and try again.' }
     }
