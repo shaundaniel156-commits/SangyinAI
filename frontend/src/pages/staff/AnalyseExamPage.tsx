@@ -1,5 +1,5 @@
-import { Plus, Sparkles, Stethoscope, Trash2 } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { FileText, Plus, Sparkles, Stethoscope, Trash2, Upload, X } from 'lucide-react'
+import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { Card, CardBody, CardHeader } from '../../components/ui/Card'
@@ -22,6 +22,34 @@ interface Row {
 
 const EMPTY_ROW: Row = { topic: '', score: '', outOf: '' }
 
+// A marked exam script, mark sheet or report card: PDFs and photos (scans and handwriting too), Word or text.
+const ACCEPT = '.pdf,.png,.jpg,.jpeg,.webp,.docx,.txt,.md,.csv'
+// Uploads pass through the site's proxy, which takes about 4.5 MB per request; photos are shrunk first, so this is for other files.
+const MAX_MB = 3
+const PHOTO_PX = 2000
+
+/** The file's contents as base64, without the "data:…;base64," prefix. */
+function readBase64(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '')
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
+}
+
+/** A phone photo scaled to at most PHOTO_PX on its longer side, as a JPEG: still sharp enough to read, a fraction of the size. */
+async function shrinkPhoto(file: File): Promise<File> {
+  const bitmap = await createImageBitmap(file)
+  const scale = Math.min(1, PHOTO_PX / Math.max(bitmap.width, bitmap.height))
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(bitmap.width * scale)
+  canvas.height = Math.round(bitmap.height * scale)
+  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85))
+  return blob ? new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }) : file
+}
+
 /**
  * Analyse exam results: the teacher enters one student's marks per topic or question and/or pastes the report,
  * and the AI diagnoses the competency gaps. The result opens as a diagnostic report.
@@ -38,18 +66,30 @@ export function AnalyseExamPage() {
   const [examTitle, setExamTitle] = useState('')
   const [rows, setRows] = useState<Row[]>([{ ...EMPTY_ROW }, { ...EMPTY_ROW }, { ...EMPTY_ROW }])
   const [report, setReport] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
   const setRow = (i: number, change: Partial<Row>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...change } : r)))
   const filled = rows.filter((r) => r.topic.trim() || r.score || r.outOf)
 
+  const chooseFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const picked = e.target.files?.[0]
+    e.target.value = ''
+    if (!picked) return
+    const chosen = picked.type.startsWith('image/') ? await shrinkPhoto(picked).catch(() => picked) : picked
+    if (chosen.size > MAX_MB * 1024 * 1024) return setError(`That file is over ${MAX_MB} MB. Try a smaller scan, fewer pages, or a photo.`)
+    setError('')
+    setFile(chosen)
+  }
+
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     setError('')
     const incomplete = filled.find((r) => !r.topic.trim() || r.score === '' || !Number(r.outOf))
     if (incomplete) return setError('Each mark row needs a topic, the marks scored and what it is out of.')
-    if (!filled.length && report.trim().length < 20) return setError('Enter marks for at least one topic, or paste the report.')
+    if (!filled.length && report.trim().length < 20 && !file) return setError('Enter marks for at least one topic, paste the report, or upload a document.')
     setBusy(true)
     try {
       const created = await api<DiagnosticReport>('/diagnostics', {
@@ -59,6 +99,7 @@ export function AnalyseExamPage() {
           examTitle: examTitle.trim(),
           items: filled.map((r) => ({ topic: r.topic.trim(), score: Number(r.score), outOf: Number(r.outOf) })),
           report: report.trim(),
+          ...(file ? { document: { name: file.name, data: await readBase64(file) } } : {}),
         },
       })
       await refresh()
@@ -78,7 +119,7 @@ export function AnalyseExamPage() {
       <PageHeader
         back={{ to: '/diagnostics', label: 'Diagnostics' }}
         title="Analyse exam results"
-        description="Enter a student’s marks from an exam or test, or paste their report. The AI finds the competency gaps and suggests next steps."
+        description="Enter a student’s marks from an exam or test, paste their report, or upload the marked script or report card. The AI finds the competency gaps and suggests next steps."
       />
 
       {students.length === 0 ? (
@@ -138,6 +179,30 @@ export function AnalyseExamPage() {
           </div>
 
           <div className="space-y-6 xl:col-span-2">
+            <Card>
+              <CardHeader title="Upload a document" description="Optional. A marked exam script, mark sheet or report card: PDF, photo, Word or text. Photos are made smaller automatically; other files up to 3 MB." />
+              <CardBody>
+                <input ref={fileInput} type="file" accept={ACCEPT} onChange={chooseFile} className="sr-only" tabIndex={-1} aria-hidden />
+                {file ? (
+                  <div className="flex items-center gap-3 rounded-lg border border-line bg-surface-2 px-3 py-2.5">
+                    <FileText className="size-5 shrink-0 text-brand-ink" aria-hidden />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-ink">{file.name}</p>
+                      <p className="text-xs text-ink-3">{(file.size / 1024 / 1024).toFixed(1)} MB · the AI will read it</p>
+                    </div>
+                    <button type="button" onClick={() => setFile(null)} aria-label="Remove document" className="rounded-md p-1.5 text-ink-3 hover:bg-surface-3 hover:text-bad-ink">
+                      <X className="size-4" aria-hidden />
+                    </button>
+                  </div>
+                ) : (
+                  <Button variant="secondary" onClick={() => fileInput.current?.click()} className="w-full" icon={<Upload className="size-4" aria-hidden />}>
+                    Upload document
+                  </Button>
+                )}
+                <p className="mt-2 text-xs text-ink-3">The document goes to the AI as it is, including any names written on it.</p>
+              </CardBody>
+            </Card>
+
             <Card>
               <CardHeader title="Report or comments" description="Optional. Paste the report card comments, or describe the mistakes you saw." />
               <CardBody>

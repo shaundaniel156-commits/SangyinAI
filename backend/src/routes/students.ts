@@ -37,6 +37,8 @@ export async function studentRoutes(app: FastifyInstance) {
     '/diagnostics',
     {
       onRequest: requireRole('teacher', 'admin'),
+      // Room for an uploaded document of up to 10 MB (sent as base64, about a third larger).
+      bodyLimit: 15 * 1024 * 1024,
       config: { rateLimit: { max: 20, timeWindow: '1 hour', hook: 'preHandler' as const, keyGenerator: (request: FastifyRequest) => request.user?.sub ?? request.ip } },
     },
     async (request, reply) => {
@@ -46,8 +48,14 @@ export async function studentRoutes(app: FastifyInstance) {
       const student = await prisma.student.findFirst({ where: { id: r.studentId, ...studentScope(request.user!) }, include: { class: true } })
       if (!student) return reply.code(404).send({ error: 'Student not found in your classes.' })
 
-      const result = await diagnoseExam(r, { classLevel: student.class.level, framework: student.class.framework, schoolId: request.user!.schoolId })
-      if (!result) return reply.code(503).send({ error: 'The AI is not available right now. Enter the marks for each topic so the gaps can be worked out from them, or try again later.' })
+      let result
+      try {
+        result = await diagnoseExam(r, { classLevel: student.class.level, framework: student.class.framework, schoolId: request.user!.schoolId })
+      } catch (error) {
+        request.log.warn(error, 'exam diagnosis: unreadable document')
+        return reply.code(400).send({ error: 'That document could not be read. Try a PDF or a clear photo instead.' })
+      }
+      if (!result) return reply.code(503).send({ error: 'The AI is not available right now, so the document or report could not be read. Enter the marks for each topic so the gaps can be worked out from them, or try again later.' })
 
       const { diagnosis, source } = result
       const names = (level: string) => diagnosis.competencies.filter((c) => c.level === level).map((c) => c.name)

@@ -45,11 +45,19 @@ async function withBusyRetry<R>(label: string, call: () => Promise<R>): Promise<
 
 // Asks Gemini for JSON in an exact shape, then checks the answer really fits that shape.
 // Returns null if Gemini gave no usable answer (blocked by a safety filter, empty, or the wrong shape).
-export async function askGeminiForJson<T>(schema: z.ZodType<T>, systemInstruction: string, prompt: string, label: string): Promise<T | null> {
+// files: documents for Gemini to read along with the prompt (a PDF or a photo, as base64).
+export async function askGeminiForJson<T>(
+  schema: z.ZodType<T>,
+  systemInstruction: string,
+  prompt: string,
+  label: string,
+  files: { mimeType: string; data: string }[] = [],
+): Promise<T | null> {
+  const contents = files.length ? [{ role: 'user', parts: [{ text: prompt }, ...files.map((inlineData) => ({ inlineData }))] }] : prompt
   const response = await withBusyRetry(label, () =>
     getGemini().models.generateContent({
       model: MODEL,
-      contents: prompt,
+      contents,
       config: {
         systemInstruction,
         responseMimeType: 'application/json',
