@@ -1,8 +1,9 @@
-import { ChevronRight, Stethoscope } from 'lucide-react'
+import { ChevronRight, FileSearch, Stethoscope } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { DiagnosticCard, LevelSplit } from '../../components/domain/DiagnosticCard'
 import { Avatar } from '../../components/ui/Avatar'
+import { ButtonLink } from '../../components/ui/Button'
 import { Card, CardHeader } from '../../components/ui/Card'
 import { DataTable } from '../../components/ui/DataTable'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -45,6 +46,11 @@ export function DiagnosticsPage() {
       <PageHeader
         title="Diagnostics"
         description="Competency-level diagnosis for each student and class, built from assessments, assignments, quizzes and teacher observations."
+        actions={
+          <ButtonLink to="/diagnostics/new" icon={<FileSearch className="size-4" aria-hidden />}>
+            Analyse exam results
+          </ButtonLink>
+        }
         meta={
           <>
             <StatusBadge icon={Stethoscope}>{reports.length} reports · Mathematics</StatusBadge>

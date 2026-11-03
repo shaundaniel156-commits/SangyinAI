@@ -169,7 +169,7 @@ export function toAiAssessment(a: AiAssessmentRow) {
 
 // The report as generated (a snapshot), in the frontend's DiagnosticReport shape.
 export function toDiagnostic(r: Prisma.DiagnosticReportGetPayload<object>, guidanceId?: string) {
-  const s = r.summary as { identifiedAreas: string[]; strengths: string[]; developing: string[]; needsSupport: string[]; competencies: unknown[]; evidence: unknown[]; processing: string }
+  const s = r.summary as { identifiedAreas: string[]; strengths: string[]; developing: string[]; needsSupport: string[]; competencies: unknown[]; evidence: unknown[]; processing: string; overview?: string; nextSteps?: string[]; basis?: string }
   return {
     id: r.id,
     studentId: r.studentId,
@@ -182,6 +182,8 @@ export function toDiagnostic(r: Prisma.DiagnosticReportGetPayload<object>, guida
     competencies: s.competencies,
     evidence: s.evidence,
     processing: s.processing,
+    // Reports made from exam results (Analyse exam results) carry the AI's overview and next steps.
+    ...(s.basis === 'exam' ? { basis: s.basis, overview: s.overview, nextSteps: s.nextSteps } : {}),
     ...(guidanceId ? { guidanceId } : {}),
   }
 }

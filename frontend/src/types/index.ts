@@ -143,6 +143,10 @@ export interface DiagnosticReport {
   /** Local vs. refined processing — displayed as a UI state only. */
   processing: 'local' | 'refined'
   guidanceId?: string
+  /** Made from exam results on Analyse exam results, with the AI's overview and next steps. */
+  basis?: 'exam'
+  overview?: string
+  nextSteps?: string[]
 }
 
 export type GuidanceStatus = 'pending_review' | 'approved' | 'revision_requested' | 'overridden'

@@ -73,7 +73,28 @@ export function DiagnosticDetailPage() {
         }
       />
 
-      {report.processing === 'local' && (
+      {report.basis === 'exam' && report.processing === 'local' && (
+        <DemoNotice className="mb-6">Worked out from the marks alone, because the AI was not available. Analyse the exam again later for the AI’s assessment.</DemoNotice>
+      )}
+      {report.basis === 'exam' && report.overview && (
+        <Card className="mb-6">
+          <CardHeader title={report.processing === 'refined' ? 'AI assessment' : 'Summary'} icon={<Sparkles aria-hidden />} />
+          <CardBody>
+            <p className="text-sm text-ink">{report.overview}</p>
+            {report.nextSteps && report.nextSteps.length > 0 && (
+              <>
+                <p className="mt-4 text-xs font-medium uppercase tracking-wide text-ink-3">Next steps</p>
+                <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-ink-2">
+                  {report.nextSteps.map((s) => (
+                    <li key={s}>{s}</li>
+                  ))}
+                </ol>
+              </>
+            )}
+          </CardBody>
+        </Card>
+      )}
+      {report.basis !== 'exam' && report.processing === 'local' && (
         <DemoNotice className="mb-6">
           Diagnosed on this device so it works offline. Complex or ambiguous cases are queued and refined by the larger cloud model once the
           school is back online.
@@ -185,6 +206,8 @@ export function DiagnosticDetailPage() {
                     Open guidance review
                   </ButtonLink>
                 </>
+              ) : report.basis === 'exam' ? (
+                <p className="text-sm text-ink-2">{report.needsSupport.length ? 'Follow the next steps above, then analyse the next test to see progress.' : 'No area currently requires support. Continue regular class practice.'}</p>
               ) : (
                 <p className="text-sm text-ink-2">No area currently requires support, so no guidance plan has been prepared. Continue regular class practice.</p>
               )}

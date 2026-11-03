@@ -1,5 +1,6 @@
-import type { FastifyInstance } from 'fastify'
-import { requireUser } from '../auth/session.ts'
+import type { FastifyInstance, FastifyRequest } from 'fastify'
+import { diagnoseExam, ExamDiagnosisRequestSchema } from '../ai/examDiagnosis.ts'
+import { requireRole, requireUser } from '../auth/session.ts'
 import { prisma } from '../db/client.ts'
 import { studentScope } from './access.ts'
 import { byName, studentInclude, toDiagnostic, toStudent } from './mappers.ts'
@@ -29,4 +30,46 @@ export async function studentRoutes(app: FastifyInstance) {
     })
     return reports.map((r) => toDiagnostic(r, r.student.guidancePlans[0]?.id))
   })
+
+  // Analyse exam results: a teacher enters one student's marks per topic and/or the written report, and the AI
+  // (or, without it, the marks alone) diagnoses the competency gaps. Saved as a diagnostic report.
+  app.post(
+    '/diagnostics',
+    {
+      onRequest: requireRole('teacher', 'admin'),
+      config: { rateLimit: { max: 20, timeWindow: '1 hour', hook: 'preHandler' as const, keyGenerator: (request: FastifyRequest) => request.user?.sub ?? request.ip } },
+    },
+    async (request, reply) => {
+      const parsed = ExamDiagnosisRequestSchema.safeParse(request.body)
+      if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Check the details and try again.' })
+      const r = parsed.data
+      const student = await prisma.student.findFirst({ where: { id: r.studentId, ...studentScope(request.user!) }, include: { class: true } })
+      if (!student) return reply.code(404).send({ error: 'Student not found in your classes.' })
+
+      const result = await diagnoseExam(r, { classLevel: student.class.level, framework: student.class.framework, schoolId: request.user!.schoolId })
+      if (!result) return reply.code(503).send({ error: 'The AI is not available right now. Enter the marks for each topic so the gaps can be worked out from them, or try again later.' })
+
+      const { diagnosis, source } = result
+      const names = (level: string) => diagnosis.competencies.filter((c) => c.level === level).map((c) => c.name)
+      const summary = {
+        overview: diagnosis.overview,
+        nextSteps: diagnosis.nextSteps,
+        identifiedAreas: [...names('needs_support'), ...names('developing')],
+        strengths: names('strength'),
+        developing: names('developing'),
+        needsSupport: names('needs_support'),
+        competencies: diagnosis.competencies.map((c, i) => ({ competencyId: `exam-${i + 1}`, name: c.name, topic: c.topic, subject: r.subject, score: c.score, level: c.level })),
+        evidence: [
+          ...r.items.map((i) => {
+            const pct = (i.score / i.outOf) * 100
+            return { assessmentTitle: r.examTitle, item: `${i.topic}: ${i.score} / ${i.outOf}`, outcome: pct >= 70 ? 'correct' : pct >= 40 ? 'partial' : 'incorrect' }
+          }),
+        ],
+        processing: source === 'gemini' ? 'refined' : 'local',
+        basis: 'exam',
+      }
+      const report = await prisma.diagnosticReport.create({ data: { studentId: student.id, subject: r.subject, summary } })
+      return reply.code(201).send(toDiagnostic(report))
+    },
+  )
 }

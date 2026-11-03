@@ -14,6 +14,7 @@ import { ReportsPage } from './pages/staff/ReportsPage'
 import { PerformancePage } from './pages/staff/PerformancePage'
 import { DiagnosticsPage } from './pages/staff/DiagnosticsPage'
 import { DiagnosticDetailPage } from './pages/staff/DiagnosticDetailPage'
+import { AnalyseExamPage } from './pages/staff/AnalyseExamPage'
 import { GuidancePage } from './pages/staff/GuidancePage'
 import { GuidanceDetailPage } from './pages/staff/GuidanceDetailPage'
 import { AcademicStructurePage } from './pages/admin/AcademicStructurePage'
@@ -71,6 +72,7 @@ export default function App() {
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/performance" element={<PerformancePage />} />
         <Route path="/diagnostics" element={<DiagnosticsPage />} />
+        <Route path="/diagnostics/new" element={<AnalyseExamPage />} />
         <Route path="/diagnostics/:id" element={<DiagnosticDetailPage />} />
         <Route path="/guidance" element={<GuidancePage />} />
         <Route path="/guidance/:id" element={<GuidanceDetailPage />} />
