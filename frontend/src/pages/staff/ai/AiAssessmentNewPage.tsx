@@ -1,7 +1,7 @@
-import { Check, FileUp, Loader2, Sparkles, Users } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
+import { Check, FileSearch, FileUp, Loader2, Plus, Sparkles, Users, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button } from '../../../components/ui/Button'
+import { Button, ButtonLink } from '../../../components/ui/Button'
 import { Card, CardBody, CardHeader } from '../../../components/ui/Card'
 import { SelectField, TextArea, TextField } from '../../../components/ui/Field'
 import { PageHeader } from '../../../components/ui/PageHeader'
@@ -17,7 +17,6 @@ import {
   DIFFICULTY_LABEL,
   QUESTION_TYPE_LABEL,
   availableQuestionCount,
-  curriculumTopicsFor,
   detectGaps,
   generateAssessmentDraft,
   studentsWithGaps,
@@ -41,11 +40,12 @@ function subjectsFor(classId: string): Subject[] {
   return own.length ? own : SUBJECTS
 }
 
-/** Pre-select the worst gap (the one with most students needing support). */
+/** Automatic: pre-select every topic in the results where a student needs support. */
 function defaultSelection(classId: string, subject: Subject): string[] {
-  const top = detectGaps(classId, subject)[0]
-  return top && top.needsSupport > 0 ? [top.competency] : []
+  return detectGaps(classId, subject).filter((g) => g.needsSupport > 0).map((g) => g.competency)
 }
+
+type TopicMode = 'auto' | 'manual'
 
 export function AiAssessmentNewPage() {
   const { role } = useSession()
@@ -56,7 +56,12 @@ export function AiAssessmentNewPage() {
 
   const [classId, setClassId] = useState(classes[0]?.id ?? '')
   const [subject, setSubject] = useState<Subject>(() => (subjectsFor(classes[0]?.id ?? '').includes('Mathematics') ? 'Mathematics' : subjectsFor(classes[0]?.id ?? '')[0] ?? 'Mathematics'))
-  const [selected, setSelected] = useState<string[]>(() => defaultSelection(classes[0]?.id ?? '', subject))
+  // Automatic: topics detected from the class's exam results; manual: topics the teacher types.
+  const [mode, setMode] = useState<TopicMode>('auto')
+  const [autoSelected, setAutoSelected] = useState<string[]>(() => defaultSelection(classes[0]?.id ?? '', subject))
+  const [manualTopics, setManualTopics] = useState<string[]>([])
+  const [topicInput, setTopicInput] = useState('')
+  const selected = mode === 'auto' ? autoSelected : manualTopics
   const { live } = useLiveData()
   const [includeDeveloping, setIncludeDeveloping] = useState(false)
   const [excluded, setExcluded] = useState<Set<string>>(new Set())
@@ -70,19 +75,11 @@ export function AiAssessmentNewPage() {
   const [genStep, setGenStep] = useState(0)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const scored = useMemo(() => detectGaps(classId, subject), [classId, subject])
-  const gaps = useMemo(
-    () => [
-      ...scored.map((g) => ({ ...g, untracked: false })),
-      ...curriculumTopicsFor(classId, subject).filter((t) => !scored.some((g) => g.competency === t)).map((t) => ({ competency: t, subject, needsSupport: 0, developing: 0, average: 0, untracked: true })),
-    ],
-    [scored, classId, subject],
-  )
-  // Topics without scores can't pick out students who need them, so the whole class is offered.
-  const anyUntracked = selected.some((c) => gaps.find((g) => g.competency === c)?.untracked)
+  const gaps = useMemo(() => detectGaps(classId, subject), [classId, subject])
+  // Typed topics have no results to pick out the students who need them, so the whole class is offered.
   const candidates = useMemo(
-    () => (anyUntracked ? getStudentsByClass(classId) : studentsWithGaps(classId, selected, includeDeveloping)),
-    [anyUntracked, classId, selected, includeDeveloping],
+    () => (mode === 'manual' ? getStudentsByClass(classId) : studentsWithGaps(classId, subject, selected, includeDeveloping)),
+    [mode, classId, subject, selected, includeDeveloping],
   )
   const recipients = candidates.filter((s) => !excluded.has(s.id))
   const available = availableQuestionCount(selected, types)
@@ -102,8 +99,22 @@ export function AiAssessmentNewPage() {
     const subjectToUse = options.includes(nextSubject) ? nextSubject : (options[0] ?? nextSubject)
     setClassId(nextClass)
     setSubject(subjectToUse)
-    setSelected(defaultSelection(nextClass, subjectToUse))
+    setAutoSelected(defaultSelection(nextClass, subjectToUse))
     setExcluded(new Set())
+  }
+
+  const addTopics = () => {
+    // Several topics can be typed at once, separated by commas or semicolons.
+    const typed = topicInput.split(/[,;]/).map((t) => t.trim()).filter(Boolean)
+    if (!typed.length) return
+    setManualTopics((ts) => [...ts, ...typed.filter((t) => !ts.some((x) => x.toLowerCase() === t.toLowerCase()))])
+    setTopicInput('')
+  }
+  const onTopicKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      addTopics()
+    }
   }
 
   const toggle = <T,>(list: T[], item: T) => (list.includes(item) ? list.filter((x) => x !== item) : [...list, item])
@@ -173,54 +184,108 @@ export function AiAssessmentNewPage() {
               </div>
 
               <fieldset>
-                <legend className="mb-2 text-sm font-medium text-ink">Competency gaps and topics — choose which to target</legend>
-                {gaps.length === 0 && (
-                  <p className="rounded-xl border border-dashed border-line px-4 py-3 text-sm text-ink-3">
-                    No scores or curriculum topics for {subject} yet. Add its topics in the Manual feed (Curriculum and courses), then come back.
-                  </p>
-                )}
-                <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line">
-                  {gaps.map((g) => {
-                    const on = selected.includes(g.competency)
-                    return (
-                      <li key={g.competency}>
-                        <label className={cn('flex cursor-pointer items-center gap-4 px-4 py-3 transition-colors', on ? 'bg-brand-soft' : 'hover:bg-surface-2')}>
-                          <input
-                            type="checkbox"
-                            checked={on}
-                            onChange={() => {
-                              setSelected((s) => toggle(s, g.competency))
-                              setExcluded(new Set())
-                            }}
-                            className="size-4 rounded border-line-strong accent-brand-600"
-                          />
-                          <span className="min-w-0 flex-1">
-                            <span className="block text-sm font-medium text-ink">{g.competency}</span>
-                            {g.untracked ? (
-                              <span className="mt-1 block text-xs text-ink-3">Curriculum topic · no scores yet</span>
-                            ) : (
-                            <span className="mt-1.5 flex items-center gap-2">
-                              <span className="h-1.5 w-28 overflow-hidden rounded-full bg-surface-3" aria-hidden>
-                                <span
-                                  className={cn('block h-full rounded-full', g.average < 60 ? 'bg-bad' : g.average < 70 ? 'bg-warn' : 'bg-good')}
-                                  style={{ width: `${g.average}%` }}
-                                />
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                  <legend className="text-sm font-medium text-ink">Topics to target</legend>
+                  <SegmentedControl<TopicMode>
+                    label="How to choose topics"
+                    value={mode}
+                    onChange={(m) => {
+                      setMode(m)
+                      setExcluded(new Set())
+                    }}
+                    options={[
+                      { id: 'auto', label: 'Automatic' },
+                      { id: 'manual', label: 'Type my own' },
+                    ]}
+                  />
+                </div>
+
+                {mode === 'manual' ? (
+                  <div className="space-y-3">
+                    <div className="flex items-end gap-2">
+                      <TextField
+                        label="Topic"
+                        hideLabel
+                        value={topicInput}
+                        onChange={(e) => setTopicInput(e.target.value)}
+                        onKeyDown={onTopicKey}
+                        placeholder="e.g. Fractions, Word problems with money"
+                        className="flex-1"
+                      />
+                      <Button variant="secondary" onClick={addTopics} disabled={!topicInput.trim()} icon={<Plus className="size-4" aria-hidden />}>
+                        Add
+                      </Button>
+                    </div>
+                    {manualTopics.length ? (
+                      <ul className="flex flex-wrap gap-2">
+                        {manualTopics.map((t) => (
+                          <li key={t} className="inline-flex items-center gap-1 rounded-full border border-line bg-brand-soft py-1 pl-3 pr-1 text-sm font-medium text-brand-ink">
+                            {t}
+                            <button type="button" onClick={() => setManualTopics((ts) => ts.filter((x) => x !== t))} aria-label={`Remove ${t}`} className="rounded-full p-1 hover:bg-surface-3">
+                              <X className="size-3.5" aria-hidden />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-xs text-ink-3">Type a topic and press Enter or Add. Separate several with commas.</p>
+                    )}
+                  </div>
+                ) : gaps.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-line px-4 py-4 text-sm text-ink-3">
+                    <p>No exam results for {subject} in this class yet, so there are no topics to detect.</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <ButtonLink to="/diagnostics/new" size="sm" variant="secondary" icon={<FileSearch className="size-4" aria-hidden />}>
+                        Analyse exam results
+                      </ButtonLink>
+                      <Button size="sm" variant="secondary" onClick={() => setMode('manual')}>
+                        Type my own topics
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="mb-2 text-xs text-ink-3">
+                      Detected from the class’s exam results. Topics where a student needs support are ticked; untick any you don’t want.
+                    </p>
+                    <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line">
+                      {gaps.map((g) => {
+                        const on = autoSelected.includes(g.competency)
+                        return (
+                          <li key={g.competency}>
+                            <label className={cn('flex cursor-pointer items-center gap-4 px-4 py-3 transition-colors', on ? 'bg-brand-soft' : 'hover:bg-surface-2')}>
+                              <input
+                                type="checkbox"
+                                checked={on}
+                                onChange={() => {
+                                  setAutoSelected((s) => toggle(s, g.competency))
+                                  setExcluded(new Set())
+                                }}
+                                className="size-4 rounded border-line-strong accent-brand-600"
+                              />
+                              <span className="min-w-0 flex-1">
+                                <span className="block text-sm font-medium text-ink">{g.competency}</span>
+                                <span className="mt-1.5 flex items-center gap-2">
+                                  <span className="h-1.5 w-28 overflow-hidden rounded-full bg-surface-3" aria-hidden>
+                                    <span
+                                      className={cn('block h-full rounded-full', g.average < 60 ? 'bg-bad' : g.average < 70 ? 'bg-warn' : 'bg-good')}
+                                      style={{ width: `${g.average}%` }}
+                                    />
+                                  </span>
+                                  <span className="tabular text-xs text-ink-3">Class mastery {g.average}%</span>
+                                </span>
                               </span>
-                              <span className="tabular text-xs text-ink-3">Class mastery {g.average}%</span>
-                            </span>
-                            )}
-                          </span>
-                          {!g.untracked && (
-                            <span className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-2">
-                              {g.needsSupport > 0 && <StatusBadge tone="bad">{g.needsSupport} need support</StatusBadge>}
-                              <StatusBadge tone="warn">{g.developing} developing</StatusBadge>
-                            </span>
-                          )}
-                        </label>
-                      </li>
-                    )
-                  })}
-                </ul>
+                              <span className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-2">
+                                {g.needsSupport > 0 && <StatusBadge tone="bad">{g.needsSupport} need support</StatusBadge>}
+                                <StatusBadge tone="warn">{g.developing} developing</StatusBadge>
+                              </span>
+                            </label>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </>
+                )}
               </fieldset>
             </CardBody>
           </Card>
@@ -280,9 +345,14 @@ export function AiAssessmentNewPage() {
           <Card>
             <CardHeader
               title="Who receives it"
-              description={`${recipients.length} of ${candidates.length} students with these gaps`}
+              description={
+                mode === 'manual'
+                  ? `${recipients.length} of ${candidates.length} students in the class (untick any who don’t need it)`
+                  : `${recipients.length} of ${candidates.length} students with these gaps`
+              }
               icon={<Users className="size-5" aria-hidden />}
             />
+            {mode === 'auto' && (
             <div className="border-b border-line px-6 py-3">
               <label className="flex items-center gap-2 text-sm text-ink-2">
                 <input
@@ -297,8 +367,11 @@ export function AiAssessmentNewPage() {
                 Also include students who are still developing
               </label>
             </div>
+            )}
             {candidates.length === 0 ? (
-              <p className="px-6 py-5 text-sm text-ink-3">Choose at least one gap to see the students who need it.</p>
+              <p className="px-6 py-5 text-sm text-ink-3">
+                {mode === 'manual' ? 'This class has no students yet.' : 'Choose at least one topic to see the students who need it.'}
+              </p>
             ) : (
               <ul className="max-h-72 divide-y divide-line overflow-y-auto">
                 {candidates.map((s) => (

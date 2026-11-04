@@ -51,7 +51,7 @@ function Review({ assessment: a }: { assessment: AiAssessment }) {
   const draft = a.status === 'draft'
   const cls = getClass(a.classId)
   const used = new Set(a.questions.map((q) => q.sourceId))
-  const candidates = studentsWithGaps(a.classId, a.competencies, true)
+  const candidates = studentsWithGaps(a.classId, a.subject, a.competencies, true)
   const chosen = new Set(a.studentIds)
   const canAdd = extraQuestion(a.competencies, used) !== null
   const ready = a.questions.length > 0 && a.studentIds.length > 0 && a.title.trim().length > 0

@@ -9,8 +9,9 @@
 import { AI_QUESTION_BANK, type QuestionBank } from '../data/aiQuestionBank'
 import { getClass } from '../data/classes'
 import { CURRICULUM_FRAMEWORKS, getFramework } from '../data/curriculum'
-import { COMPETENCIES, getStudentsByClass } from '../data/students'
-import type { AiAssessment, AiDifficulty, AiQuestion, AiQuestionType, Student, Subject } from '../types'
+import { DIAGNOSTIC_REPORTS } from '../data/diagnostics'
+import { getStudentsByClass } from '../data/students'
+import type { AiAssessment, AiDifficulty, AiQuestion, AiQuestionType, CompetencyLevel, Student, Subject } from '../types'
 import { API_URL, apiHeaders } from './api'
 
 export const DIFFICULTY_LABEL: Record<AiDifficulty | 'mixed', string> = {
@@ -35,28 +36,48 @@ export interface CompetencyGap {
 }
 
 /** Competency gaps for one class and subject, read from recorded results (worst first). */
+/**
+ * Each student's results per topic in a subject: their competency scores, overridden by their latest exam analysis
+ * (Analyse exam results) for that subject. Topic name → student id → result.
+ */
+function resultsByTopic(classId: string, subject: Subject): Map<string, Map<string, { score: number; level: CompetencyLevel }>> {
+  const byTopic = new Map<string, Map<string, { score: number; level: CompetencyLevel }>>()
+  const add = (topic: string, studentId: string, score: number, level: CompetencyLevel) => {
+    if (!byTopic.has(topic)) byTopic.set(topic, new Map())
+    byTopic.get(topic)!.set(studentId, { score, level })
+  }
+  for (const s of getStudentsByClass(classId)) {
+    for (const c of s.competencies) if (c.subject === subject) add(c.name, s.id, c.score, c.level)
+    const latest = DIAGNOSTIC_REPORTS.filter((r) => r.studentId === s.id && r.subject.toLowerCase() === subject.toLowerCase()).sort((a, b) => b.generatedOn.localeCompare(a.generatedOn))[0]
+    for (const c of latest?.competencies ?? []) add(c.name, s.id, c.score, c.level)
+  }
+  return byTopic
+}
+
+/** The topics found in the class's results for a subject, the weakest first. Topics nobody has results for are left out. */
 export function detectGaps(classId: string, subject: Subject): CompetencyGap[] {
-  const students = getStudentsByClass(classId)
-  return COMPETENCIES.filter((c) => c.subject === subject)
-    .map((c) => {
-      const scores = students.flatMap((s) => s.competencies.filter((sc) => sc.competencyId === c.id))
+  return [...resultsByTopic(classId, subject)]
+    .map(([competency, results]) => {
+      const scores = [...results.values()]
       return {
-        competency: c.name,
+        competency,
         subject,
         needsSupport: scores.filter((s) => s.level === 'needs_support').length,
         developing: scores.filter((s) => s.level === 'developing').length,
-        average: Math.round(scores.reduce((t, s) => t + s.score, 0) / Math.max(scores.length, 1)),
+        average: Math.round(scores.reduce((t, s) => t + s.score, 0) / scores.length),
       }
     })
     .sort((a, b) => b.needsSupport - a.needsSupport || a.average - b.average)
 }
 
 /** Students in the class who need help with at least one of the chosen competencies. */
-export function studentsWithGaps(classId: string, competencies: string[], includeDeveloping: boolean): Student[] {
-  const wanted = new Set(competencies)
-  return getStudentsByClass(classId).filter((s) =>
-    s.competencies.some((c) => wanted.has(c.name) && (c.level === 'needs_support' || (includeDeveloping && c.level === 'developing'))),
-  )
+export function studentsWithGaps(classId: string, subject: Subject, competencies: string[], includeDeveloping: boolean): Student[] {
+  const needing = new Set<string>()
+  for (const [topic, results] of resultsByTopic(classId, subject)) {
+    if (!competencies.includes(topic)) continue
+    for (const [id, r] of results) if (r.level === 'needs_support' || (includeDeveloping && r.level === 'developing')) needing.add(id)
+  }
+  return getStudentsByClass(classId).filter((s) => needing.has(s.id))
 }
 
 export interface GenerateInput {
