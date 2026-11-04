@@ -1,9 +1,9 @@
-import { Check, FileSearch, FileUp, Loader2, Plus, Sparkles, Users, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, FileSearch, FileText, FileUp, Loader2, Plus, SendHorizontal, Sparkles, Users, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, ButtonLink } from '../../../components/ui/Button'
 import { Card, CardBody, CardHeader } from '../../../components/ui/Card'
-import { SelectField, TextArea, TextField } from '../../../components/ui/Field'
+import { SelectField, TextArea, TextField, inputClasses } from '../../../components/ui/Field'
 import { PageHeader } from '../../../components/ui/PageHeader'
 import { StatusBadge } from '../../../components/ui/StatusBadge'
 import { SegmentedControl } from '../../../components/ui/Tabs'
@@ -21,8 +21,10 @@ import {
   generateAssessmentDraft,
   studentsWithGaps,
   subjectsForClass,
+  type AiDraft,
 } from '../../../lib/aiAssessment'
 import { cn } from '../../../lib/cn'
+import { formatDate } from '../../../lib/format'
 import { subjectChoices } from '../../../lib/subjects'
 import type { AiDifficulty, AiQuestionType, Subject } from '../../../types'
 import { WorkflowSteps } from './WorkflowSteps'
@@ -31,7 +33,40 @@ const SUBJECTS: Subject[] = ['Mathematics', 'English']
 const COUNTS = ['5', '8', '10'] as const
 const DIFFICULTIES: (AiDifficulty | 'mixed')[] = ['foundation', 'mixed', 'core', 'stretch']
 const TYPES: AiQuestionType[] = ['multiple_choice', 'short_answer', 'written_work']
-const GENERATION_STEPS = ['Reading report data', 'Mapping gaps to curriculum objectives', 'Writing questions and answer keys', 'Preparing the draft for your review']
+const GENERATION_STEPS = ['Reading your report data', 'Mapping the gaps to curriculum objectives', 'Writing the questions and answer keys', 'Writing the teaching plan']
+
+/** One turn in the conversation with the AI, shown after "Generate assessment". */
+interface ChatMessage {
+  id: number
+  role: 'user' | 'ai'
+  text: string
+  /** AI turns: still working. */
+  thinking?: boolean
+  /** AI turns: the assessment it drafted, once ready. */
+  draft?: AiDraft
+}
+
+/** The teacher's request, in words, from the form. */
+function describeRequest(r: { className: string; subject: string; topics: string[]; students: number; count: number; difficulty: AiDifficulty | 'mixed'; types: AiQuestionType[]; dueDate: string; notes: string }): string {
+  const lines = [
+    `Draft a ${r.subject} assessment for ${r.className} on ${r.topics.join(', ')}.`,
+    `${r.count} questions, ${DIFFICULTY_LABEL[r.difficulty].toLowerCase()} difficulty, ${r.types.map((t) => QUESTION_TYPE_LABEL[t].toLowerCase()).join(' and ')}, for ${r.students} student${r.students === 1 ? '' : 's'}${r.dueDate ? `, due ${formatDate(r.dueDate)}` : ''}.`,
+  ]
+  if (r.notes) lines.push(`Notes: ${r.notes}`)
+  return lines.join('\n')
+}
+
+/** The AI's reply: what it drafted and why (its rationale), the plan in brief, and what to do next. */
+function describeDraft(draft: AiDraft, className: string): string {
+  const n = draft.questions.length
+  const s = draft.studentIds.length
+  const parts = [`Here is “${draft.title}”: ${n} question${n === 1 ? '' : 's'} for ${s} student${s === 1 ? '' : 's'} in ${className}, on ${draft.competencies.join(', ')}.`]
+  if (draft.source === 'offline') parts.push('I could not reach the AI service just now, so these questions come from the reviewed question bank and the teaching plan is a general one. Reply “try again” in a few minutes for questions written for this class.')
+  parts.push(...draft.rationale.filter((line) => !line.startsWith('Prepared offline')))
+  if (draft.teachingPlan) parts.push(`Teaching plan: ${draft.teachingPlan.overview}`)
+  parts.push('Open it to read every question and the full teaching plan, change anything, then approve and send. Or reply below with what to change — for example “make them easier” or “add a word problem about money”.')
+  return parts.join('\n\n')
+}
 
 const inAWeek = () => new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10)
 
@@ -72,8 +107,11 @@ export function AiAssessmentNewPage() {
   const [dueDate, setDueDate] = useState(inAWeek)
   const [notes, setNotes] = useState('')
   const [fileName, setFileName] = useState('')
-  const [generating, setGenerating] = useState(false)
-  const [genStep, setGenStep] = useState(0)
+  // The conversation with the AI, once "Generate assessment" is pressed; empty while the form is shown.
+  const [chat, setChat] = useState<ChatMessage[]>([])
+  const [busy, setBusy] = useState(false)
+  // Changes the teacher asked for in replies; each new version is drafted with all of them.
+  const [followUps, setFollowUps] = useState<string[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
 
   const gaps = useMemo(() => detectGaps(classId, subject), [classId, subject])
@@ -86,13 +124,6 @@ export function AiAssessmentNewPage() {
   const available = availableQuestionCount(selected, types)
   // Online, the AI writes the questions; the local bank only matters offline.
   const canGenerate = selected.length > 0 && recipients.length > 0 && types.length > 0 && (live || available > 0)
-
-  // Walk through the progress messages while the (simulated) model works.
-  useEffect(() => {
-    if (!generating) return
-    const t = window.setInterval(() => setGenStep((s) => Math.min(s + 1, GENERATION_STEPS.length - 1)), 650)
-    return () => window.clearInterval(t)
-  }, [generating])
 
   const changeScope = (nextClass: string, nextSubject: Subject) => {
     // A class may not have the current subject (e.g. moving from P6 to a university cohort).
@@ -129,9 +160,16 @@ export function AiAssessmentNewPage() {
     e.target.value = ''
   }
 
-  const generate = async () => {
-    setGenStep(0)
-    setGenerating(true)
+  const className = classes.find((c) => c.id === classId)?.name ?? 'the class'
+
+  // Asks the AI: the first time from the form, afterwards with the teacher's reply added to the notes.
+  const ask = async (followUp?: string) => {
+    const asked = followUp ? [...followUps, followUp] : followUps
+    setFollowUps(asked)
+    const userText = followUp ?? describeRequest({ className, subject, topics: selected, students: recipients.length, count: Number(count), difficulty, types, dueDate, notes: notes.trim() })
+    const aiId = Date.now()
+    setChat((c) => [...c, { id: aiId - 1, role: 'user', text: userText }, { id: aiId, role: 'ai', text: '', thinking: true }])
+    setBusy(true)
     const draft = await generateAssessmentDraft({
       classId,
       subject,
@@ -141,19 +179,37 @@ export function AiAssessmentNewPage() {
       difficulty,
       types,
       dueDate,
-      reportNotes: notes.trim(),
+      reportNotes: [notes.trim(), ...asked.map((f) => `Teacher's follow-up request: ${f}`)].filter(Boolean).join('\n\n'),
     })
+    setChat((c) => c.map((m) => (m.id === aiId ? { ...m, text: describeDraft(draft, className), draft, thinking: false } : m)))
+    setBusy(false)
+  }
+
+  // "Open and review": saves the version the teacher chose and opens it.
+  const open = async (draft: AiDraft) => {
     try {
       const saved = await create(draft)
-      notify('Draft ready for your review', { description: `${saved.questions.length} questions for ${saved.studentIds.length} students.` })
+      notify('Assessment ready for your review', { description: `${saved.questions.length} questions for ${saved.studentIds.length} students.` })
       navigate(`/ai-assessments/${saved.id}`)
     } catch (error) {
-      setGenerating(false)
-      notify('Draft not saved', { tone: 'info', description: (error as Error).message })
+      notify('Assessment not saved', { tone: 'info', description: (error as Error).message })
     }
   }
 
-  if (generating) return <GeneratingView step={genStep} />
+  if (chat.length) {
+    return (
+      <ChatView
+        messages={chat}
+        busy={busy}
+        onReply={(text) => void ask(text)}
+        onOpen={(draft) => void open(draft)}
+        onBack={() => {
+          setChat([])
+          setFollowUps([])
+        }}
+      />
+    )
+  }
 
   return (
     <>
@@ -415,8 +471,8 @@ export function AiAssessmentNewPage() {
                   Only {available} questions are available for {selected.length === 1 ? 'this gap' : 'these gaps'}. Select another gap or question type for a longer assessment.
                 </p>
               )}
-              <Button size="lg" className="w-full" disabled={!canGenerate} onClick={generate} icon={<Sparkles className="size-4" aria-hidden />}>
-                Generate draft
+              <Button size="lg" className="w-full" disabled={!canGenerate} onClick={() => void ask()} icon={<Sparkles className="size-4" aria-hidden />}>
+                Generate assessment
               </Button>
               <p className="text-xs text-ink-3">Drafted by the AI (or the question bank when offline). You review every question before anything is sent.</p>
             </CardBody>
@@ -436,31 +492,146 @@ function SummaryLine({ ok, children }: { ok: boolean; children: ReactNode }) {
   )
 }
 
-function GeneratingView({ step }: { step: number }) {
+/** Reveals text a few characters at a time, like someone typing. */
+function useTypewriter(text: string): string {
+  const [shown, setShown] = useState(0)
+  useEffect(() => {
+    setShown(0)
+    if (!text) return
+    const t = window.setInterval(() => setShown((n) => (n >= text.length ? n : n + 4)), 16)
+    return () => window.clearInterval(t)
+  }, [text])
+  return text.slice(0, Math.min(shown, text.length))
+}
+
+interface ChatViewProps {
+  messages: ChatMessage[]
+  busy: boolean
+  onReply: (text: string) => void
+  onOpen: (draft: AiDraft) => void
+  onBack: () => void
+}
+
+/** The conversation: the teacher's request, the AI's reply with the assessment attached, and a box to ask for changes. */
+function ChatView({ messages, busy, onReply, onOpen, onBack }: ChatViewProps) {
+  const [reply, setReply] = useState('')
+  const endRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [messages])
+
+  const send = () => {
+    const text = reply.trim()
+    if (!text || busy) return
+    setReply('')
+    onReply(text)
+  }
+
   return (
-    <div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center text-center" role="status" aria-live="polite">
-      <span className="relative grid size-20 place-items-center">
-        <span className="absolute inset-0 animate-ping rounded-full bg-brand-500/20" aria-hidden />
-        <span className="relative grid size-16 place-items-center rounded-full bg-brand-600 text-white shadow-[0_0_40px_rgba(91,147,230,0.5)]">
-          <Sparkles className="size-7" aria-hidden />
-        </span>
+    <div className="mx-auto flex min-h-[70vh] max-w-3xl flex-col">
+      <button type="button" onClick={onBack} className="inline-flex items-center gap-1 self-start text-sm text-ink-3 transition-colors hover:text-ink">
+        <ArrowLeft className="size-4" aria-hidden />
+        Change the report data
+      </button>
+      <div className="flex-1 space-y-8 py-8">
+        {messages.map((m) =>
+          m.role === 'user' ? (
+            <div key={m.id} className="flex justify-end">
+              <p className="max-w-[85%] whitespace-pre-line rounded-2xl bg-surface-2 px-5 py-3 text-[15px] leading-relaxed text-ink">{m.text}</p>
+            </div>
+          ) : (
+            <AiTurn key={m.id} message={m} onOpen={onOpen} />
+          ),
+        )}
+        <div ref={endRef} />
+      </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          send()
+        }}
+        className="sticky bottom-4 flex items-center gap-2 rounded-2xl border border-line bg-surface p-2 shadow-lg"
+      >
+        <input
+          value={reply}
+          onChange={(e) => setReply(e.target.value)}
+          disabled={busy}
+          placeholder={busy ? 'The AI is working…' : 'Reply with changes, e.g. “make them easier” or “add a question about money”'}
+          aria-label="Reply to the AI"
+          className={cn(inputClasses, 'h-10 border-0 bg-transparent shadow-none focus:ring-0')}
+        />
+        <Button type="submit" size="sm" disabled={busy || !reply.trim()} icon={<SendHorizontal className="size-4" aria-hidden />}>
+          Send
+        </Button>
+      </form>
+      <p className="mt-3 text-center text-xs text-ink-3">Drafted by the AI (or the question bank when offline). You review every question before anything is sent.</p>
+    </div>
+  )
+}
+
+/** One reply from the AI: its working while it drafts, then its message typed out and the assessment attached. */
+function AiTurn({ message: m, onOpen }: { message: ChatMessage; onOpen: (draft: AiDraft) => void }) {
+  const shown = useTypewriter(m.text)
+  const [step, setStep] = useState(0)
+  const typing = shown.length < m.text.length
+
+  useEffect(() => {
+    if (!m.thinking) return
+    const t = window.setInterval(() => setStep((n) => Math.min(n + 1, GENERATION_STEPS.length - 1)), 2500)
+    return () => window.clearInterval(t)
+  }, [m.thinking])
+
+  return (
+    <div className="flex gap-3">
+      <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-brand-600 text-white">
+        <Sparkles className="size-4" aria-hidden />
       </span>
-      <h1 className="mt-8 text-2xl font-bold tracking-tight text-ink">Drafting your assessment…</h1>
-      <p className="mt-2 text-sm text-ink-3">This usually takes a few seconds.</p>
-      <ol className="mt-8 w-full space-y-3 text-left">
-        {GENERATION_STEPS.map((label, i) => (
-          <li key={label} className={cn('flex items-center gap-3 text-sm transition-opacity', i > step && 'opacity-40')}>
-            {i < step ? (
-              <Check className="size-4 text-good" aria-hidden />
-            ) : i === step ? (
-              <Loader2 className="size-4 animate-spin text-brand-600" aria-hidden />
-            ) : (
-              <span className="size-4 rounded-full border border-line-strong" aria-hidden />
-            )}
-            <span className={i === step ? 'font-medium text-ink' : 'text-ink-2'}>{label}</span>
-          </li>
-        ))}
-      </ol>
+      <div className="min-w-0 flex-1">
+        {m.thinking ? (
+          <p className="flex items-center gap-2 text-sm text-ink-3" role="status" aria-live="polite">
+            <Loader2 className="size-4 animate-spin text-brand-600" aria-hidden />
+            {GENERATION_STEPS[step]}…
+          </p>
+        ) : (
+          <>
+            <p className="text-xs text-ink-3">{m.draft?.source === 'offline' ? 'From the question bank' : 'Written by the AI'} · read your report data, drafted questions and a teaching plan</p>
+            <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed text-ink">
+              {shown}
+              {typing && (
+                <span className="animate-pulse text-brand-600" aria-hidden>
+                  ▍
+                </span>
+              )}
+            </p>
+            {m.draft && !typing && <DraftCard draft={m.draft} onOpen={() => onOpen(m.draft!)} />}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** The drafted assessment, attached to the AI's reply. */
+function DraftCard({ draft, onOpen }: { draft: AiDraft; onOpen: () => void }) {
+  const n = draft.questions.length
+  const s = draft.studentIds.length
+  return (
+    <div className="mt-4 inline-flex max-w-full flex-col gap-3 rounded-xl border border-line bg-surface-2 p-4">
+      <div className="flex items-center gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand-ink">
+          <FileText className="size-5" aria-hidden />
+        </span>
+        <div className="min-w-0">
+          <p className="truncate font-semibold text-ink">{draft.title}</p>
+          <p className="text-xs text-ink-3">
+            {n} question{n === 1 ? '' : 's'} · {s} student{s === 1 ? '' : 's'} · {draft.subject} · {DIFFICULTY_LABEL[draft.difficulty]}
+          </p>
+        </div>
+      </div>
+      <Button size="sm" onClick={onOpen} icon={<ArrowRight className="size-4" aria-hidden />}>
+        Open and review
+      </Button>
     </div>
   )
 }
