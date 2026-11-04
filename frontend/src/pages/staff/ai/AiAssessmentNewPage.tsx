@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Check, FileSearch, FileText, FileUp, Loader2, Plus, SendHorizontal, Sparkles, Users, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, FileSearch, FileText, FileUp, Loader2, Plus, RefreshCw, SendHorizontal, Sparkles, Users, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, ButtonLink } from '../../../components/ui/Button'
@@ -60,6 +60,9 @@ function describeRequest(r: { className: string; subject: string; topics: string
 function describeDraft(draft: AiDraft, className: string): string {
   const n = draft.questions.length
   const s = draft.studentIds.length
+  if (n === 0) {
+    return `I could not write an assessment on ${draft.competencies.join(', ')} just now: the AI service was busy and the question bank has nothing for ${n === 0 && draft.competencies.length === 1 ? 'this topic' : 'these topics'} yet. This is usually over in a few minutes — press Try again, or reply with a different topic.`
+  }
   const parts = [`Here is “${draft.title}”: ${n} question${n === 1 ? '' : 's'} for ${s} student${s === 1 ? '' : 's'} in ${className}, on ${draft.competencies.join(', ')}.`]
   if (draft.source === 'offline') parts.push('I could not reach the AI service just now, so these questions come from the reviewed question bank and the teaching plan is a general one. Reply “try again” in a few minutes for questions written for this class.')
   parts.push(...draft.rationale.filter((line) => !line.startsWith('Prepared offline')))
@@ -192,7 +195,8 @@ export function AiAssessmentNewPage() {
       notify('Assessment ready for your review', { description: `${saved.questions.length} questions for ${saved.studentIds.length} students.` })
       navigate(`/ai-assessments/${saved.id}`)
     } catch (error) {
-      notify('Assessment not saved', { tone: 'info', description: (error as Error).message })
+      const message = (error as Error).message
+      notify('Assessment not saved', { tone: 'info', description: message === 'Invalid draft' ? 'The draft has no questions. Press Try again.' : message })
     }
   }
 
@@ -202,6 +206,7 @@ export function AiAssessmentNewPage() {
         messages={chat}
         busy={busy}
         onReply={(text) => void ask(text)}
+        onRetry={() => void ask()}
         onOpen={(draft) => void open(draft)}
         onBack={() => {
           setChat([])
@@ -508,12 +513,14 @@ interface ChatViewProps {
   messages: ChatMessage[]
   busy: boolean
   onReply: (text: string) => void
+  /** Asks again with the same brief (after a failed attempt). */
+  onRetry: () => void
   onOpen: (draft: AiDraft) => void
   onBack: () => void
 }
 
 /** The conversation: the teacher's request, the AI's reply with the assessment attached, and a box to ask for changes. */
-function ChatView({ messages, busy, onReply, onOpen, onBack }: ChatViewProps) {
+function ChatView({ messages, busy, onReply, onRetry, onOpen, onBack }: ChatViewProps) {
   const [reply, setReply] = useState('')
   const endRef = useRef<HTMLDivElement>(null)
 
@@ -541,7 +548,7 @@ function ChatView({ messages, busy, onReply, onOpen, onBack }: ChatViewProps) {
               <p className="max-w-[85%] whitespace-pre-line rounded-2xl bg-surface-2 px-5 py-3 text-[15px] leading-relaxed text-ink">{m.text}</p>
             </div>
           ) : (
-            <AiTurn key={m.id} message={m} onOpen={onOpen} />
+            <AiTurn key={m.id} message={m} onOpen={onOpen} onRetry={onRetry} busy={busy} />
           ),
         )}
         <div ref={endRef} />
@@ -571,7 +578,7 @@ function ChatView({ messages, busy, onReply, onOpen, onBack }: ChatViewProps) {
 }
 
 /** One reply from the AI: its working while it drafts, then its message typed out and the assessment attached. */
-function AiTurn({ message: m, onOpen }: { message: ChatMessage; onOpen: (draft: AiDraft) => void }) {
+function AiTurn({ message: m, onOpen, onRetry, busy }: { message: ChatMessage; onOpen: (draft: AiDraft) => void; onRetry: () => void; busy: boolean }) {
   const shown = useTypewriter(m.text)
   const [step, setStep] = useState(0)
   const typing = shown.length < m.text.length
@@ -604,7 +611,12 @@ function AiTurn({ message: m, onOpen }: { message: ChatMessage; onOpen: (draft: 
                 </span>
               )}
             </p>
-            {m.draft && !typing && <DraftCard draft={m.draft} onOpen={() => onOpen(m.draft!)} />}
+            {m.draft && !typing && m.draft.questions.length > 0 && <DraftCard draft={m.draft} onOpen={() => onOpen(m.draft!)} />}
+            {m.draft && !typing && m.draft.questions.length === 0 && (
+              <Button size="sm" variant="secondary" className="mt-4" disabled={busy} onClick={onRetry} icon={<RefreshCw className="size-4" aria-hidden />}>
+                Try again
+              </Button>
+            )}
           </>
         )}
       </div>

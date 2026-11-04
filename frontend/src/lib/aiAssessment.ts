@@ -95,6 +95,22 @@ export interface GenerateInput {
 
 export type AiDraft = Omit<AiAssessment, 'id' | 'createdOn' | 'status' | 'sentOn'>
 
+// "ratio and proportions", "RATIO & PROPORTION" and "Ratio and Proportion" are the same topic: compare names without case, punctuation, "and" or a final s.
+const topicKey = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .split(' ')
+    .filter((w) => w && !['and', 'the', 'of'].includes(w))
+    .map((w) => w.replace(/s$/, ''))
+    .join(' ')
+
+/** The local bank's questions for a topic, matched loosely by name. */
+function bankFor(competency: string): QuestionBank[] {
+  const key = topicKey(competency)
+  return Object.entries(AI_QUESTION_BANK).find(([name]) => topicKey(name) === key)?.[1] ?? []
+}
+
 let questionSeq = 0
 const toQuestion = (competency: string, q: QuestionBank): AiQuestion => ({ ...q, id: `q-${Date.now().toString(36)}-${questionSeq++}`, competency })
 
@@ -105,7 +121,7 @@ const matches = (q: QuestionBank, difficulty: GenerateInput['difficulty'], types
 function pickQuestions(input: GenerateInput): AiQuestion[] {
   const order: AiDifficulty[] = ['foundation', 'core', 'stretch']
   const pools = input.competencies.map((c) => {
-    const bank = AI_QUESTION_BANK[c] ?? []
+    const bank = bankFor(c)
     const preferred = bank.filter((q) => matches(q, input.difficulty, input.types))
     const fallback = bank.filter((q) => !preferred.includes(q) && input.types.includes(q.type))
     const sorted = [...preferred, ...fallback].sort((a, b) => order.indexOf(a.difficulty) - order.indexOf(b.difficulty))
@@ -186,7 +202,9 @@ function buildRationale(input: GenerateInput, questions: AiQuestion[]): string[]
   lines.push(
     `Questions start with ${foundation} foundation item${foundation === 1 ? '' : 's'} to rebuild confidence, then move to core and stretch items so progress can be measured.`,
   )
-  if (questions.length < input.questionCount) {
+  if (questions.length === 0) {
+    lines.push(`The AI service could not be reached and the question bank has nothing yet for ${input.competencies.join(', ')}, so no questions were written. Try again in a few minutes.`)
+  } else if (questions.length < input.questionCount) {
     lines.push(`Only ${questions.length} suitable questions matched your settings — add more question types or gaps for a longer assessment.`)
   }
   if (input.reportNotes.trim()) lines.push('Your report notes were included as context when choosing and ordering questions.')
@@ -196,7 +214,7 @@ function buildRationale(input: GenerateInput, questions: AiQuestion[]): string[]
 
 /** How many bank questions exist for these gaps and types — the most a draft can hold. */
 export function availableQuestionCount(competencies: string[], types: AiQuestionType[]): number {
-  return competencies.reduce((n, c) => n + (AI_QUESTION_BANK[c] ?? []).filter((q) => types.includes(q.type)).length, 0)
+  return competencies.reduce((n, c) => n + bankFor(c).filter((q) => types.includes(q.type)).length, 0)
 }
 
 // A sound general plan for when the AI can't be reached (the backend's ai/offline.ts has the same one).
@@ -315,7 +333,7 @@ export async function generateAssessmentDraft(input: GenerateInput): Promise<AiD
 
 /** A different bank question for the same competency (for "Regenerate"), or null when none is left. */
 export function replacementQuestion(current: AiQuestion, usedSourceIds: Set<string>): AiQuestion | null {
-  const bank = AI_QUESTION_BANK[current.competency] ?? []
+  const bank = bankFor(current.competency)
   const next = bank.find((q) => !usedSourceIds.has(q.sourceId) && q.difficulty === current.difficulty) ?? bank.find((q) => !usedSourceIds.has(q.sourceId))
   return next ? toQuestion(current.competency, next) : null
 }
@@ -323,7 +341,7 @@ export function replacementQuestion(current: AiQuestion, usedSourceIds: Set<stri
 /** One more unused question across the targeted competencies (for "Add question"). */
 export function extraQuestion(competencies: string[], usedSourceIds: Set<string>): AiQuestion | null {
   for (const c of competencies) {
-    const next = (AI_QUESTION_BANK[c] ?? []).find((q) => !usedSourceIds.has(q.sourceId))
+    const next = bankFor(c).find((q) => !usedSourceIds.has(q.sourceId))
     if (next) return toQuestion(c, next)
   }
   return null

@@ -1,6 +1,22 @@
 import { AI_QUESTION_BANK, type QuestionBank } from '../data/aiQuestionBank.ts'
 import type { AssessmentDraft, GenerateAssessmentRequest } from './schemas.ts'
  
+// "ratio and proportions", "RATIO & PROPORTION" and "Ratio and Proportion" are the same topic: compare names without case, punctuation, "and" or a final s.
+const topicKey = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .split(' ')
+    .filter((w) => w && !['and', 'the', 'of'].includes(w))
+    .map((w) => w.replace(/s$/, ''))
+    .join(' ')
+
+// The bank's questions for a topic, matched loosely by name.
+export function bankFor(bank: Record<string, QuestionBank[]>, competency: string): QuestionBank[] {
+  const key = topicKey(competency)
+  return Object.entries(bank).find(([name]) => topicKey(name) === key)?.[1] ?? []
+}
+
 // Used when there is no internet, no API key, or Gemini cannot answer.
 // Picks reviewed questions from the bank, easiest first, across the chosen gaps.
 // `ownBank`: the institution's own reviewed questions by topic, used before the built-in bank.
@@ -8,7 +24,7 @@ export function offlineDraft(r: GenerateAssessmentRequest, ownBank: Record<strin
   const order = ['foundation', 'core', 'stretch']
   const pools = r.competencies.map((c) => ({
     competency: c,
-    queue: [...(ownBank[c] ?? []), ...(AI_QUESTION_BANK[c] ?? [])]
+    queue: [...bankFor(ownBank, c), ...bankFor(AI_QUESTION_BANK, c)]
       .filter((q) => r.types.includes(q.type) && (r.difficulty === 'mixed' || q.difficulty === r.difficulty))
       .sort((a, b) => order.indexOf(a.difficulty) - order.indexOf(b.difficulty)),
   }))
@@ -28,7 +44,11 @@ export function offlineDraft(r: GenerateAssessmentRequest, ownBank: Record<strin
     title: `${r.competencies.length === 1 ? r.competencies[0] : `${r.competencies.length} focus areas`} — Catch-up Practice`,
     messageToStudents: `This practice will help you strengthen ${focus}. Take your time and read the explanation after each answer.`,
     parentNote: `This week your child is practising ${focus}. Ask them to show you one question they solved and explain how they did it.`,
-    rationale: [`Prepared offline from the reviewed question bank (${questions.length} questions). Generate again when online for questions written by AI.`],
+    rationale: [
+      questions.length
+        ? `Prepared offline from the reviewed question bank (${questions.length} questions). Generate again when online for questions written by AI.`
+        : `The AI service could not be reached and the question bank has nothing yet for ${focus}, so no questions were written. Try again in a few minutes.`,
+    ],
     questions,
     teachingPlan: templatePlan(r.competencies),
   }
