@@ -23,20 +23,21 @@ import {
   subjectsForClass,
 } from '../../../lib/aiAssessment'
 import { cn } from '../../../lib/cn'
+import { subjectChoices } from '../../../lib/subjects'
 import type { AiDifficulty, AiQuestionType, Subject } from '../../../types'
 import { WorkflowSteps } from './WorkflowSteps'
 
 const SUBJECTS: Subject[] = ['Mathematics', 'English']
 const COUNTS = ['5', '8', '10'] as const
 const DIFFICULTIES: (AiDifficulty | 'mixed')[] = ['foundation', 'mixed', 'core', 'stretch']
-const TYPES: AiQuestionType[] = ['multiple_choice', 'short_answer']
+const TYPES: AiQuestionType[] = ['multiple_choice', 'short_answer', 'written_work']
 const GENERATION_STEPS = ['Reading report data', 'Mapping gaps to curriculum objectives', 'Writing questions and answer keys', 'Preparing the draft for your review']
 
 const inAWeek = () => new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10)
 
-/** The class's subjects or course units, or Mathematics and English when it lists none. */
+/** The class's subjects or course units, then the school's standard subjects; Mathematics and English when there are none. */
 function subjectsFor(classId: string): Subject[] {
-  const own = subjectsForClass(classId)
+  const own = subjectChoices(subjectsForClass(classId))
   return own.length ? own : SUBJECTS
 }
 
@@ -334,6 +335,7 @@ export function AiAssessmentNewPage() {
                       </label>
                     ))}
                   </div>
+                  <p className="mt-2 text-xs text-ink-3">Written work is done on paper: the student uploads a photo and the AI marks it against the model answer. You can read every photo.</p>
                 </fieldset>
                 <TextField label="Due date" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-48" />
               </div>

@@ -184,7 +184,8 @@ export interface GuidancePlan {
 // AI-generated remedial assessments (teacher drafts → review → sent to students)
 // ---------------------------------------------------------------------------
 
-export type AiQuestionType = 'multiple_choice' | 'short_answer'
+/** written_work: done on paper and uploaded as a photo, which the AI marks against the model answer. */
+export type AiQuestionType = 'multiple_choice' | 'short_answer' | 'written_work'
 
 export type AiDifficulty = 'foundation' | 'core' | 'stretch'
 

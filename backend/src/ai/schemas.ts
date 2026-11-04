@@ -11,7 +11,7 @@ export const GenerateAssessmentRequestSchema = z.object({
   classSummary: z.array(z.string()),
   questionCount: z.number().int().min(1).max(15),
   difficulty: z.enum(['foundation', 'core', 'stretch', 'mixed']),
-  types: z.array(z.enum(['multiple_choice', 'short_answer'])).min(1),
+  types: z.array(z.enum(['multiple_choice', 'short_answer', 'written_work'])).min(1),
   reportNotes: z.string().max(4000),
 })
 export type GenerateAssessmentRequest = z.infer<typeof GenerateAssessmentRequestSchema>
@@ -19,11 +19,11 @@ export type GenerateAssessmentRequest = z.infer<typeof GenerateAssessmentRequest
 // The exact shape the AI must reply with (structured output).
 export const DraftQuestionSchema = z.object({
   competency: z.string(),
-  type: z.enum(['multiple_choice', 'short_answer']),
+  type: z.enum(['multiple_choice', 'short_answer', 'written_work']),
   difficulty: z.enum(['foundation', 'core', 'stretch']),
   prompt: z.string(),
-  options: z.array(z.string()).describe('Exactly 4 options for multiple_choice; an empty list for short_answer'),
-  answer: z.string().describe('For multiple_choice, copy the correct option exactly'),
+  options: z.array(z.string()).describe('Exactly 4 options for multiple_choice; an empty list otherwise'),
+  answer: z.string().describe('For multiple_choice, copy the correct option exactly. For written_work, the model answer with the working or points a marker should look for'),
   explanation: z.string(),
 })
  
@@ -58,7 +58,7 @@ export interface AiQuestion {
   id: string
   sourceId: string
   competency: string
-  type: 'multiple_choice' | 'short_answer'
+  type: 'multiple_choice' | 'short_answer' | 'written_work'
   difficulty: 'foundation' | 'core' | 'stretch'
   prompt: string
   options?: string[]

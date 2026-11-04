@@ -13,12 +13,13 @@ import { getClass } from '../../data/classes'
 import { FRAMEWORK_LABEL } from '../../data/curriculum'
 import { classesInScope } from '../../data/selectors'
 import { COMPETENCIES } from '../../data/students'
+import { subjectsForClass } from '../../lib/aiAssessment'
 import { api } from '../../lib/api'
 import { cn } from '../../lib/cn'
+import { subjectChoices } from '../../lib/subjects'
 import type { AssessmentType, Subject } from '../../types'
 
 const TYPES: AssessmentType[] = ['Test', 'Quiz', 'Assignment', 'Teacher Observation']
-const SUBJECTS: Subject[] = ['Mathematics', 'English']
 
 export function CreateAssessmentPage() {
   const { role } = useSession()
@@ -37,6 +38,7 @@ export function CreateAssessmentPage() {
   const max = Number(maxScore || (type === 'Teacher Observation' ? 10 : 20))
 
   const cls = getClass(classId)
+  const subjects = subjectChoices(subjectsForClass(classId), [subject])
   const availableTopics = COMPETENCIES.filter((c) => c.subject === subject)
 
   const toggleTopic = (name: string) => setTopics((t) => (t.includes(name) ? t.filter((x) => x !== name) : [...t, name]))
@@ -112,7 +114,7 @@ export function CreateAssessmentPage() {
                   setSubject(e.target.value as Subject)
                   setTopics([])
                 }}
-                options={SUBJECTS.map((s) => ({ value: s, label: s }))}
+                options={subjects.map((s) => ({ value: s, label: s }))}
               />
               <TextField label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
               <TextField label={type === 'Teacher Observation' ? 'Rating scale (max)' : 'Maximum score'} type="number" min={1} max={1000} value={maxScore || String(max)} onChange={(e) => setMaxScore(e.target.value)} />

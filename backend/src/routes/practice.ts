@@ -2,16 +2,23 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import type { SessionUser } from '../auth/session.ts'
 import { requireRole, requireUser } from '../auth/session.ts'
+import { markWrittenWork } from '../ai/markWork.ts'
 import { prisma } from '../db/client.ts'
 import { studentScope } from './access.ts'
 import { practiceInclude, toPracticeActivity } from './mappers.ts'
 
 const studentOnly = { onRequest: requireRole('student') }
 
+// A photo of work done on paper, for a written_work question (shrunk in the browser; at most 4 MB each as base64).
+const WorkSchema = z.object({ mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']), data: z.string().min(1).max(5_600_000) })
 const AnswersSchema = z.object({
   answers: z.record(z.string(), z.string().max(1000)),
+  // Keyed by question id, like answers.
+  work: z.record(z.string(), WorkSchema).refine((w) => Object.keys(w).length <= 15, { message: 'At most 15 photos' }).optional(),
   feedback: z.enum(['easy', 'okay', 'difficult']).optional(),
 })
+// The photos make this request far bigger than the server's usual limit.
+const answersOptions = { onRequest: requireRole('student'), bodyLimit: 40 * 1024 * 1024 }
 
 // Marking rules from the frontend's TakeAssessmentModal: ignore case, spaces, commas and full stops;
 // "a / b" accepts either; open-ended items ("Answers will vary") count as done when attempted.
@@ -26,7 +33,7 @@ function isCorrect(answer: string, given: string): boolean {
 async function findOwnAssignment(user: SessionUser, id: string) {
   return prisma.practiceAssignment.findFirst({
     where: { id, student: { userId: user.sub, schoolId: user.schoolId }, aiAssessment: { status: 'sent' } },
-    include: { aiAssessment: { include: { questions: { orderBy: { position: 'asc' } } } } },
+    include: { aiAssessment: { include: { questions: { orderBy: { position: 'asc' } }, class: { select: { level: true } } } } },
   })
 }
 
@@ -72,24 +79,43 @@ export async function practiceRoutes(app: FastifyInstance) {
   })
 
   // "Check my answers": marks on the server, saves the result, and returns the score with each answer and explanation
-  // (the frontend's AttemptResult plus per-question marking).
-  app.post<{ Params: { id: string } }>('/practice/:id/answers', studentOnly, async (request, reply) => {
+  // (the frontend's AttemptResult plus per-question marking). Written work arrives as photos: the AI marks each
+  // against the model answer and writes feedback; if it can't, the photo is kept for the teacher to read (pending).
+  app.post<{ Params: { id: string } }>('/practice/:id/answers', answersOptions, async (request, reply) => {
     const parsed = AnswersSchema.safeParse(request.body)
     if (!parsed.success) return reply.code(400).send({ error: 'Invalid answers', issues: parsed.error.issues })
     const item = await findOwnAssignment(request.user!, request.params.id)
     if (!item) return reply.code(404).send({ error: 'Practice not found.' })
 
     const questions = item.aiAssessment.questions
+    const work = parsed.data.work ?? {}
+    const uploaded = questions.filter((q) => q.type === 'written_work' && work[q.id])
+    const marks = await markWrittenWork(
+      uploaded.map((q) => ({ prompt: q.prompt, answer: q.answer, explanation: q.explanation, competency: q.competency, ...work[q.id]! })),
+      { subject: item.aiAssessment.subject, classLevel: item.aiAssessment.class.level },
+    )
+    const markOf = new Map(uploaded.map((q, i) => [q.id, marks[i] ?? null]))
+
+    const answers = { ...parsed.data.answers, ...Object.fromEntries(uploaded.map((q) => [q.id, 'photo'])) }
     const marked = questions.map((q) => {
-      const given = parsed.data.answers[q.id] ?? ''
-      return { id: q.id, given, correct: isCorrect(q.answer, given), answer: q.answer, explanation: q.explanation }
+      const given = answers[q.id] ?? ''
+      if (q.type !== 'written_work') return { id: q.id, given, correct: isCorrect(q.answer, given), answer: q.answer, explanation: q.explanation }
+      const mark = markOf.get(q.id)
+      return { id: q.id, given, correct: mark?.correct ?? false, answer: q.answer, explanation: q.explanation, ...(mark ? { feedback: mark.feedback } : {}), pending: Boolean(work[q.id]) && !mark }
     })
     const score = marked.filter((m) => m.correct).length
     const completedAt = new Date()
-    await prisma.practiceAssignment.update({
-      where: { id: item.id },
-      data: { status: 'completed', answers: parsed.data.answers, score, completedAt, startedAt: item.startedAt ?? completedAt, ...(parsed.data.feedback ? { feedback: parsed.data.feedback } : {}) },
-    })
+    await prisma.$transaction([
+      prisma.practiceAssignment.update({
+        where: { id: item.id },
+        data: { status: 'completed', answers, score, completedAt, startedAt: item.startedAt ?? completedAt, ...(parsed.data.feedback ? { feedback: parsed.data.feedback } : {}) },
+      }),
+      ...uploaded.map((q) => {
+        const mark = markOf.get(q.id)
+        const fields = { mimeType: work[q.id]!.mimeType, data: Buffer.from(work[q.id]!.data, 'base64'), correct: mark?.correct ?? null, feedback: mark?.feedback ?? '' }
+        return prisma.practiceUpload.upsert({ where: { assignmentId_questionId: { assignmentId: item.id, questionId: q.id } }, create: { assignmentId: item.id, questionId: q.id, ...fields }, update: fields })
+      }),
+    ])
     return { score, total: questions.length, completedOn: completedAt.toISOString(), questions: marked }
   })
 }

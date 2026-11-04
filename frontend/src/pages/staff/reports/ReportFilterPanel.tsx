@@ -1,9 +1,8 @@
 import { SelectField, TextField } from '../../../components/ui/Field'
 import { SCHOOL } from '../../../data/school'
-import type { SchoolClass, Student, Subject } from '../../../types'
+import { subjectChoices } from '../../../lib/subjects'
+import type { SchoolClass, Student } from '../../../types'
 import type { ReportFilters, ReportType } from './types'
-
-const SUBJECTS: Subject[] = ['Mathematics', 'English', 'Science', 'Social Studies']
 
 interface ReportFilterPanelProps {
   type: ReportType
@@ -17,6 +16,7 @@ interface ReportFilterPanelProps {
 /** Period, class, student and subject filters; only fields relevant to the report type are shown. */
 export function ReportFilterPanel({ type, filters, onChange, classes, students }: ReportFilterPanelProps) {
   const needsClass = type === 'student' || type === 'class'
+  const subjects = subjectChoices(students.flatMap((s) => s.subjects))
   const classOptions = needsClass
     ? classes.map((c) => ({ value: c.id, label: c.name }))
     : [{ value: 'all', label: 'All classes in scope' }, ...classes.map((c) => ({ value: c.id, label: c.name }))]
@@ -58,7 +58,7 @@ export function ReportFilterPanel({ type, filters, onChange, classes, students }
           label="Subject"
           value={filters.subject}
           onChange={(e) => onChange({ subject: e.target.value as ReportFilters['subject'] })}
-          options={[{ value: 'all', label: 'All subjects' }, ...SUBJECTS.map((s) => ({ value: s, label: s }))]}
+          options={[{ value: 'all', label: 'All subjects' }, ...subjects.map((s) => ({ value: s, label: s }))]}
         />
       )}
     </div>

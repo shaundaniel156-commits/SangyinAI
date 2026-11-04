@@ -12,13 +12,12 @@ import { SearchBar } from '../../components/ui/SearchBar'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { getClass } from '../../data/classes'
 import { TEACHERS } from '../../data/teachers'
+import { subjectChoices } from '../../lib/subjects'
 import type { Subject, Teacher } from '../../types'
 import { ACCOUNT_STATUS_LABEL, AccountStatusBadge } from './components/AccountStatusBadge'
 import { AssignClassModal } from './components/AssignClassModal'
 import { InviteModal } from './components/InviteModal'
 import { TeacherDetails } from './components/TeacherDetails'
-
-const SUBJECTS: Subject[] = ['Mathematics', 'English', 'Science', 'Social Studies']
 
 export function TeachersPage() {
   const [query, setQuery] = useState('')
@@ -27,6 +26,7 @@ export function TeachersPage() {
   const [selected, setSelected] = useState<Teacher | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [assigning, setAssigning] = useState<Teacher | null>(null)
+  const subjects = subjectChoices(TEACHERS.flatMap((t) => t.subjects))
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -60,7 +60,7 @@ export function TeachersPage() {
                 label: 'Filter by subject',
                 value: subject,
                 onChange: setSubject,
-                options: [{ value: 'all', label: 'All subjects' }, ...SUBJECTS.map((s) => ({ value: s, label: s }))],
+                options: [{ value: 'all', label: 'All subjects' }, ...subjects.map((s) => ({ value: s, label: s }))],
               },
               {
                 id: 'status',

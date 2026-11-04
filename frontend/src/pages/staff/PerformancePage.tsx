@@ -17,6 +17,7 @@ import { assessmentsInScope, classesInScope } from '../../data/selectors'
 import { getStudentsByClass } from '../../data/students'
 import { levelFromScore } from '../../lib/competency'
 import { formatDate, formatSignedPoints } from '../../lib/format'
+import { subjectChoices } from '../../lib/subjects'
 import type { Subject } from '../../types'
 
 const SERIES_COLORS = ['var(--color-series-1)', 'var(--color-series-2)', 'var(--color-series-3)']
@@ -33,7 +34,9 @@ export function PerformancePage() {
   const students = getStudentsByClass(classId)
   const competencies = getClassCompetencyAverages(classId)
   const subjectComps = competencies.filter((c) => c.subject === subject)
-  const subjectAverages = (['Mathematics', 'English'] as Subject[]).map((s) => {
+  // The subjects this class has results in (its competency areas), with the school's standard ones for the filter.
+  const classSubjects = [...new Set(competencies.map((c) => c.subject))]
+  const subjectAverages = classSubjects.map((s) => {
     const list = competencies.filter((c) => c.subject === s)
     return { subject: s, value: Math.round(list.reduce((a, c) => a + c.average, 0) / Math.max(list.length, 1)) }
   })
@@ -64,10 +67,7 @@ export function PerformancePage() {
             label: 'Subject',
             value: subject,
             onChange: (v) => setSubject(v as Subject),
-            options: [
-              { value: 'Mathematics', label: 'Mathematics' },
-              { value: 'English', label: 'English' },
-            ],
+            options: subjectChoices(classSubjects, [subject]).map((s) => ({ value: s, label: s })),
           },
           { id: 'term', label: 'Term', value: term, onChange: setTerm, options: SCHOOL.termOptions.map((t) => ({ value: t, label: t })) },
         ]}

@@ -182,7 +182,7 @@ const questionColumns: Column[] = [
   { key: 'subject', header: 'Subject or course unit', aliases: ['Subject', 'Course unit', 'Course'], required: true, example: 'Mathematics', help: 'Where the question belongs.' },
   { key: 'level', header: 'Level or year', aliases: ['Level', 'Class level', 'Year'], example: 'Primary 6', help: 'Optional, e.g. Primary 6, Senior 2, Year 1.' },
   { key: 'competency', header: 'Topic or skill', aliases: ['Topic', 'Skill', 'Competency'], required: true, example: 'Ratio and Proportion', help: 'The topic or skill it tests. Use the same names as your curriculum.' },
-  { key: 'type', header: 'Type', aliases: ['Question type'], example: 'multiple_choice', help: 'multiple_choice or short_answer (MCQ / short answer also work).' },
+  { key: 'type', header: 'Type', aliases: ['Question type'], example: 'multiple_choice', help: 'multiple_choice, short_answer or written_work (MCQ / short answer / paper also work).' },
   { key: 'difficulty', header: 'Difficulty', example: 'foundation', help: 'foundation, core or stretch (easy / medium / hard also work). Default core.' },
   { key: 'question', header: 'Question', aliases: ['Prompt', 'Question text'], required: true, example: 'Share 20 sweets in the ratio 3 : 2. How many are in the larger share?', help: 'The question as students will see it.' },
   { key: 'optionA', header: 'Option A', aliases: ['A'], example: '12', help: 'Multiple choice only.' },
@@ -193,10 +193,11 @@ const questionColumns: Column[] = [
   { key: 'explanation', header: 'Explanation', aliases: ['Working', 'Feedback'], required: true, example: '3 + 2 = 5 parts; 20 ÷ 5 = 4; 3 × 4 = 12.', help: 'Shown after answering, so learners see the method.' },
 ]
 
-function questionType(raw: string): 'multiple_choice' | 'short_answer' | null {
+function questionType(raw: string): 'multiple_choice' | 'short_answer' | 'written_work' | null {
   const s = raw.toLowerCase().replace(/[^a-z]/g, '')
   if (!s || ['multiplechoice', 'mcq', 'mc', 'objective'].includes(s)) return 'multiple_choice'
   if (['shortanswer', 'short', 'sa', 'open', 'structured'].includes(s)) return 'short_answer'
+  if (['writtenwork', 'written', 'paper', 'working', 'upload'].includes(s)) return 'written_work'
   return null
 }
 function difficulty(raw: string): 'foundation' | 'core' | 'stretch' | null {
@@ -225,7 +226,7 @@ const questions: FeedKind = {
       const q = questionFrom(r)
       return [
         ...required(r, questionColumns),
-        ...(q.type ? [] : ['Type must be multiple_choice or short_answer']),
+        ...(q.type ? [] : ['Type must be multiple_choice, short_answer or written_work']),
         ...(q.difficulty ? [] : ['Difficulty must be foundation, core or stretch']),
         ...(q.type === 'multiple_choice' && q.options.length < 2 ? ['Multiple choice needs at least 2 options'] : []),
         ...(q.type === 'multiple_choice' && v(r, 'answer') && !q.options.includes(q.answer) ? ['The answer must be one of the options (or its letter)'] : []),

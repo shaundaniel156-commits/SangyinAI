@@ -17,8 +17,9 @@ import { FrameworkBadge } from '../../../components/domain/FrameworkBadge'
 import { CURRICULUM_DISCLAIMER } from '../../../data/curriculum'
 import { DIFFICULTY_LABEL, curriculumRefsFor, extraQuestion, replacementQuestion, studentsWithGaps } from '../../../lib/aiAssessment'
 import { formatDate } from '../../../lib/format'
-import type { AiAssessment } from '../../../types'
+import type { AiAssessment, Student } from '../../../types'
 import { QuestionItem } from './QuestionItem'
+import { StudentWorkModal } from './StudentWorkModal'
 import { TeachingPlanCard } from './TeachingPlanCard'
 import { WorkflowSteps } from './WorkflowSteps'
 
@@ -48,6 +49,9 @@ function Review({ assessment: a }: { assessment: AiAssessment }) {
   const navigate = useNavigate()
   const [confirmSend, setConfirmSend] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
+  // The student whose uploaded written work is open.
+  const [workFor, setWorkFor] = useState<Student | null>(null)
+  const hasWrittenWork = a.questions.some((q) => q.type === 'written_work')
 
   const draft = a.status === 'draft'
   const cls = getClass(a.classId)
@@ -262,9 +266,16 @@ function Review({ assessment: a }: { assessment: AiAssessment }) {
                       )}
                       <span className="flex-1 truncate text-sm text-ink">{s.name}</span>
                       {attempt ? (
-                        <StatusBadge tone="good">
-                          {attempt.score}/{attempt.total}
-                        </StatusBadge>
+                        <span className="flex items-center gap-3">
+                          {hasWrittenWork && (
+                            <button type="button" onClick={() => setWorkFor(s)} className="text-xs font-medium text-brand-ink hover:underline">
+                              View work
+                            </button>
+                          )}
+                          <StatusBadge tone="good">
+                            {attempt.score}/{attempt.total}
+                          </StatusBadge>
+                        </span>
                       ) : (
                         <span className="tabular text-xs text-ink-3">{draft ? `${s.average}%` : 'Not started'}</span>
                       )}
@@ -276,6 +287,8 @@ function Review({ assessment: a }: { assessment: AiAssessment }) {
           </Card>
         </div>
       </div>
+
+      <StudentWorkModal assessment={a} student={workFor} onClose={() => setWorkFor(null)} />
 
       <Modal
         open={confirmSend}

@@ -142,7 +142,7 @@ export function StudentProfilePage() {
         <Card>
           <CardHeader title="Competency areas" description="Current mastery estimate per area" />
           <CardBody>
-            {(['Mathematics', 'English'] as Subject[]).map((subject) => (
+            {[...new Set(student.competencies.map((c) => c.subject))].map((subject) => (
               <div key={subject} className="mb-6 last:mb-0">
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-3">{subject}</h3>
                 <CompetencyList competencies={student.competencies.filter((c) => c.subject === subject)} />

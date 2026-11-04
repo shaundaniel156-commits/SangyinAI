@@ -24,6 +24,7 @@ export const DIFFICULTY_LABEL: Record<AiDifficulty | 'mixed', string> = {
 export const QUESTION_TYPE_LABEL: Record<AiQuestionType, string> = {
   multiple_choice: 'Multiple choice',
   short_answer: 'Short answer',
+  written_work: 'Written work',
 }
 
 export interface CompetencyGap {

@@ -84,6 +84,8 @@ enum AiAssessmentStatus {
 enum QuestionType {
   multiple_choice
   short_answer
+  // Worked out on paper; the student uploads a photo, which is marked against the model answer.
+  written_work
 }
 
 enum Difficulty {
@@ -455,8 +457,25 @@ model PracticeAssignment {
   feedback       String?
   startedAt      DateTime?
   completedAt    DateTime?
+  uploads        PracticeUpload[]
 
   @@unique([aiAssessmentId, studentId])
+}
+
+// A photo of the work a student did on paper for one written_work question, with the AI's marking.
+model PracticeUpload {
+  id           String             @id @default(cuid())
+  assignmentId String
+  assignment   PracticeAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  questionId   String
+  mimeType     String
+  data         Bytes
+  // null until marked: the AI could not be reached, so the teacher reads it instead.
+  correct      Boolean?
+  feedback     String             @default("")
+  createdAt    DateTime           @default(now())
+
+  @@unique([assignmentId, questionId])
 }
 
 model Notification {

@@ -19,9 +19,15 @@ export interface AttemptResult {
   completedOn: string
 }
 
-/** The server's marking of a student's answers. */
+/** A photo of written work, as sent to the server (base64). */
+export interface WorkUpload {
+  mimeType: string
+  data: string
+}
+
+/** The server's marking of a student's answers. Written work carries the AI's feedback, or is pending the teacher. */
 export interface MarkedAttempt extends AttemptResult {
-  questions: { id: string; given: string; correct: boolean; answer: string; explanation: string }[]
+  questions: { id: string; given: string; correct: boolean; answer: string; explanation: string; feedback?: string; pending?: boolean }[]
 }
 
 interface AiAssessmentsValue {
@@ -33,7 +39,7 @@ interface AiAssessmentsValue {
   send: (id: string) => Promise<void>
   recordAttempt: (id: string, result: Omit<AttemptResult, 'completedOn'>) => void
   /** Signed in: sends the student's answers to be marked and saved; returns the marking. Offline: null (mark locally). */
-  submitAnswers: (id: string, answers: Record<string, string>) => Promise<MarkedAttempt | null>
+  submitAnswers: (id: string, answers: Record<string, string>, work?: Record<string, WorkUpload>) => Promise<MarkedAttempt | null>
 }
 
 const AiAssessmentsContext = createContext<AiAssessmentsValue | null>(null)
@@ -124,10 +130,10 @@ export function AiAssessmentsProvider({ children }: { children: ReactNode }) {
     setAttempts((a) => ({ ...a, [id]: { ...result, completedOn: new Date().toISOString() } }))
   }, [])
 
-  const submitAnswers = useCallback(async (id: string, answers: Record<string, string>) => {
+  const submitAnswers = useCallback(async (id: string, answers: Record<string, string>, work: Record<string, WorkUpload> = {}) => {
     const item = items.find((a) => a.id === id)
     if (!live || !item?.practiceId) return null
-    const marked = await api<MarkedAttempt>(`/practice/${item.practiceId}/answers`, { body: { answers } })
+    const marked = await api<MarkedAttempt>(`/practice/${item.practiceId}/answers`, { body: { answers, ...(Object.keys(work).length ? { work } : {}) } })
     setAttempts((a) => ({ ...a, [id]: { score: marked.score, total: marked.total, completedOn: marked.completedOn } }))
     return marked
   }, [items, live])

@@ -59,6 +59,7 @@ export const CHOICES: Record<string, { value: string; label: string }[]> = {
   type: [
     { value: 'multiple_choice', label: 'Multiple choice' },
     { value: 'short_answer', label: 'Short answer' },
+    { value: 'written_work', label: 'Written work (photo upload)' },
   ],
   difficulty: [
     { value: 'foundation', label: 'Foundation' },

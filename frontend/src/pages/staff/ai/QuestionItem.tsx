@@ -1,4 +1,4 @@
-import { Check, Pencil, RefreshCw, Trash2 } from 'lucide-react'
+import { Camera, Check, Pencil, RefreshCw, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '../../../components/ui/Button'
 import { TextArea, TextField, inputClasses } from '../../../components/ui/Field'
@@ -63,6 +63,8 @@ export function QuestionItem({ index, question: q, editable, canRegenerate, onCh
               ))}
             </div>
           </fieldset>
+        ) : draft.type === 'written_work' ? (
+          <TextArea label="Model answer and marking points" rows={3} value={draft.answer} onChange={(e) => setDraft({ ...draft, answer: e.target.value })} hint="The AI marks each uploaded photo against this." />
         ) : (
           <TextField label="Expected answer" value={draft.answer} onChange={(e) => setDraft({ ...draft, answer: e.target.value })} />
         )}
@@ -118,6 +120,14 @@ export function QuestionItem({ index, question: q, editable, canRegenerate, onCh
             )
           })}
         </ul>
+      ) : q.type === 'written_work' ? (
+        <div className="mt-3 rounded-lg border border-good/40 bg-good-soft px-3 py-2 text-sm text-good-ink">
+          <p className="flex items-center gap-2 font-medium">
+            <Camera className="size-4 shrink-0" aria-hidden />
+            Done on paper and uploaded as a photo, which the AI marks
+          </p>
+          <p className="mt-1 whitespace-pre-line">Model answer and marking points: {q.answer}</p>
+        </div>
       ) : (
         <p className="mt-3 inline-flex items-center gap-2 rounded-lg border border-good/40 bg-good-soft px-3 py-2 text-sm font-medium text-good-ink">
           <Check className="size-4" aria-hidden />

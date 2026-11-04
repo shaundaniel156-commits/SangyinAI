@@ -13,7 +13,7 @@ const teacherOrAdmin = { onRequest: requireRole('teacher', 'admin') }
 const QuestionSchema = z.object({
   sourceId: z.string().min(1),
   competency: z.string().min(1),
-  type: z.enum(['multiple_choice', 'short_answer']),
+  type: z.enum(['multiple_choice', 'short_answer', 'written_work']),
   difficulty: z.enum(['foundation', 'core', 'stretch']),
   prompt: z.string().min(1).max(2000),
   options: z.array(z.string().max(500)).max(6).optional(),
@@ -163,6 +163,28 @@ export async function aiAssessmentRoutes(app: FastifyInstance) {
     if (item.status !== 'draft') return reply.code(409).send({ error: 'Sent assessments are kept so students keep their results.' })
     await prisma.aiAssessment.delete({ where: { id: item.id } })
     return reply.code(204).send()
+  })
+
+  // One student's uploaded written work on a sent assessment, with the AI's marking, for the teacher to read.
+  app.get<{ Params: { id: string; studentId: string } }>('/ai/assessments/:id/work/:studentId', teacherOrAdmin, async (request, reply) => {
+    const assignment = await prisma.practiceAssignment.findFirst({
+      where: { aiAssessmentId: request.params.id, studentId: request.params.studentId, aiAssessment: aiAssessmentScope(request.user!) },
+      include: { uploads: true, aiAssessment: { select: { questions: { select: { id: true, prompt: true, answer: true, position: true } } } } },
+    })
+    if (!assignment) return reply.code(404).send({ error: 'Assessment not found.' })
+    const questions = new Map(assignment.aiAssessment.questions.map((q) => [q.id, q]))
+    return assignment.uploads
+      .filter((u) => questions.has(u.questionId))
+      .sort((a, b) => questions.get(a.questionId)!.position - questions.get(b.questionId)!.position)
+      .map((u) => ({
+        questionId: u.questionId,
+        prompt: questions.get(u.questionId)!.prompt,
+        answer: questions.get(u.questionId)!.answer,
+        image: `data:${u.mimeType};base64,${Buffer.from(u.data).toString('base64')}`,
+        correct: u.correct,
+        feedback: u.feedback,
+        uploadedOn: u.createdAt.toISOString(),
+      }))
   })
 
   // "Approve & send": gives each chosen student their copy, keeps the approved draft as a fine-tuning example

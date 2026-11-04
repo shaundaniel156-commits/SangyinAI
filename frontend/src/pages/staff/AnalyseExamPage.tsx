@@ -12,6 +12,8 @@ import { useToast } from '../../context/ToastContext'
 import { getClass } from '../../data/classes'
 import { studentsInScope } from '../../data/selectors'
 import { api, ApiError } from '../../lib/api'
+import { readBase64, shrinkPhoto } from '../../lib/photo'
+import { subjectChoices } from '../../lib/subjects'
 import type { DiagnosticReport } from '../../types'
 
 interface Row {
@@ -26,29 +28,6 @@ const EMPTY_ROW: Row = { topic: '', score: '', outOf: '' }
 const ACCEPT = '.pdf,.png,.jpg,.jpeg,.webp,.docx,.txt,.md,.csv'
 // Uploads pass through the site's proxy, which takes about 4.5 MB per request; photos are shrunk first, so this is for other files.
 const MAX_MB = 3
-const PHOTO_PX = 2000
-
-/** The file's contents as base64, without the "data:…;base64," prefix. */
-function readBase64(file: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '')
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
-  })
-}
-
-/** A phone photo scaled to at most PHOTO_PX on its longer side, as a JPEG: still sharp enough to read, a fraction of the size. */
-async function shrinkPhoto(file: File): Promise<File> {
-  const bitmap = await createImageBitmap(file)
-  const scale = Math.min(1, PHOTO_PX / Math.max(bitmap.width, bitmap.height))
-  const canvas = document.createElement('canvas')
-  canvas.width = Math.round(bitmap.width * scale)
-  canvas.height = Math.round(bitmap.height * scale)
-  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85))
-  return blob ? new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }) : file
-}
 
 /**
  * Analyse exam results: the teacher enters one student's marks per topic or question and/or pastes the report,
@@ -143,7 +122,12 @@ export function AnalyseExamPage() {
                     ...students.map((s) => ({ value: s.id, label: `${s.name} · ${getClass(s.classId)?.name ?? ''}` })),
                   ]}
                 />
-                <TextField label="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} required placeholder="e.g. Mathematics" />
+                <TextField label="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} required placeholder="e.g. Mathematics" list="exam-subjects" />
+                <datalist id="exam-subjects">
+                  {subjectChoices(students.find((s) => s.id === studentId)?.subjects ?? []).map((s) => (
+                    <option key={s} value={s} />
+                  ))}
+                </datalist>
                 <TextField label="Exam or test" value={examTitle} onChange={(e) => setExamTitle(e.target.value)} required placeholder="e.g. End of term 2 exam" />
               </CardBody>
             </Card>

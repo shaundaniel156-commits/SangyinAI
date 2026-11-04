@@ -325,7 +325,7 @@ interface BankItem {
   subject: string
   level: string | null
   competency: string
-  type: 'multiple_choice' | 'short_answer'
+  type: 'multiple_choice' | 'short_answer' | 'written_work'
   difficulty: string
   prompt: string
   options: string[]
