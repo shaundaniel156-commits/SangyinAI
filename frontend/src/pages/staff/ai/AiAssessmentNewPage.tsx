@@ -46,12 +46,11 @@ interface ChatMessage {
   draft?: AiDraft
 }
 
-/** The teacher's request, in words, from the form. */
-function describeRequest(r: { className: string; subject: string; topics: string[]; students: number; count: number; difficulty: AiDifficulty | 'mixed'; types: AiQuestionType[]; dueDate: string; notes: string }): string {
-  const lines = [
-    `Draft a ${r.subject} assessment for ${r.className} on ${r.topics.join(', ')}.`,
-    `${r.count} questions, ${DIFFICULTY_LABEL[r.difficulty].toLowerCase()} difficulty, ${r.types.map((t) => QUESTION_TYPE_LABEL[t].toLowerCase()).join(' and ')}, for ${r.students} student${r.students === 1 ? '' : 's'}${r.dueDate ? `, due ${formatDate(r.dueDate)}` : ''}.`,
-  ]
+/** The teacher's request, in words: what they typed to the AI, or the form's choices. */
+function describeRequest(r: { message: string; className: string; subject: string; topics: string[]; students: number; count: number; difficulty: AiDifficulty | 'mixed'; types: AiQuestionType[]; dueDate: string; notes: string }): string {
+  const settings = `${r.count} questions, ${DIFFICULTY_LABEL[r.difficulty].toLowerCase()} difficulty, ${r.types.map((t) => QUESTION_TYPE_LABEL[t].toLowerCase()).join(' and ')}, for ${r.students} student${r.students === 1 ? '' : 's'}${r.dueDate ? `, due ${formatDate(r.dueDate)}` : ''}.`
+  if (r.message) return `${r.message}\n\n${r.className} · ${r.subject}${r.topics.length ? ` · ${r.topics.join(', ')}` : ''} · ${settings}`
+  const lines = [`Draft a ${r.subject} assessment for ${r.className} on ${r.topics.join(', ')}.`, settings]
   if (r.notes) lines.push(`Notes: ${r.notes}`)
   return lines.join('\n')
 }
@@ -109,6 +108,8 @@ export function AiAssessmentNewPage() {
   const [types, setTypes] = useState<AiQuestionType[]>(TYPES)
   const [dueDate, setDueDate] = useState(inAWeek)
   const [notes, setNotes] = useState('')
+  // What the teacher wants, in their own words, sent to the AI with the form's choices.
+  const [message, setMessage] = useState('')
   const [fileName, setFileName] = useState('')
   // The conversation with the AI, once "Generate assessment" is pressed; empty while the form is shown.
   const [chat, setChat] = useState<ChatMessage[]>([])
@@ -118,15 +119,18 @@ export function AiAssessmentNewPage() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const gaps = useMemo(() => detectGaps(classId, subject), [classId, subject])
-  // Typed topics have no results to pick out the students who need them, so the whole class is offered.
+  // With no topics chosen, the AI picks them from the teacher's message.
+  const topicsFromMessage = selected.length === 0 && message.trim().length > 0
+  // Typed topics (or none) have no results to pick out the students who need them, so the whole class is offered.
+  const wholeClass = mode === 'manual' || topicsFromMessage
   const candidates = useMemo(
-    () => (mode === 'manual' ? getStudentsByClass(classId) : studentsWithGaps(classId, subject, selected, includeDeveloping)),
-    [mode, classId, subject, selected, includeDeveloping],
+    () => (wholeClass ? getStudentsByClass(classId) : studentsWithGaps(classId, subject, selected, includeDeveloping)),
+    [wholeClass, classId, subject, selected, includeDeveloping],
   )
   const recipients = candidates.filter((s) => !excluded.has(s.id))
   const available = availableQuestionCount(selected, types)
-  // Online, the AI writes the questions; the local bank only matters offline.
-  const canGenerate = selected.length > 0 && recipients.length > 0 && types.length > 0 && (live || available > 0)
+  // Online, the AI writes the questions; the local bank only matters offline (and can't follow a message on its own).
+  const canGenerate = (selected.length > 0 || topicsFromMessage) && recipients.length > 0 && types.length > 0 && (live || available > 0)
 
   const changeScope = (nextClass: string, nextSubject: Subject) => {
     // A class may not have the current subject (e.g. moving from P6 to a university cohort).
@@ -169,7 +173,7 @@ export function AiAssessmentNewPage() {
   const ask = async (followUp?: string) => {
     const asked = followUp ? [...followUps, followUp] : followUps
     setFollowUps(asked)
-    const userText = followUp ?? describeRequest({ className, subject, topics: selected, students: recipients.length, count: Number(count), difficulty, types, dueDate, notes: notes.trim() })
+    const userText = followUp ?? describeRequest({ message: message.trim(), className, subject, topics: selected, students: recipients.length, count: Number(count), difficulty, types, dueDate, notes: notes.trim() })
     const aiId = Date.now()
     setChat((c) => [...c, { id: aiId - 1, role: 'user', text: userText }, { id: aiId, role: 'ai', text: '', thinking: true }])
     setBusy(true)
@@ -182,7 +186,7 @@ export function AiAssessmentNewPage() {
       difficulty,
       types,
       dueDate,
-      reportNotes: [notes.trim(), ...asked.map((f) => `Teacher's follow-up request: ${f}`)].filter(Boolean).join('\n\n'),
+      reportNotes: [message.trim() && `Teacher's instructions: ${message.trim()}`, notes.trim(), ...asked.map((f) => `Teacher's follow-up request: ${f}`)].filter(Boolean).join('\n\n'),
     })
     setChat((c) => c.map((m) => (m.id === aiId ? { ...m, text: describeDraft(draft, className), draft, thinking: false } : m)))
     setBusy(false)
@@ -409,13 +413,13 @@ export function AiAssessmentNewPage() {
             <CardHeader
               title="Who receives it"
               description={
-                mode === 'manual'
+                wholeClass
                   ? `${recipients.length} of ${candidates.length} students in the class (untick any who don’t need it)`
                   : `${recipients.length} of ${candidates.length} students with these gaps`
               }
               icon={<Users className="size-5" aria-hidden />}
             />
-            {mode === 'auto' && (
+            {!wholeClass && (
             <div className="border-b border-line px-6 py-3">
               <label className="flex items-center gap-2 text-sm text-ink-2">
                 <input
@@ -433,7 +437,7 @@ export function AiAssessmentNewPage() {
             )}
             {candidates.length === 0 ? (
               <p className="px-6 py-5 text-sm text-ink-3">
-                {mode === 'manual' ? 'This class has no students yet.' : 'Choose at least one topic to see the students who need it.'}
+                {wholeClass ? 'This class has no students yet.' : 'Choose at least one topic, or tell the AI what you need below, to see who receives it.'}
               </p>
             ) : (
               <ul className="max-h-72 divide-y divide-line overflow-y-auto">
@@ -464,13 +468,26 @@ export function AiAssessmentNewPage() {
 
           <Card>
             <CardBody className="space-y-4">
+              <TextArea
+                label="Tell the AI what you need"
+                rows={4}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="e.g. Eight questions on adding fractions with different denominators, two of them word problems about market prices. Keep the English simple and start easy."
+                hint="Optional. Written in your own words; sent with the choices above. Leave the topics unticked and the AI picks them from this."
+              />
               <ul className="space-y-2 text-sm text-ink-2">
-                <SummaryLine ok={selected.length > 0}>{selected.length ? `${selected.length} gap${selected.length > 1 ? 's' : ''}: ${selected.join(', ')}` : 'No gap selected'}</SummaryLine>
+                <SummaryLine ok={selected.length > 0 || topicsFromMessage}>
+                  {selected.length ? `${selected.length} gap${selected.length > 1 ? 's' : ''}: ${selected.join(', ')}` : topicsFromMessage ? 'Topics: the AI chooses them from your message' : 'No gap selected'}
+                </SummaryLine>
                 <SummaryLine ok={recipients.length > 0}>{recipients.length} student{recipients.length === 1 ? '' : 's'} selected</SummaryLine>
                 <SummaryLine ok={types.length > 0 && (live || available > 0)}>
                   {live ? Number(count) : Math.min(Number(count), available)} questions · {DIFFICULTY_LABEL[difficulty]}
                 </SummaryLine>
               </ul>
+              {!live && topicsFromMessage && (
+                <p className="rounded-lg bg-warn-soft px-3 py-2 text-xs text-warn-ink">The AI can’t be reached, and the question bank needs a topic to be ticked.</p>
+              )}
               {!live && selected.length > 0 && available < Number(count) && (
                 <p className="rounded-lg bg-warn-soft px-3 py-2 text-xs text-warn-ink">
                   Only {available} questions are available for {selected.length === 1 ? 'this gap' : 'these gaps'}. Select another gap or question type for a longer assessment.

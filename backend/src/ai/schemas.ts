@@ -6,7 +6,8 @@ export const GenerateAssessmentRequestSchema = z.object({
   classLevel: z.string(),
   framework: z.enum(['uganda', 'cambridge', 'institution']),
   subject: z.string(),
-  competencies: z.array(z.string()).min(1),
+  // Empty: the AI chooses the topics from the teacher's instructions (in reportNotes).
+  competencies: z.array(z.string()),
   curriculumObjectives: z.array(z.string()),
   classSummary: z.array(z.string()),
   questionCount: z.number().int().min(1).max(15),

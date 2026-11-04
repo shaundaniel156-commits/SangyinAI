@@ -33,14 +33,14 @@ export function buildAssessmentPrompt(r: GenerateAssessmentRequest, extra: { ref
 Class level: ${r.classLevel}
 Curriculum: ${framework}
 Subject: ${r.subject}
-Competency gaps to target: ${r.competencies.join(', ')}
+Competency gaps to target: ${r.competencies.join(', ') || "choose them from the teacher's instructions below, and name each question's competency as the topic it tests (the same name for the same topic)"}
 Curriculum objectives for these gaps:
 ${r.curriculumObjectives.map((o) => `- ${o}`).join('\n') || '- (none supplied)'}
  
 What the class results show:
 ${r.classSummary.map((s) => `- ${s}`).join('\n')}
  
-Teacher's notes: ${r.reportNotes.trim() || '(none)'}
+Teacher's notes and instructions: ${r.reportNotes.trim() || '(none)'}
  
 Settings:
 - Number of questions: ${r.questionCount}

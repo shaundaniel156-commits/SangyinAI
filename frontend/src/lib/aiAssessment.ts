@@ -302,12 +302,14 @@ export async function generateAssessmentDraft(input: GenerateInput): Promise<AiD
     const res = await fetch(`${API_URL}/ai/assessments/generate`, { method: 'POST', headers: apiHeaders(), body: JSON.stringify(request) })
     if (!res.ok) throw new Error(`Server replied ${res.status}`)
     const { draft, source } = (await res.json()) as { draft: ServerDraft; source: 'gemini' | 'offline' }
+    // No topics chosen: the AI picked them from the teacher's instructions, so take them from its questions.
+    const competencies = input.competencies.length ? input.competencies : [...new Set(draft.questions.map((q) => q.competency))].slice(0, 10)
  
     return {
       title: draft.title,
       classId: input.classId,
       subject: input.subject,
-      competencies: input.competencies,
+      competencies,
       studentIds: input.studentIds,
       questions: draft.questions.map((q) => {
         const n = questionSeq++
@@ -321,7 +323,7 @@ export async function generateAssessmentDraft(input: GenerateInput): Promise<AiD
       curriculumRefs,
       parentNote: draft.parentNote,
       shareWithParents: true,
-      teachingPlan: draft.teachingPlan ?? templatePlan(input.competencies),
+      teachingPlan: draft.teachingPlan ?? templatePlan(competencies),
       source,
       requestSent: request,
     }
