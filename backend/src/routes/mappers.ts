@@ -159,6 +159,7 @@ export function toAiAssessment(a: AiAssessmentRow) {
     curriculumRefs: a.curriculumRefs,
     ...(a.parentNote !== null ? { parentNote: a.parentNote } : {}),
     shareWithParents: a.shareWithParents,
+    ...(a.teachingPlan ? { teachingPlan: a.teachingPlan } : {}),
     createdOn: a.createdAt.toISOString(),
     status: a.status,
     ...(a.sentAt ? { sentOn: a.sentAt.toISOString() } : {}),

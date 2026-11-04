@@ -413,6 +413,8 @@ model AiAssessment {
   curriculumRefs    String[]
   parentNote        String?
   shareWithParents  Boolean              @default(true)
+  // How to teach the targeted gaps (ai/schemas.ts TeachingPlan), drafted with the questions.
+  teachingPlan      Json?
   // gemini or offline, when known; and the anonymous request sent to the AI (kept for fine-tuning).
   source            AiSource?
   requestSent       Json?

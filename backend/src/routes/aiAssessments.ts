@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
+import { TeachingPlanSchema } from '../ai/schemas.ts'
 import { requireRole, requireUser } from '../auth/session.ts'
 import { prisma } from '../db/client.ts'
 import { notifyParents, notifyUsers } from '../messaging/messages.ts'
@@ -48,6 +49,7 @@ const DraftSchema = EditableFields.extend({
   parentNote: EditableFields.shape.parentNote.optional(),
   shareWithParents: EditableFields.shape.shareWithParents.default(true),
   source: z.enum(['gemini', 'offline']).optional(),
+  teachingPlan: TeachingPlanSchema.optional(),
   // The anonymous request sent to the AI (no student names), kept for fine-tuning.
   requestSent: z.record(z.string(), z.unknown()).optional(),
 })
@@ -110,7 +112,7 @@ export async function aiAssessmentRoutes(app: FastifyInstance) {
     const parsed = DraftSchema.safeParse(request.body)
     if (!parsed.success) return reply.code(400).send({ error: 'Invalid draft', issues: parsed.error.issues })
     const user = request.user!
-    const { questions, dueDate, requestSent, ...rest } = parsed.data
+    const { questions, dueDate, requestSent, teachingPlan, ...rest } = parsed.data
     if (!(await prisma.schoolClass.count({ where: { id: rest.classId, ...classScope(user) } }))) return reply.code(404).send({ error: 'Class not found.' })
     const outside = await studentsOutsideClass(rest.classId, rest.studentIds)
     if (outside.length) return reply.code(400).send({ error: 'Some students are not in this class.', studentIds: outside })
@@ -121,6 +123,7 @@ export async function aiAssessmentRoutes(app: FastifyInstance) {
         createdById: user.sub,
         dueDate: dueDate ? new Date(dueDate) : null,
         ...(requestSent ? { requestSent: requestSent as Prisma.InputJsonValue } : {}),
+        ...(teachingPlan ? { teachingPlan: teachingPlan as Prisma.InputJsonValue } : {}),
         questions: { create: questionRows(questions) },
       },
       include: aiAssessmentInclude,

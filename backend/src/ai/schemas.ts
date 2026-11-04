@@ -27,12 +27,29 @@ export const DraftQuestionSchema = z.object({
   explanation: z.string(),
 })
  
+// How to teach each targeted gap: method, lesson steps with minutes, the total time to spend, and when to stop.
+export const TeachingPlanSchema = z.object({
+  overview: z.string().describe('Two sentences for the teacher: the order to take the topics in and the time to spend in all'),
+  topics: z.array(
+    z.object({
+      competency: z.string().describe('The competency name, copied word for word'),
+      approach: z.string().describe('The teaching method and why it fits the evidence, in one or two sentences'),
+      steps: z.array(z.object({ title: z.string(), detail: z.string(), minutes: z.number().int().min(5).max(60) })).min(2).max(5),
+      recommendedTime: z.string().describe('e.g. "Two 20-minute sessions over one week"'),
+      stopWhen: z.string().describe('The sign that learners have got it and should move on, so time is not wasted on over-practice'),
+      commonMistakes: z.array(z.string()).max(3),
+    }),
+  ),
+})
+export type TeachingPlan = z.infer<typeof TeachingPlanSchema>
+
 export const AssessmentDraftSchema = z.object({
   title: z.string(),
   messageToStudents: z.string(),
   parentNote: z.string(),
   rationale: z.array(z.string()),
   questions: z.array(DraftQuestionSchema),
+  teachingPlan: TeachingPlanSchema,
 })
 export type AssessmentDraft = z.infer<typeof AssessmentDraftSchema>
  

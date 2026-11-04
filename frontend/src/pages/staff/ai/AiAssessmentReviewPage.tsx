@@ -19,6 +19,7 @@ import { DIFFICULTY_LABEL, curriculumRefsFor, extraQuestion, replacementQuestion
 import { formatDate } from '../../../lib/format'
 import type { AiAssessment } from '../../../types'
 import { QuestionItem } from './QuestionItem'
+import { TeachingPlanCard } from './TeachingPlanCard'
 import { WorkflowSteps } from './WorkflowSteps'
 
 export function AiAssessmentReviewPage() {
@@ -131,6 +132,8 @@ function Review({ assessment: a }: { assessment: AiAssessment }) {
               </ol>
             )}
           </Card>
+
+          {a.teachingPlan && <TeachingPlanCard plan={a.teachingPlan} />}
 
           {draft && (
             <div className="flex flex-col-reverse gap-3 rounded-2xl border border-line bg-surface p-5 sm:flex-row sm:items-center sm:justify-between">

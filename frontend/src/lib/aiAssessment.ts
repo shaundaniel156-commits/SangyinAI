@@ -11,7 +11,7 @@ import { getClass } from '../data/classes'
 import { CURRICULUM_FRAMEWORKS, getFramework } from '../data/curriculum'
 import { DIAGNOSTIC_REPORTS } from '../data/diagnostics'
 import { getStudentsByClass } from '../data/students'
-import type { AiAssessment, AiDifficulty, AiQuestion, AiQuestionType, CompetencyLevel, Student, Subject } from '../types'
+import type { AiAssessment, AiDifficulty, AiQuestion, AiQuestionType, CompetencyLevel, Student, Subject, TeachingPlan } from '../types'
 import { API_URL, apiHeaders } from './api'
 
 export const DIFFICULTY_LABEL: Record<AiDifficulty | 'mixed', string> = {
@@ -198,6 +198,26 @@ export function availableQuestionCount(competencies: string[], types: AiQuestion
   return competencies.reduce((n, c) => n + (AI_QUESTION_BANK[c] ?? []).filter((q) => types.includes(q.type)).length, 0)
 }
 
+// A sound general plan for when the AI can't be reached (the backend's ai/offline.ts has the same one).
+function templatePlan(competencies: string[]): TeachingPlan {
+  return {
+    overview: `Take the gaps one at a time, weakest first: ${competencies.join(', ')}. About 40 minutes per gap over a week is usually enough; move on as soon as the quick check is passed.`,
+    topics: competencies.map((competency) => ({
+      competency,
+      approach: 'Worked examples with guided practice: model the method step by step, then let learners try in pairs while you check. (General plan — generate again when online for one based on the class’s evidence.)',
+      steps: [
+        { title: 'Check the prerequisite', detail: `Two quick questions on the skill ${competency} builds on.`, minutes: 5 },
+        { title: `Model ${competency}`, detail: 'Work through two examples aloud, naming each step.', minutes: 10 },
+        { title: 'Guided practice', detail: 'Learners try two questions in pairs while you move around and check.', minutes: 15 },
+        { title: 'Quick check', detail: 'Five short questions done alone.', minutes: 10 },
+      ],
+      recommendedTime: 'Two 20-minute sessions over one week',
+      stopWhen: 'Most learners get 4 of the 5 quick-check questions right on two different days.',
+      commonMistakes: [],
+    })),
+  }
+}
+
 /** Offline fallback: builds a draft from the local question bank. */
 export async function generateLocalDraft(input: GenerateInput): Promise<AiDraft> {
   const questions = pickQuestions(input)
@@ -217,6 +237,7 @@ export async function generateLocalDraft(input: GenerateInput): Promise<AiDraft>
     curriculumRefs: input.competencies.flatMap((c) => curriculumRefsFor(input.classId, input.subject, c)),
     parentNote: `This week your child is practising ${input.competencies.join(' and ')} with a short set of questions from school. You can help by asking them to show you one question they solved and explain how they worked it out. A few minutes is enough.`,
     shareWithParents: true,
+    teachingPlan: templatePlan(input.competencies),
     source: 'offline',
   }
 }
@@ -227,6 +248,7 @@ interface ServerDraft {
   messageToStudents: string
   parentNote: string
   rationale: string[]
+  teachingPlan?: TeachingPlan
   questions: { competency: string; type: AiQuestionType; difficulty: AiDifficulty; prompt: string; options: string[]; answer: string; explanation: string }[]
 }
  
@@ -280,6 +302,7 @@ export async function generateAssessmentDraft(input: GenerateInput): Promise<AiD
       curriculumRefs,
       parentNote: draft.parentNote,
       shareWithParents: true,
+      teachingPlan: draft.teachingPlan ?? templatePlan(input.competencies),
       source,
       requestSent: request,
     }

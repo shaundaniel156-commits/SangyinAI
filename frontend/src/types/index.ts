@@ -204,6 +204,20 @@ export interface AiQuestion {
 
 export type AiAssessmentStatus = 'draft' | 'sent'
 
+/** How to teach the targeted gaps, drafted with the questions (backend ai/schemas.ts TeachingPlan). */
+export interface TeachingPlan {
+  overview: string
+  topics: {
+    competency: string
+    approach: string
+    steps: { title: string; detail: string; minutes: number }[]
+    recommendedTime: string
+    /** The sign that learners have got it, so practice stops before it becomes over-learning. */
+    stopWhen: string
+    commonMistakes: string[]
+  }[]
+}
+
 export interface AiAssessment {
   id: string
   title: string
@@ -225,6 +239,7 @@ export interface AiAssessment {
   /** Plain-language home-support note shared with parents once the teacher approves. */
   parentNote?: string
   shareWithParents?: boolean
+  teachingPlan?: TeachingPlan
   createdOn: string
   status: AiAssessmentStatus
   sentOn?: string
