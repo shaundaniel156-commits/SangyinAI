@@ -49,13 +49,31 @@ function setback(error: unknown): Setback {
 }
 const SETBACK_TEXT: Record<Exclude<Setback, null>, string> = { busy: 'is still busy', quota: 'is over its quota for today', silent: 'did not answer' }
 
+// After MODEL fails this way, requests skip it for a while instead of each waiting through its retries first.
+const AVOID_MAIN_MS = 5 * 60_000
+let avoidMainUntil = 0
+
+// Gives up waiting after REQUEST_TIMEOUT_MS. The library's own timeout does not stop a request Google is sitting
+// on (one was held for 14 minutes), so this is enforced here; a late answer is simply ignored.
+function inTime<R>(work: Promise<R>): Promise<R> {
+  let timer: ReturnType<typeof setTimeout>
+  const limit = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`timed out after ${REQUEST_TIMEOUT_MS / 1000}s`)), REQUEST_TIMEOUT_MS)
+  })
+  // The abandoned request may still fail later; that must not crash the server.
+  work.catch(() => {})
+  return Promise.race([work, limit]).finally(() => clearTimeout(timer))
+}
+
 // Runs a Gemini call with MODEL. When Google says it is busy, tries again up to twice; when that still fails,
 // or the model is over quota or doesn't answer, tries each fallback model once. Other errors (wrong key, bad
 // request) are not retried — waiting won't fix them. The call gets the model to use.
 export async function withBusyRetry<R>(label: string, call: (model: string) => Promise<R>): Promise<R> {
-  for (let attempt = 0; ; attempt++) {
+  // While MODEL is known to be struggling, go straight to the fallback models.
+  const skipMain = FALLBACK_MODELS.length > 0 && Date.now() < avoidMainUntil
+  for (let attempt = 0; !skipMain; attempt++) {
     try {
-      return await call(MODEL)
+      return await inTime(call(MODEL))
     } catch (error) {
       const why = setback(error)
       if (!why) throw error
@@ -66,13 +84,14 @@ export async function withBusyRetry<R>(label: string, call: (model: string) => P
         continue
       }
       if (!FALLBACK_MODELS.length) throw error
-      console.log(`[ai] ${label} ${MODEL} ${SETBACK_TEXT[why]}; trying ${FALLBACK_MODELS.join(', then ')}`)
+      avoidMainUntil = Date.now() + AVOID_MAIN_MS
+      console.log(`[ai] ${label} ${MODEL} ${SETBACK_TEXT[why]}; using ${FALLBACK_MODELS.join(', then ')} for the next ${AVOID_MAIN_MS / 60_000} minutes`)
       break
     }
   }
   for (const [i, model] of FALLBACK_MODELS.entries()) {
     try {
-      return await call(model)
+      return await inTime(call(model))
     } catch (error) {
       const why = setback(error)
       if (!why || i === FALLBACK_MODELS.length - 1) throw error
