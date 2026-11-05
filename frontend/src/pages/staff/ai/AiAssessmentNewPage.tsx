@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Check, FileSearch, FileText, FileUp, Loader2, Plus, RefreshCw, SendHorizontal, Sparkles, Users, X } from 'lucide-react'
+import { ArrowRight, Check, FileSearch, FileText, FileUp, Loader2, Plus, RefreshCw, SendHorizontal, Sparkles, Users, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, ButtonLink } from '../../../components/ui/Button'
@@ -166,9 +166,10 @@ export function AiAssessmentNewPage() {
   const className = classes.find((c) => c.id === classId)?.name ?? 'the class'
 
   // Asks the AI: the first time from the form, afterwards with the teacher's reply added to the notes.
-  const ask = async (followUp?: string) => {
-    const asked = followUp ? [...followUps, followUp] : followUps
+  const ask = async (followUp?: string, fresh = false) => {
+    const asked = fresh ? [] : followUp ? [...followUps, followUp] : followUps
     setFollowUps(asked)
+    if (fresh) setChat([])
     const userText = followUp ?? describeRequest({ className, subject, topics: selected, students: recipients.length, count: Number(count), difficulty, types, dueDate, notes: notes.trim() })
     const aiId = Date.now()
     setChat((c) => [...c, { id: aiId - 1, role: 'user', text: userText }, { id: aiId, role: 'ai', text: '', thinking: true }])
@@ -198,22 +199,6 @@ export function AiAssessmentNewPage() {
       const message = (error as Error).message
       notify('Assessment not saved', { tone: 'info', description: message === 'Invalid draft' ? 'The draft has no questions. Press Try again.' : message })
     }
-  }
-
-  if (chat.length) {
-    return (
-      <ChatView
-        messages={chat}
-        busy={busy}
-        onReply={(text) => void ask(text)}
-        onRetry={() => void ask()}
-        onOpen={(draft) => void open(draft)}
-        onBack={() => {
-          setChat([])
-          setFollowUps([])
-        }}
-      />
-    )
   }
 
   return (
@@ -399,7 +384,22 @@ export function AiAssessmentNewPage() {
                   <p className="mt-2 text-xs text-ink-3">Written work is done on paper: the student uploads a photo and the AI marks it against the model answer. You can read every photo.</p>
                 </fieldset>
                 <TextField label="Due date" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-48" />
+                <Button size="lg" disabled={!canGenerate || busy} onClick={() => void ask(undefined, true)} icon={<Sparkles className="size-4" aria-hidden />}>
+                  Generate assessment
+                </Button>
               </div>
+              <ul className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-ink-2">
+                <SummaryLine ok={selected.length > 0}>{selected.length ? `${selected.length} gap${selected.length > 1 ? 's' : ''}: ${selected.join(', ')}` : 'No gap selected'}</SummaryLine>
+                <SummaryLine ok={recipients.length > 0}>{recipients.length} student{recipients.length === 1 ? '' : 's'} selected</SummaryLine>
+                <SummaryLine ok={types.length > 0 && (live || available > 0)}>
+                  {live ? Number(count) : Math.min(Number(count), available)} questions · {DIFFICULTY_LABEL[difficulty]}
+                </SummaryLine>
+              </ul>
+              {!live && selected.length > 0 && available < Number(count) && (
+                <p className="rounded-lg bg-warn-soft px-3 py-2 text-xs text-warn-ink">
+                  Only {available} questions are available for {selected.length === 1 ? 'this gap' : 'these gaps'}. Select another gap or question type for a longer assessment.
+                </p>
+              )}
             </CardBody>
           </Card>
         </div>
@@ -462,26 +462,14 @@ export function AiAssessmentNewPage() {
             )}
           </Card>
 
-          <Card>
-            <CardBody className="space-y-4">
-              <ul className="space-y-2 text-sm text-ink-2">
-                <SummaryLine ok={selected.length > 0}>{selected.length ? `${selected.length} gap${selected.length > 1 ? 's' : ''}: ${selected.join(', ')}` : 'No gap selected'}</SummaryLine>
-                <SummaryLine ok={recipients.length > 0}>{recipients.length} student{recipients.length === 1 ? '' : 's'} selected</SummaryLine>
-                <SummaryLine ok={types.length > 0 && (live || available > 0)}>
-                  {live ? Number(count) : Math.min(Number(count), available)} questions · {DIFFICULTY_LABEL[difficulty]}
-                </SummaryLine>
-              </ul>
-              {!live && selected.length > 0 && available < Number(count) && (
-                <p className="rounded-lg bg-warn-soft px-3 py-2 text-xs text-warn-ink">
-                  Only {available} questions are available for {selected.length === 1 ? 'this gap' : 'these gaps'}. Select another gap or question type for a longer assessment.
-                </p>
-              )}
-              <Button size="lg" className="w-full" disabled={!canGenerate} onClick={() => void ask()} icon={<Sparkles className="size-4" aria-hidden />}>
-                Generate assessment
-              </Button>
-              <p className="text-xs text-ink-3">Drafted by the AI (or the question bank when offline). You review every question before anything is sent.</p>
-            </CardBody>
-          </Card>
+          <ChatPanel
+            messages={chat}
+            busy={busy}
+            ready={canGenerate}
+            onReply={(text) => void ask(text)}
+            onRetry={() => void ask()}
+            onOpen={(draft) => void open(draft)}
+          />
         </div>
       </div>
     </>
@@ -509,71 +497,80 @@ function useTypewriter(text: string): string {
   return text.slice(0, Math.min(shown, text.length))
 }
 
-interface ChatViewProps {
+interface ChatPanelProps {
   messages: ChatMessage[]
   busy: boolean
+  /** The form has enough to generate from (a reply before any assessment starts one). */
+  ready: boolean
   onReply: (text: string) => void
   /** Asks again with the same brief (after a failed attempt). */
   onRetry: () => void
   onOpen: (draft: AiDraft) => void
-  onBack: () => void
 }
 
-/** The conversation: the teacher's request, the AI's reply with the assessment attached, and a box to ask for changes. */
-function ChatView({ messages, busy, onReply, onRetry, onOpen, onBack }: ChatViewProps) {
+/** The conversation with the AI, beside the form: its reply with the assessment attached, and a box to ask for changes. */
+function ChatPanel({ messages, busy, ready, onReply, onRetry, onOpen }: ChatPanelProps) {
   const [reply, setReply] = useState('')
-  const endRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
 
+  // Keep the newest message in view as replies arrive.
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    const list = listRef.current
+    if (list) list.scrollTop = list.scrollHeight
   }, [messages])
 
   const send = () => {
     const text = reply.trim()
-    if (!text || busy) return
+    if (!text || busy || !ready) return
     setReply('')
     onReply(text)
   }
 
   return (
-    <div className="mx-auto flex min-h-[70vh] max-w-3xl flex-col">
-      <button type="button" onClick={onBack} className="inline-flex items-center gap-1 self-start text-sm text-ink-3 transition-colors hover:text-ink">
-        <ArrowLeft className="size-4" aria-hidden />
-        Change the report data
-      </button>
-      <div className="flex-1 space-y-8 py-8">
-        {messages.map((m) =>
-          m.role === 'user' ? (
-            <div key={m.id} className="flex justify-end">
-              <p className="max-w-[85%] whitespace-pre-line rounded-2xl bg-surface-2 px-5 py-3 text-[15px] leading-relaxed text-ink">{m.text}</p>
-            </div>
-          ) : (
-            <AiTurn key={m.id} message={m} onOpen={onOpen} onRetry={onRetry} busy={busy} />
-          ),
+    <Card className="flex max-h-[calc(100vh-7rem)] min-h-[28rem] flex-col">
+      <CardHeader title="Sangyin AI" description="Drafts the assessment and explains its choices. Reply to change it." icon={<Sparkles className="size-5" aria-hidden />} />
+      <div ref={listRef} className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
+        {messages.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center text-center">
+            <span className="grid size-12 place-items-center rounded-full bg-brand-soft text-brand-ink">
+              <Sparkles className="size-6" aria-hidden />
+            </span>
+            <p className="mt-4 text-sm font-medium text-ink">Your assessment will appear here</p>
+            <p className="mt-1 max-w-xs text-xs text-ink-3">Press Generate assessment. Then reply here to change it — for example “make them easier” or “add a question about money”.</p>
+          </div>
+        ) : (
+          messages.map((m) =>
+            m.role === 'user' ? (
+              <div key={m.id} className="flex justify-end">
+                <p className="max-w-[90%] whitespace-pre-line rounded-2xl bg-surface-2 px-4 py-2.5 text-sm leading-relaxed text-ink">{m.text}</p>
+              </div>
+            ) : (
+              <AiTurn key={m.id} message={m} onOpen={onOpen} onRetry={onRetry} busy={busy} />
+            ),
+          )
         )}
-        <div ref={endRef} />
       </div>
       <form
         onSubmit={(e) => {
           e.preventDefault()
           send()
         }}
-        className="sticky bottom-4 flex items-center gap-2 rounded-2xl border border-line bg-surface p-2 shadow-lg"
+        className="flex items-center gap-2 border-t border-line p-3"
       >
         <input
           value={reply}
           onChange={(e) => setReply(e.target.value)}
           disabled={busy}
-          placeholder={busy ? 'The AI is working…' : 'Reply with changes, e.g. “make them easier” or “add a question about money”'}
+          placeholder={busy ? 'The AI is working…' : 'Reply'}
           aria-label="Reply to the AI"
           className={cn(inputClasses, 'h-10 border-0 bg-transparent shadow-none focus:ring-0')}
         />
-        <Button type="submit" size="sm" disabled={busy || !reply.trim()} icon={<SendHorizontal className="size-4" aria-hidden />}>
+        <Button type="submit" size="sm" disabled={busy || !ready || !reply.trim()} icon={<SendHorizontal className="size-4" aria-hidden />} aria-label="Send">
           Send
         </Button>
       </form>
-      <p className="mt-3 text-center text-xs text-ink-3">Drafted by the AI (or the question bank when offline). You review every question before anything is sent.</p>
-    </div>
+      <p className="px-4 pb-3 text-center text-xs text-ink-3">The AI can make mistakes. You review every question before anything is sent.</p>
+    </Card>
   )
 }
 
@@ -591,8 +588,8 @@ function AiTurn({ message: m, onOpen, onRetry, busy }: { message: ChatMessage; o
 
   return (
     <div className="flex gap-3">
-      <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-brand-600 text-white">
-        <Sparkles className="size-4" aria-hidden />
+      <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-brand-600 text-white">
+        <Sparkles className="size-3.5" aria-hidden />
       </span>
       <div className="min-w-0 flex-1">
         {m.thinking ? (
@@ -603,7 +600,7 @@ function AiTurn({ message: m, onOpen, onRetry, busy }: { message: ChatMessage; o
         ) : (
           <>
             <p className="text-xs text-ink-3">{m.draft?.source === 'offline' ? 'From the question bank' : 'Written by the AI'} · read your report data, drafted questions and a teaching plan</p>
-            <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed text-ink">
+            <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-ink">
               {shown}
               {typing && (
                 <span className="animate-pulse text-brand-600" aria-hidden>
@@ -629,7 +626,7 @@ function DraftCard({ draft, onOpen }: { draft: AiDraft; onOpen: () => void }) {
   const n = draft.questions.length
   const s = draft.studentIds.length
   return (
-    <div className="mt-4 inline-flex max-w-full flex-col gap-3 rounded-xl border border-line bg-surface-2 p-4">
+    <div className="mt-4 flex max-w-full flex-col gap-3 rounded-xl border border-line bg-surface-2 p-4">
       <div className="flex items-center gap-3">
         <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand-ink">
           <FileText className="size-5" aria-hidden />
