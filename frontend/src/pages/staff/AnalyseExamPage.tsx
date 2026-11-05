@@ -14,7 +14,7 @@ import { studentsInScope } from '../../data/selectors'
 import { api, ApiError } from '../../lib/api'
 import { readBase64, shrinkPhoto } from '../../lib/photo'
 import { subjectChoices } from '../../lib/subjects'
-import type { DiagnosticReport } from '../../types'
+import type { DiagnosticReport, GuidancePlan } from '../../types'
 
 interface Row {
   topic: string
@@ -48,6 +48,8 @@ export function AnalyseExamPage() {
   const [file, setFile] = useState<File | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
+  // What the button says while working: the diagnosis first, then the guidance plan drafted from it.
+  const [stage, setStage] = useState<'diagnosis' | 'guidance'>('diagnosis')
   const [error, setError] = useState('')
 
   const setRow = (i: number, change: Partial<Row>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...change } : r)))
@@ -70,6 +72,7 @@ export function AnalyseExamPage() {
     if (incomplete) return setError('Each mark row needs a topic, the marks scored and what it is out of.')
     if (!filled.length && report.trim().length < 20 && !file) return setError('Enter marks for at least one topic, paste the report, or upload a document.')
     setBusy(true)
+    setStage('diagnosis')
     try {
       const created = await api<DiagnosticReport>('/diagnostics', {
         body: {
@@ -81,9 +84,14 @@ export function AnalyseExamPage() {
           ...(file ? { document: { name: file.name, data: await readBase64(file) } } : {}),
         },
       })
+      // Straight away, the AI drafts a guidance plan for the gaps it found, for the teacher to review. If that
+      // fails the diagnosis still stands; the plan can be generated later from AI Guidance.
+      setStage('guidance')
+      const guidance = await api<{ plans: GuidancePlan[] }>('/guidance/generate', { body: { studentId, subject: subject.trim() } }).catch(() => null)
+      const drafted = guidance?.plans.length ?? 0
       await refresh()
       notify('Competency gaps diagnosed', {
-        description: created.processing === 'refined' ? 'Review the AI’s assessment.' : 'Worked out from the marks; the AI was not available.',
+        description: `${created.processing === 'refined' ? 'Review the AI’s assessment.' : 'Worked out from the marks; the AI was not available.'}${drafted ? ` ${drafted} guidance plan${drafted === 1 ? ' is' : 's are'} waiting for your review under AI Guidance.` : ''}`,
       })
       navigate(`/diagnostics/${created.id}`)
     } catch (err) {
@@ -208,7 +216,7 @@ export function AnalyseExamPage() {
               </p>
             )}
             <Button type="submit" disabled={busy || !studentId} className="w-full" icon={<Sparkles className="size-4" aria-hidden />}>
-              {busy ? 'Analysing…' : 'Find competency gaps'}
+              {busy ? (stage === 'guidance' ? 'Drafting teaching guidance…' : 'Analysing…') : 'Find competency gaps'}
             </Button>
           </div>
         </form>

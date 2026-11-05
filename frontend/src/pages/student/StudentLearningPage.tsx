@@ -1,9 +1,10 @@
-import { BookOpenCheck, CheckCircle2, Target } from 'lucide-react'
+import { BookOpenCheck, CheckCircle2, Sparkles, Target } from 'lucide-react'
 import { useState } from 'react'
 import { Card, CardBody, CardHeader } from '../../components/ui/Card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { StatusBadge } from '../../components/ui/StatusBadge'
+import { GUIDANCE_PLANS } from '../../data/guidance'
 import { PRACTICE_ACTIVITIES } from '../../data/practice'
 import { formatShortDate } from '../../lib/format'
 import type { PracticeActivity } from '../../types'
@@ -17,10 +18,38 @@ export function StudentLearningPage() {
   const steps = getLearningSequence(student)
   const later = PRACTICE_ACTIVITIES.filter((a) => a.focus !== student.currentFocus && a.status !== 'completed')
   const finished = PRACTICE_ACTIVITIES.filter((a) => a.focus !== student.currentFocus && a.status === 'completed')
+  // Guidance plans the teacher approved for this student (only approved plans ever reach a student).
+  const plans = GUIDANCE_PLANS.filter((g) => g.studentId === student.id && g.status === 'approved')
 
   return (
     <>
       <PageHeader title="My Learning" description="Your learning path, one step at a time." />
+
+      {plans.length > 0 && (
+        <section aria-labelledby="plans-from-teacher" className="mb-6">
+          <h2 id="plans-from-teacher" className="mb-3 text-base font-semibold text-ink">
+            From your teacher
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2">
+            {plans.map((g) => (
+              <Card key={g.id}>
+                <CardHeader title={`Your plan for ${g.competencyGap}`} description={`${g.subject} · steps your teacher chose for you`} icon={<Sparkles className="size-5" aria-hidden />} />
+                <CardBody>
+                  <ol className="space-y-2.5">
+                    {g.outputs.studentSequence.map((step, i) => (
+                      <li key={step} className="flex gap-3 text-sm text-ink">
+                        <span className="tabular grid size-6 shrink-0 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand-ink">{i + 1}</span>
+                        <span className="pt-0.5">{step}</span>
+                      </li>
+                    ))}
+                  </ol>
+                  {g.pacing && <p className="mt-4 rounded-lg bg-surface-2 px-3 py-2 text-xs text-ink-3">When: {g.pacing}</p>}
+                </CardBody>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">

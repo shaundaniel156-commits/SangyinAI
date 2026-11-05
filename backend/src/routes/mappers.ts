@@ -191,7 +191,7 @@ export function toDiagnostic(r: Prisma.DiagnosticReportGetPayload<object>, guida
 
 // --- Guidance ---------------------------------------------------------------
 
-interface PlanBody {
+export interface PlanBody {
   teachingApproach: { method: string; rationale: string }
   sequence: { title: string; detail: string }[]
   pacing: string
@@ -203,6 +203,9 @@ export interface PlanEdits {
   rationale?: string
   pacing?: string
   practice?: string[]
+  sequence?: { title: string; detail: string }[]
+  parentNote?: string
+  studentSequence?: string[]
 }
 
 // The plan with the teacher's edits applied, plus `edited` and `decidedAt` (as the frontend's GuidanceReviewContext shows them).
@@ -218,10 +221,10 @@ export function toGuidancePlan(g: Prisma.GuidancePlanGetPayload<object>) {
     createdOn: day(g.createdAt),
     status: g.status,
     teachingApproach: { method: edits?.method ?? plan.teachingApproach.method, rationale: edits?.rationale ?? plan.teachingApproach.rationale },
-    sequence: plan.sequence,
+    sequence: edits?.sequence ?? plan.sequence,
     pacing: edits?.pacing ?? plan.pacing,
     practice: edits?.practice ?? plan.practice,
-    outputs: plan.outputs,
+    outputs: { ...plan.outputs, parentNote: edits?.parentNote ?? plan.outputs.parentNote, studentSequence: edits?.studentSequence ?? plan.outputs.studentSequence },
     ...(g.teacherNote ? { teacherNote: g.teacherNote } : {}),
     edited: Boolean(edits && Object.keys(edits).length),
     ...(g.decidedAt ? { decidedAt: g.decidedAt.toISOString() } : {}),

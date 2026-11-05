@@ -64,7 +64,7 @@ export function GuidanceDetailPage() {
 
   const approve = () => {
     decide(plan.id, 'approved')
-    notify('Plan approved', { description: 'Preview only — in the full system the parent note and student practice would now be shared.' })
+    notify('Plan approved and shared', { description: 'The student now sees the steps under My Learning, and the home-support note has gone to their parents.' })
   }
 
   return (
@@ -229,7 +229,7 @@ export function GuidanceDetailPage() {
               </Button>
               <p className={cn('mt-4 rounded-lg px-3 py-2 text-xs', plan.status === 'approved' ? 'bg-good-soft text-good-ink' : 'bg-surface-2 text-ink-3')}>
                 {plan.status === 'approved'
-                  ? 'Approved — ready to share with the parent and student.'
+                  ? 'Approved — shared with the student and their parents.'
                   : 'Not shared yet. Parents and students only see this after you approve the plan.'}
               </p>
             </CardBody>

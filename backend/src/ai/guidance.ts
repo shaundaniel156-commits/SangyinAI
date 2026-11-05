@@ -13,6 +13,8 @@ export const GuidanceRequestSchema = z.object({
   curriculumObjectives: z.array(z.string()),
   evidence: z.array(z.string()).describe('e.g. "Q3 Simplify 6:9 — incorrect"'),
   studentFeedback: z.string().describe('e.g. "Found it difficult; needs more help"'),
+  // When a teacher asks for a plan to be rewritten: what they want changed.
+  teacherRequest: z.string().max(3000).optional(),
 })
 export type GuidanceRequest = z.infer<typeof GuidanceRequestSchema>
  
@@ -75,7 +77,8 @@ Curriculum objectives:
 ${r.curriculumObjectives.map((o) => `- ${o}`).join('\n') || '- (none supplied)'}
 Evidence from assessments:
 ${r.evidence.map((e) => `- ${e}`).join('\n') || '- (none supplied)'}
-What the learner said: ${r.studentFeedback || '(nothing)'}${context.references ? `\n\n${context.references}` : ''}`
+What the learner said: ${r.studentFeedback || '(nothing)'}${r.teacherRequest ? `
+The teacher asked for an earlier plan to be rewritten. Follow their request: ${r.teacherRequest}` : ''}${context.references ? `\n\n${context.references}` : ''}`
   try {
     const plan = await askGeminiForJson(GuidancePlanSchema, GUIDANCE_SYSTEM_PROMPT, prompt, 'guidance')
     if (!plan) return { plan: templatePlan(r), source: 'offline' }

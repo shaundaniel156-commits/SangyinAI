@@ -1,7 +1,7 @@
-import { Sparkles } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { Sparkles, Wand2 } from 'lucide-react'
+import { useState } from 'react'
 import { GuidanceCard } from '../../components/domain/GuidanceCard'
-import { ButtonLink } from '../../components/ui/Button'
+import { Button, ButtonLink } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { FilterBar } from '../../components/ui/FilterBar'
@@ -13,6 +13,7 @@ import { useSession } from '../../context/SessionContext'
 import { classesInScope, guidanceInScope } from '../../data/selectors'
 import { getStudent } from '../../data/students'
 import type { GuidanceStatus } from '../../types'
+import { GenerateGuidanceModal } from './guidance/GenerateGuidanceModal'
 
 type TabId = 'all' | GuidanceStatus
 
@@ -22,8 +23,10 @@ export function GuidancePage() {
   const [tab, setTab] = useState<TabId>('pending_review')
   const [query, setQuery] = useState('')
   const [classId, setClassId] = useState('all')
+  const [generating, setGenerating] = useState(false)
 
-  const plans = useMemo(() => guidanceInScope(role).map(resolve), [role, resolve])
+  // Recomputed on every draw: the list changes when the AI adds plans.
+  const plans = guidanceInScope(role).map(resolve)
   const count = (s: GuidanceStatus) => plans.filter((p) => p.status === s).length
   const rows = plans.filter((p) => {
     const s = getStudent(p.studentId)
@@ -41,11 +44,16 @@ export function GuidancePage() {
         title="AI Guidance"
         description="Teaching plans suggested for each identified competency gap. Nothing reaches students or parents until you approve it."
         actions={
-          nextPending && (
-            <ButtonLink to={`/guidance/${nextPending.id}`} icon={<Sparkles className="size-4" aria-hidden />}>
-              Review next plan
-            </ButtonLink>
-          )
+          <>
+            <Button variant={nextPending ? 'secondary' : 'primary'} onClick={() => setGenerating(true)} icon={<Wand2 className="size-4" aria-hidden />}>
+              Generate guidance
+            </Button>
+            {nextPending && (
+              <ButtonLink to={`/guidance/${nextPending.id}`} icon={<Sparkles className="size-4" aria-hidden />}>
+                Review next plan
+              </ButtonLink>
+            )}
+          </>
         }
       />
       <Card>
@@ -86,9 +94,21 @@ export function GuidancePage() {
             ))}
           </div>
         ) : (
-          <EmptyState icon={Sparkles} title="No plans here" description="There are no guidance plans matching this view." />
+          <EmptyState
+            icon={Sparkles}
+            title="No plans here"
+            description={plans.length ? 'There are no guidance plans matching this view.' : 'Let the AI draft a guidance plan for each student’s competency gaps. You review, edit and approve before anything is shared.'}
+            action={
+              plans.length === 0 && (
+                <Button onClick={() => setGenerating(true)} icon={<Wand2 className="size-4" aria-hidden />}>
+                  Generate guidance
+                </Button>
+              )
+            }
+          />
         )}
       </Card>
+      {generating && <GenerateGuidanceModal open onClose={() => setGenerating(false)} />}
     </>
   )
 }

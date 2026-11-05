@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import { GUIDANCE_PLANS } from '../data/guidance'
 import { api } from '../lib/api'
-import type { GuidancePlan, GuidanceStatus } from '../types'
+import type { GuidancePlan, GuidanceStatus, GuidanceStep } from '../types'
 import { useLiveData } from './LiveDataContext'
 import { useToast } from './ToastContext'
 
@@ -14,6 +14,11 @@ export interface PlanEdits {
   rationale?: string
   pacing?: string
   practice?: string[]
+  sequence?: GuidanceStep[]
+  /** The home-support note parents receive. */
+  parentNote?: string
+  /** The steps the student sees. */
+  studentSequence?: string[]
 }
 
 interface Decision {
@@ -28,6 +33,8 @@ interface GuidanceReviewValue {
   decide: (planId: string, status: GuidanceStatus, note?: string) => void
   saveEdits: (planId: string, edits: PlanEdits) => void
   reset: (planId: string) => void
+  /** "Request revision": the AI rewrites the plan following the teacher's note; it returns to "Awaiting review". */
+  regenerate: (planId: string, note: string) => Promise<void>
   /** The plan with any local decision/edits applied. */
   resolve: (plan: GuidancePlan) => GuidancePlan & { edited: boolean; decidedAt?: string }
 }
@@ -93,6 +100,13 @@ export function GuidanceReviewProvider({ children }: { children: ReactNode }) {
     save(planId, { status: 'pending_review', note: null, edits: null })
   }, [forget, save])
 
+  const regenerate = useCallback<GuidanceReviewValue['regenerate']>(async (planId, note) => {
+    const saved = await api<GuidancePlan>(`/guidance/${planId}/regenerate`, { body: { note } })
+    const plan = GUIDANCE_PLANS.find((p) => p.id === planId)
+    if (plan) Object.assign(plan, saved)
+    forget(planId)
+  }, [forget])
+
   const resolve = useCallback<GuidanceReviewValue['resolve']>(
     (plan) => {
       const d = decisions[plan.id]
@@ -105,8 +119,10 @@ export function GuidanceReviewProvider({ children }: { children: ReactNode }) {
           method: d.edits?.method ?? plan.teachingApproach.method,
           rationale: d.edits?.rationale ?? plan.teachingApproach.rationale,
         },
+        sequence: d.edits?.sequence ?? plan.sequence,
         pacing: d.edits?.pacing ?? plan.pacing,
         practice: d.edits?.practice ?? plan.practice,
+        outputs: { ...plan.outputs, parentNote: d.edits?.parentNote ?? plan.outputs.parentNote, studentSequence: d.edits?.studentSequence ?? plan.outputs.studentSequence },
         edited: Boolean(d.edits),
         decidedAt: d.decidedAt,
       }
@@ -114,7 +130,7 @@ export function GuidanceReviewProvider({ children }: { children: ReactNode }) {
     [decisions],
   )
 
-  const value = useMemo(() => ({ decisions, decide, saveEdits, reset, resolve }), [decisions, decide, saveEdits, reset, resolve])
+  const value = useMemo(() => ({ decisions, decide, saveEdits, reset, regenerate, resolve }), [decisions, decide, saveEdits, reset, regenerate, resolve])
   return <GuidanceReviewContext.Provider value={value}>{children}</GuidanceReviewContext.Provider>
 }
 
