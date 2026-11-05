@@ -41,7 +41,8 @@ const DecisionSchema = z
   })
   .refine((d) => d.status !== undefined || d.note !== undefined || d.edits !== undefined, { message: 'Send a status, a note or edits.' })
 
-const GenerateSchema = z.object({ studentId: z.string().min(1), subject: z.string().trim().min(1).max(60).optional() })
+// again: also draft a new version for gaps that already have an approved plan (the teacher asked for a fresh draft).
+const GenerateSchema = z.object({ studentId: z.string().min(1), subject: z.string().trim().min(1).max(60).optional(), again: z.boolean().optional() })
 const RegenerateSchema = z.object({ note: z.string().trim().min(1).max(2000) })
 
 // Each plan is one request to the AI, so a student gets plans for their weakest gaps first, this many at a time.
@@ -103,8 +104,10 @@ export async function guidanceRoutes(app: FastifyInstance) {
     return plans.map(toGuidancePlan)
   })
 
-  // The AI drafts guidance plans for one student's weakest gaps (those without a plan already), for the teacher to
-  // review. Returns the new plans, or none with the reason (no gaps recorded, or all already have a plan).
+  // The AI drafts guidance plans for one student's weakest gaps, for the teacher to review and edit. Gaps with no
+  // plan come first; with `again`, gaps whose plan is already approved get a new draft too. A gap with a draft
+  // already waiting is never drafted twice: those drafts come back as `waiting`. Returns the new plans, or none
+  // with the reason.
   app.post('/guidance/generate', aiRoute, async (request, reply) => {
     const parsed = GenerateSchema.safeParse(request.body)
     if (!parsed.success) return reply.code(400).send({ error: 'Choose a student.' })
@@ -116,11 +119,17 @@ export async function guidanceRoutes(app: FastifyInstance) {
     if (!found?.gaps.length) return { plans: [], reason: 'No competency gaps are recorded for this student yet. Analyse their exam results first.' }
     const existing = await prisma.guidancePlan.findMany({
       where: { studentId: student.id, subject: found.subject, status: { in: ['pending_review', 'approved'] } },
-      select: { competencyGap: true },
+      orderBy: { createdAt: 'desc' },
     })
-    const covered = new Set(existing.map((p) => p.competencyGap.toLowerCase()))
-    const gaps = found.gaps.filter((g) => !covered.has(g.name.toLowerCase())).slice(0, MAX_GAPS)
-    if (!gaps.length) return { plans: [], reason: 'This student already has guidance for their current gaps.' }
+    const names = (status: string) => new Set(existing.filter((p) => p.status === status).map((p) => p.competencyGap.toLowerCase()))
+    const [waitingFor, approvedFor] = [names('pending_review'), names('approved')]
+    const open = found.gaps.filter((g) => !waitingFor.has(g.name.toLowerCase()))
+    const fresh = open.filter((g) => !approvedFor.has(g.name.toLowerCase()))
+    const gaps = (fresh.length ? fresh : parsed.data.again ? open : []).slice(0, MAX_GAPS)
+    if (!gaps.length) {
+      const waiting = existing.filter((p) => p.status === 'pending_review').map(toGuidancePlan)
+      return { plans: [], waiting, reason: waiting.length ? 'A draft for this student is already waiting for your review.' : 'This student already has guidance for their current gaps.' }
+    }
 
     const drafted = await Promise.all(
       gaps.map((g) =>
@@ -192,6 +201,13 @@ export async function guidanceRoutes(app: FastifyInstance) {
         ...(edits === null ? { edits: Prisma.DbNull } : edits ? { edits: { ...((plan.edits ?? {}) as PlanEdits), ...edits } as Prisma.InputJsonValue } : {}),
       },
     })
+    // A newly approved plan replaces any older approved plan for the same gap, so the student sees one guide per gap.
+    if (status === 'approved') {
+      await prisma.guidancePlan.updateMany({
+        where: { studentId: plan.studentId, subject: plan.subject, competencyGap: { equals: plan.competencyGap, mode: 'insensitive' }, status: 'approved', id: { not: plan.id } },
+        data: { status: 'overridden', teacherNote: 'Replaced by a newer approved plan.' },
+      })
+    }
     const shared = toGuidancePlan(updated)
     // Once approved, the plan (as the teacher left it) is shared: its steps with the student, and its home-support
     // note with the child's parents (app, email and SMS). Failures are logged and never block the approval.
