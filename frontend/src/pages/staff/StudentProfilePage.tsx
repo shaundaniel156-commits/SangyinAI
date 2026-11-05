@@ -1,4 +1,4 @@
-import { ClipboardList, Sparkles, Stethoscope, Target, UserRound } from 'lucide-react'
+import { ClipboardList, Sparkles, Stethoscope, Target, UserRound, Wand2 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ChartContainer } from '../../components/charts/ChartContainer'
@@ -11,6 +11,7 @@ import { ButtonLink } from '../../components/ui/Button'
 import { Card, CardBody, CardHeader } from '../../components/ui/Card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { useAiAssessments } from '../../context/AiAssessmentsContext'
 import { getStudentAssessmentHistory } from '../../data/assessments'
 import { getClass } from '../../data/classes'
 import { FRAMEWORK_LABEL } from '../../data/curriculum'
@@ -30,6 +31,7 @@ function subjectAverage(student: Student, subject: Subject): number | null {
 
 export function StudentProfilePage() {
   const { id = '' } = useParams()
+  const { items } = useAiAssessments()
   const student = getStudent(id)
 
   if (!student) {
@@ -51,6 +53,8 @@ export function StudentProfilePage() {
   const guidance = getGuidanceForStudent(student.id)
   const history = getStudentAssessmentHistory(student.id, student.classId)
   const trend = getStudentTrend(student.id, student.classId)
+  // Practice sent to this student from the AI Assessment Builder, newest first, with their result once answered.
+  const practice = items.filter((a) => a.status === 'sent' && a.studentIds.includes(student.id)).sort((a, b) => (b.sentOn ?? b.createdOn).localeCompare(a.sentOn ?? a.createdOn))
 
   return (
     <>
@@ -185,6 +189,42 @@ export function StudentProfilePage() {
           )}
         </Card>
       </div>
+
+      <Card className="mt-6">
+        <CardHeader title="Practice" description="Assessments sent from the AI Assessment Builder, and how the student did" icon={<Wand2 className="size-5" aria-hidden />} />
+        {practice.length === 0 ? (
+          <EmptyState icon={Wand2} title="No practice sent yet" />
+        ) : (
+          <ul className="divide-y divide-line">
+            {practice.map((a) => {
+              const attempt = a.attempts?.[student.id]
+              const percent = attempt && attempt.total ? Math.round((attempt.score / attempt.total) * 100) : null
+              return (
+                <li key={a.id}>
+                  <Link to={`/ai-assessments/${a.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-surface-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-ink">{a.title}</p>
+                      <p className="truncate text-sm text-ink-3">
+                        {a.subject} · {a.competencies.join(', ')} · sent {formatShortDate(a.sentOn ?? a.createdOn)}
+                      </p>
+                    </div>
+                    {attempt && percent !== null ? (
+                      <div className="text-right">
+                        <p className={cn('tabular text-sm font-semibold', percent >= 70 ? 'text-good-ink' : percent >= 50 ? 'text-warn-ink' : 'text-bad-ink')}>
+                          {attempt.score}/{attempt.total}
+                        </p>
+                        <p className="text-xs text-ink-3">{formatShortDate(attempt.completedOn)}</p>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-ink-3">Not done yet</span>
+                    )}
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </Card>
     </>
   )
 }

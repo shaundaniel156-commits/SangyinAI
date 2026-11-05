@@ -4,6 +4,18 @@ import { getClass } from './classes'
 
 export const PRACTICE_ACTIVITIES: PracticeActivity[] = []
 
+/**
+ * The teacher's assessments (AI Assessment Builder) a student has answered, as practice records. They are listed
+ * apart from PRACTICE_ACTIVITIES ("From your teacher"), so the record views add them with this.
+ */
+export function teacherPracticeDone(items: AiAssessment[], attempts: Record<string, { score: number; total: number; completedOn: string } | undefined>, studentId: string): PracticeActivity[] {
+  return items.flatMap((a) => {
+    const attempt = attempts[a.id]
+    if (a.status !== 'sent' || !a.studentIds.includes(studentId) || !attempt) return []
+    return [{ id: `ai-${a.id}`, aiAssessmentId: a.id, title: a.title, focus: a.competencies.join(', '), subject: a.subject, status: 'completed' as const, questions: attempt.total, estimatedMinutes: Math.max(5, Math.round(attempt.total * 1.5)), completedOn: attempt.completedOn, score: attempt.score }]
+  })
+}
+
 /** Days in a row, ending today (or yesterday), with at least one practice activity completed. */
 export function practiceStreakDays(activities: PracticeActivity[] = PRACTICE_ACTIVITIES): number {
   const days = new Set(activities.filter((a) => a.completedOn).map((a) => new Date(a.completedOn!).toDateString()))

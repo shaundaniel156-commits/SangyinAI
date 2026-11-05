@@ -10,7 +10,7 @@ import { SectionHeading } from '../../components/ui/SectionHeading'
 import { StatCard } from '../../components/ui/StatCard'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { useAiAssessments } from '../../context/AiAssessmentsContext'
-import { PRACTICE_ACTIVITIES, practiceStreakDays, recentAchievements, teacherMessages } from '../../data/practice'
+import { PRACTICE_ACTIVITIES, practiceStreakDays, recentAchievements, teacherMessages, teacherPracticeDone } from '../../data/practice'
 import { ROLE_USERS } from '../../data/users'
 import { formatShortDate } from '../../lib/format'
 import type { PracticeActivity } from '../../types'
@@ -28,19 +28,19 @@ export function StudentDashboard() {
   const done = steps.filter((s) => s.state === 'completed').length
   const current = PRACTICE_ACTIVITIES.find((a) => a.status === 'in_progress')
   const upNext = PRACTICE_ACTIVITIES.filter((a) => a.status === 'not_started').slice(0, 3)
-  const completed = PRACTICE_ACTIVITIES.filter((a) => a.status === 'completed')
+  // Everything finished: regular practice, plus the teacher's assessments this student has answered.
+  const completed = [...PRACTICE_ACTIVITIES.filter((a) => a.status === 'completed'), ...teacherPracticeDone(items, attempts, ROLE_USERS.student.id)]
   const lastCompleted = [...completed].sort((a, b) => (b.completedOn ?? '').localeCompare(a.completedOn ?? ''))[0]
   const latestMessage = teacherMessages(items, ROLE_USERS.student.id)[0]
-  const streak = practiceStreakDays()
-  const achievements = recentAchievements()
+  const streak = practiceStreakDays(completed)
+  const achievements = recentAchievements(completed)
   const focusScore = student.competencies.find((c) => c.name === student.currentFocus)
 
   // Teacher-approved assessments come first; otherwise continue or start regular practice.
   const mine = items.filter((a) => a.status === 'sent' && a.studentIds.includes(ROLE_USERS.student.id))
   const pendingFromTeacher = mine.find((a) => !attempts[a.id])
   const nextActivity = current ?? upNext[0]
-  const teacherAnswered = mine.reduce((n, a) => n + (attempts[a.id]?.total ?? 0), 0)
-  const questionsAnswered = completed.reduce((n, a) => n + a.questions, 0) + teacherAnswered
+  const questionsAnswered = completed.reduce((n, a) => n + a.questions, 0)
   const minutes = completed.reduce((n, a) => n + a.estimatedMinutes, 0)
 
   return (

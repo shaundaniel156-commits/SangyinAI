@@ -5,8 +5,9 @@ import { Card, CardBody, CardHeader } from '../../components/ui/Card'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { ProgressBar } from '../../components/ui/ProgressBar'
 import { LevelBadge } from '../../components/ui/StatusBadge'
+import { useAiAssessments } from '../../context/AiAssessmentsContext'
 import { getStudentTrend } from '../../data/performance'
-import { PRACTICE_ACTIVITIES } from '../../data/practice'
+import { PRACTICE_ACTIVITIES, teacherPracticeDone } from '../../data/practice'
 import { formatShortDate } from '../../lib/format'
 import type { CompetencyScore, Subject } from '../../types'
 import { cn } from '../../lib/cn'
@@ -26,7 +27,9 @@ export function StudentProgressPage() {
   const values = trend.map((p) => p.value)
   const min = Math.max(0, Math.floor((Math.min(...values) - 10) / 10) * 10)
   const max = Math.min(100, Math.ceil((Math.max(...values) + 10) / 10) * 10)
-  const completed = PRACTICE_ACTIVITIES.filter((a) => a.status === 'completed')
+  const { items, attempts } = useAiAssessments()
+  // Everything finished, newest first: regular practice, plus the teacher's assessments this student has answered.
+  const completed = [...PRACTICE_ACTIVITIES.filter((a) => a.status === 'completed'), ...teacherPracticeDone(items, attempts, student.id)].sort((a, b) => (b.completedOn ?? '').localeCompare(a.completedOn ?? ''))
   const milestones = getCurriculumMilestones(student)
   const reached = milestones.filter((m) => m.state === 'reached').length
 
@@ -51,6 +54,7 @@ export function StudentProgressPage() {
 
         <Card>
           <CardHeader title="Practice completed" icon={<Award className="size-5" aria-hidden />} />
+          {completed.length === 0 && <p className="px-5 py-4 text-sm text-ink-3">Nothing finished yet. Practice you complete will be listed here.</p>}
           <ul className="divide-y divide-line">
             {completed.map((a) => (
               <li key={a.id} className="flex items-center gap-3 px-5 py-3">
@@ -59,7 +63,14 @@ export function StudentProgressPage() {
                   <span className="block truncate text-sm font-medium text-ink">{a.title}</span>
                   <span className="block text-xs text-ink-3">{a.focus}</span>
                 </span>
-                {a.completedOn && <span className="shrink-0 text-xs text-ink-3">{formatShortDate(a.completedOn)}</span>}
+                <span className="shrink-0 text-right text-xs text-ink-3">
+                  {a.score !== undefined && (
+                    <span className="tabular block text-sm font-semibold text-ink">
+                      {a.score}/{a.questions}
+                    </span>
+                  )}
+                  {a.completedOn && formatShortDate(a.completedOn)}
+                </span>
               </li>
             ))}
           </ul>

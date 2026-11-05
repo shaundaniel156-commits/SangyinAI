@@ -364,5 +364,7 @@ export interface PracticeActivity {
   estimatedMinutes: number
   dueLabel?: string
   completedOn?: string
+  /** Questions right, for practice the server marked (out of `questions`). */
+  score?: number
   feedback?: 'easy' | 'okay' | 'difficult'
 }

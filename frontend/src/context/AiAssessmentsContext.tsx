@@ -132,7 +132,9 @@ export function AiAssessmentsProvider({ children }: { children: ReactNode }) {
 
   const submitAnswers = useCallback(async (id: string, answers: Record<string, string>, work: Record<string, WorkUpload> = {}) => {
     const item = items.find((a) => a.id === id)
-    if (!live || !item?.practiceId) return null
+    if (!live) return null
+    // Signed in, the result must reach the server, or it would be lost on the next visit and never reach the teacher.
+    if (!item?.practiceId) throw new Error('This practice is not linked to your account yet. Refresh the page and try again.')
     const marked = await api<MarkedAttempt>(`/practice/${item.practiceId}/answers`, { body: { answers, ...(Object.keys(work).length ? { work } : {}) } })
     setAttempts((a) => ({ ...a, [id]: { score: marked.score, total: marked.total, completedOn: marked.completedOn } }))
     return marked
