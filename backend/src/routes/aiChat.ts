@@ -8,7 +8,8 @@ import { prisma } from '../db/client.ts'
 
 const TurnSchema = z.object({ role: z.enum(['user', 'ai']), text: z.string().trim().min(1).max(6000) })
 const ChatSchema = z
-  .object({ messages: z.array(TurnSchema).min(1).max(40) })
+  // context: where the user is and what they are doing (e.g. the assessment builder's current choices).
+  .object({ messages: z.array(TurnSchema).min(1).max(40), context: z.string().max(3000).optional() })
   .refine((b) => b.messages.at(-1)?.role === 'user', { message: 'The last message must be from the user.' })
 
 export async function aiChatRoutes(app: FastifyInstance) {
@@ -35,7 +36,7 @@ export async function aiChatRoutes(app: FastifyInstance) {
       reply.raw.writeHead(200, { ...headers, 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no' })
       let written = false
       try {
-        for await (const text of chatStream(parsed.data.messages, { school, user: { name: user.name, role: user.role } })) {
+        for await (const text of chatStream(parsed.data.messages, { school, user: { name: user.name, role: user.role }, context: parsed.data.context })) {
           reply.raw.write(text)
           written = true
         }

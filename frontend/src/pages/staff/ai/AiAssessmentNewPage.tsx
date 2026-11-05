@@ -1,9 +1,10 @@
-import { ArrowRight, Check, FileSearch, FileText, FileUp, Loader2, Plus, RefreshCw, SendHorizontal, Sparkles, Users, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { ArrowRight, Check, FileSearch, FileText, FileUp, Plus, RefreshCw, Sparkles, Users, X } from 'lucide-react'
+import { useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ChatComposer, ChatThread, useAiChat } from '../../../components/domain/AiChat'
 import { Button, ButtonLink } from '../../../components/ui/Button'
 import { Card, CardBody, CardHeader } from '../../../components/ui/Card'
-import { SelectField, TextArea, TextField, inputClasses } from '../../../components/ui/Field'
+import { SelectField, TextArea, TextField } from '../../../components/ui/Field'
 import { PageHeader } from '../../../components/ui/PageHeader'
 import { StatusBadge } from '../../../components/ui/StatusBadge'
 import { SegmentedControl } from '../../../components/ui/Tabs'
@@ -35,17 +36,6 @@ const DIFFICULTIES: (AiDifficulty | 'mixed')[] = ['foundation', 'mixed', 'core',
 const TYPES: AiQuestionType[] = ['multiple_choice', 'short_answer', 'written_work']
 const GENERATION_STEPS = ['Reading your report data', 'Mapping the gaps to curriculum objectives', 'Writing the questions and answer keys', 'Writing the teaching plan']
 
-/** One turn in the conversation with the AI, shown after "Generate assessment". */
-interface ChatMessage {
-  id: number
-  role: 'user' | 'ai'
-  text: string
-  /** AI turns: still working. */
-  thinking?: boolean
-  /** AI turns: the assessment it drafted, once ready. */
-  draft?: AiDraft
-}
-
 /** The teacher's request, in words, from the form. */
 function describeRequest(r: { className: string; subject: string; topics: string[]; students: number; count: number; difficulty: AiDifficulty | 'mixed'; types: AiQuestionType[]; dueDate: string; notes: string }): string {
   const lines = [
@@ -61,13 +51,13 @@ function describeDraft(draft: AiDraft, className: string): string {
   const n = draft.questions.length
   const s = draft.studentIds.length
   if (n === 0) {
-    return `I could not write an assessment on ${draft.competencies.join(', ')} just now: the AI service was busy and the question bank has nothing for ${n === 0 && draft.competencies.length === 1 ? 'this topic' : 'these topics'} yet. This is usually over in a few minutes — press Try again, or reply with a different topic.`
+    return `I could not write an assessment on ${draft.competencies.join(', ')} just now: the AI service was busy and the question bank has nothing for ${n === 0 && draft.competencies.length === 1 ? 'this topic' : 'these topics'} yet. This is usually over in a few minutes — press Try again, or choose a different topic.`
   }
   const parts = [`Here is “${draft.title}”: ${n} question${n === 1 ? '' : 's'} for ${s} student${s === 1 ? '' : 's'} in ${className}, on ${draft.competencies.join(', ')}.`]
-  if (draft.source === 'offline') parts.push('I could not reach the AI service just now, so these questions come from the reviewed question bank and the teaching plan is a general one. Reply “try again” in a few minutes for questions written for this class.')
+  if (draft.source === 'offline') parts.push('I could not reach the AI service just now, so these questions come from the reviewed question bank and the teaching plan is a general one. Press Generate assessment again in a few minutes for questions written for this class.')
   parts.push(...draft.rationale.filter((line) => !line.startsWith('Prepared offline')))
   if (draft.teachingPlan) parts.push(`Teaching plan: ${draft.teachingPlan.overview}`)
-  parts.push('Open it to read every question and the full teaching plan, change anything, then approve and send. Or reply below with what to change — for example “make them easier” or “add a word problem about money”.')
+  parts.push('Open it to read every question and the full teaching plan, change anything, then approve and send. You can also ask me anything here — how to teach these topics, what a question is testing, or what to tell parents.')
   return parts.join('\n\n')
 }
 
@@ -110,11 +100,9 @@ export function AiAssessmentNewPage() {
   const [dueDate, setDueDate] = useState(inAWeek)
   const [notes, setNotes] = useState('')
   const [fileName, setFileName] = useState('')
-  // The conversation with the AI, once "Generate assessment" is pressed; empty while the form is shown.
-  const [chat, setChat] = useState<ChatMessage[]>([])
-  const [busy, setBusy] = useState(false)
-  // Changes the teacher asked for in replies; each new version is drafted with all of them.
-  const [followUps, setFollowUps] = useState<string[]>([])
+  const [generating, setGenerating] = useState(false)
+  // The newest assessment drafted here, so the AI can talk about it.
+  const [lastDraft, setLastDraft] = useState<AiDraft | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const gaps = useMemo(() => detectGaps(classId, subject), [classId, subject])
@@ -165,15 +153,30 @@ export function AiAssessmentNewPage() {
 
   const className = classes.find((c) => c.id === classId)?.name ?? 'the class'
 
-  // Asks the AI: the first time from the form, afterwards with the teacher's reply added to the notes.
-  const ask = async (followUp?: string, fresh = false) => {
-    const asked = fresh ? [] : followUp ? [...followUps, followUp] : followUps
-    setFollowUps(asked)
-    if (fresh) setChat([])
-    const userText = followUp ?? describeRequest({ className, subject, topics: selected, students: recipients.length, count: Number(count), difficulty, types, dueDate, notes: notes.trim() })
-    const aiId = Date.now()
-    setChat((c) => [...c, { id: aiId - 1, role: 'user', text: userText }, { id: aiId, role: 'ai', text: '', thinking: true }])
-    setBusy(true)
+  // What the AI should know when the teacher asks it something here.
+  const builderContext = () =>
+    [
+      `On the AI Assessment Builder page. Class: ${className}. Subject: ${subject}. Topics chosen: ${selected.join(', ') || 'none yet'}. Students selected: ${recipients.length}. Settings: ${count} questions, ${DIFFICULTY_LABEL[difficulty].toLowerCase()} difficulty, ${types.map((t) => QUESTION_TYPE_LABEL[t].toLowerCase()).join(', ')}.`,
+      lastDraft
+        ? `Latest assessment drafted here: “${lastDraft.title}”, ${lastDraft.questions.length} questions on ${lastDraft.competencies.join(', ')}. Teaching plan overview: ${lastDraft.teachingPlan?.overview ?? 'none'}.`
+        : 'No assessment drafted yet.',
+      'You cannot draft or change the assessment yourself in this chat: for a new or different one the teacher adjusts the settings and presses Generate assessment; to edit questions they press Open and review.',
+    ].join(' ')
+  // The conversation beside the form: the assessments drafted here, and anything the teacher asks the AI.
+  const chat = useAiChat({ context: builderContext })
+  const busy = generating || chat.busy
+
+  // "Generate assessment": the brief and the AI's reply, with the assessment attached, go into the conversation.
+  const generate = async () => {
+    if (!canGenerate || busy) return
+    chat.push({ role: 'user', text: describeRequest({ className, subject, topics: selected, students: recipients.length, count: Number(count), difficulty, types, dueDate, notes: notes.trim() }) })
+    const aiId = chat.push({ role: 'ai', text: '', streaming: true, status: GENERATION_STEPS[0] })
+    setGenerating(true)
+    let step = 0
+    const ticker = window.setInterval(() => {
+      step = Math.min(step + 1, GENERATION_STEPS.length - 1)
+      chat.update(aiId, { status: GENERATION_STEPS[step] })
+    }, 2500)
     const draft = await generateAssessmentDraft({
       classId,
       subject,
@@ -183,10 +186,13 @@ export function AiAssessmentNewPage() {
       difficulty,
       types,
       dueDate,
-      reportNotes: [notes.trim(), ...asked.map((f) => `Teacher's follow-up request: ${f}`)].filter(Boolean).join('\n\n'),
+      reportNotes: notes.trim(),
     })
-    setChat((c) => c.map((m) => (m.id === aiId ? { ...m, text: describeDraft(draft, className), draft, thinking: false } : m)))
-    setBusy(false)
+    window.clearInterval(ticker)
+    if (draft.questions.length) setLastDraft(draft)
+    await chat.typeOut(aiId, describeDraft(draft, className))
+    chat.update(aiId, { streaming: false, status: undefined, ...(draft.questions.length ? { draft } : { retry: true }) })
+    setGenerating(false)
   }
 
   // "Open and review": saves the version the teacher chose and opens it.
@@ -384,7 +390,7 @@ export function AiAssessmentNewPage() {
                   <p className="mt-2 text-xs text-ink-3">Written work is done on paper: the student uploads a photo and the AI marks it against the model answer. You can read every photo.</p>
                 </fieldset>
                 <TextField label="Due date" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-48" />
-                <Button size="lg" disabled={!canGenerate || busy} onClick={() => void ask(undefined, true)} icon={<Sparkles className="size-4" aria-hidden />}>
+                <Button size="lg" disabled={!canGenerate || busy} onClick={() => void generate()} icon={<Sparkles className="size-4" aria-hidden />}>
                   Generate assessment
                 </Button>
               </div>
@@ -462,14 +468,7 @@ export function AiAssessmentNewPage() {
             )}
           </Card>
 
-          <ChatPanel
-            messages={chat}
-            busy={busy}
-            ready={canGenerate}
-            onReply={(text) => void ask(text)}
-            onRetry={() => void ask()}
-            onOpen={(draft) => void open(draft)}
-          />
+          <AssistantPanel chat={chat} busy={busy} onRetry={() => void generate()} onOpen={(draft) => void open(draft)} />
         </div>
       </div>
     </>
@@ -485,139 +484,44 @@ function SummaryLine({ ok, children }: { ok: boolean; children: ReactNode }) {
   )
 }
 
-/** Reveals text a few characters at a time, like someone typing. */
-function useTypewriter(text: string): string {
-  const [shown, setShown] = useState(0)
-  useEffect(() => {
-    setShown(0)
-    if (!text) return
-    const t = window.setInterval(() => setShown((n) => (n >= text.length ? n : n + 4)), 16)
-    return () => window.clearInterval(t)
-  }, [text])
-  return text.slice(0, Math.min(shown, text.length))
-}
-
-interface ChatPanelProps {
-  messages: ChatMessage[]
+interface AssistantPanelProps {
+  chat: ReturnType<typeof useAiChat>
   busy: boolean
-  /** The form has enough to generate from (a reply before any assessment starts one). */
-  ready: boolean
-  onReply: (text: string) => void
-  /** Asks again with the same brief (after a failed attempt). */
   onRetry: () => void
   onOpen: (draft: AiDraft) => void
 }
 
-/** The conversation with the AI, beside the form: its reply with the assessment attached, and a box to ask for changes. */
-function ChatPanel({ messages, busy, ready, onReply, onRetry, onOpen }: ChatPanelProps) {
-  const [reply, setReply] = useState('')
-  const listRef = useRef<HTMLDivElement>(null)
-
-  // Keep the newest message in view as replies arrive.
-  useEffect(() => {
-    const list = listRef.current
-    if (list) list.scrollTop = list.scrollHeight
-  }, [messages])
-
-  const send = () => {
-    const text = reply.trim()
-    if (!text || busy || !ready) return
-    setReply('')
-    onReply(text)
-  }
-
+/** The AI beside the form: it posts the assessments it drafts here, and answers anything the teacher asks. */
+function AssistantPanel({ chat, busy, onRetry, onOpen }: AssistantPanelProps) {
   return (
-    <Card className="flex max-h-[calc(100vh-7rem)] min-h-[28rem] flex-col">
-      <CardHeader title="Sangyin AI" description="Drafts the assessment and explains its choices. Reply to change it." icon={<Sparkles className="size-5" aria-hidden />} />
-      <div ref={listRef} className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
-        {messages.length === 0 ? (
+    <Card className="flex max-h-[calc(100vh-7rem)] min-h-[30rem] flex-col">
+      <CardHeader title="Sangyin AI" description="Drafts assessments here, and answers anything — how to teach a topic, what a question tests, what to tell parents." icon={<Sparkles className="size-5" aria-hidden />} />
+      <ChatThread
+        turns={chat.turns}
+        compact
+        className="flex-1 px-5 py-5"
+        empty={
           <div className="flex h-full flex-col items-center justify-center text-center">
             <span className="grid size-12 place-items-center rounded-full bg-brand-soft text-brand-ink">
               <Sparkles className="size-6" aria-hidden />
             </span>
-            <p className="mt-4 text-sm font-medium text-ink">Your assessment will appear here</p>
-            <p className="mt-1 max-w-xs text-xs text-ink-3">Press Generate assessment. Then reply here to change it — for example “make them easier” or “add a question about money”.</p>
+            <p className="mt-4 text-sm font-medium text-ink">Ask me anything</p>
+            <p className="mt-1 max-w-xs text-xs text-ink-3">For example “How do I teach ratio better to this class?” or “What should the parents practise at home?”. Press Generate assessment and the draft appears here too.</p>
           </div>
-        ) : (
-          messages.map((m) =>
-            m.role === 'user' ? (
-              <div key={m.id} className="flex justify-end">
-                <p className="max-w-[90%] whitespace-pre-line rounded-2xl bg-surface-2 px-4 py-2.5 text-sm leading-relaxed text-ink">{m.text}</p>
-              </div>
-            ) : (
-              <AiTurn key={m.id} message={m} onOpen={onOpen} onRetry={onRetry} busy={busy} />
-            ),
-          )
-        )}
-      </div>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          send()
-        }}
-        className="flex items-center gap-2 border-t border-line p-3"
-      >
-        <input
-          value={reply}
-          onChange={(e) => setReply(e.target.value)}
-          disabled={busy}
-          placeholder={busy ? 'The AI is working…' : 'Reply'}
-          aria-label="Reply to the AI"
-          className={cn(inputClasses, 'h-10 border-0 bg-transparent shadow-none focus:ring-0')}
-        />
-        <Button type="submit" size="sm" disabled={busy || !ready || !reply.trim()} icon={<SendHorizontal className="size-4" aria-hidden />} aria-label="Send">
-          Send
-        </Button>
-      </form>
+        }
+        attachment={(t) =>
+          t.draft ? (
+            <DraftCard draft={t.draft} onOpen={() => onOpen(t.draft!)} />
+          ) : t.retry ? (
+            <Button size="sm" variant="secondary" className="mt-3" disabled={busy} onClick={onRetry} icon={<RefreshCw className="size-4" aria-hidden />}>
+              Try again
+            </Button>
+          ) : null
+        }
+      />
+      <ChatComposer busy={busy} onSend={(text) => void chat.send(text)} placeholder="Ask the AI anything…" className="border-t border-line p-3" />
       <p className="px-4 pb-3 text-center text-xs text-ink-3">The AI can make mistakes. You review every question before anything is sent.</p>
     </Card>
-  )
-}
-
-/** One reply from the AI: its working while it drafts, then its message typed out and the assessment attached. */
-function AiTurn({ message: m, onOpen, onRetry, busy }: { message: ChatMessage; onOpen: (draft: AiDraft) => void; onRetry: () => void; busy: boolean }) {
-  const shown = useTypewriter(m.text)
-  const [step, setStep] = useState(0)
-  const typing = shown.length < m.text.length
-
-  useEffect(() => {
-    if (!m.thinking) return
-    const t = window.setInterval(() => setStep((n) => Math.min(n + 1, GENERATION_STEPS.length - 1)), 2500)
-    return () => window.clearInterval(t)
-  }, [m.thinking])
-
-  return (
-    <div className="flex gap-3">
-      <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-brand-600 text-white">
-        <Sparkles className="size-3.5" aria-hidden />
-      </span>
-      <div className="min-w-0 flex-1">
-        {m.thinking ? (
-          <p className="flex items-center gap-2 text-sm text-ink-3" role="status" aria-live="polite">
-            <Loader2 className="size-4 animate-spin text-brand-600" aria-hidden />
-            {GENERATION_STEPS[step]}…
-          </p>
-        ) : (
-          <>
-            <p className="text-xs text-ink-3">{m.draft?.source === 'offline' ? 'From the question bank' : 'Written by the AI'} · read your report data, drafted questions and a teaching plan</p>
-            <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-ink">
-              {shown}
-              {typing && (
-                <span className="animate-pulse text-brand-600" aria-hidden>
-                  ▍
-                </span>
-              )}
-            </p>
-            {m.draft && !typing && m.draft.questions.length > 0 && <DraftCard draft={m.draft} onOpen={() => onOpen(m.draft!)} />}
-            {m.draft && !typing && m.draft.questions.length === 0 && (
-              <Button size="sm" variant="secondary" className="mt-4" disabled={busy} onClick={onRetry} icon={<RefreshCw className="size-4" aria-hidden />}>
-                Try again
-              </Button>
-            )}
-          </>
-        )}
-      </div>
-    </div>
   )
 }
 
@@ -626,7 +530,7 @@ function DraftCard({ draft, onOpen }: { draft: AiDraft; onOpen: () => void }) {
   const n = draft.questions.length
   const s = draft.studentIds.length
   return (
-    <div className="mt-4 flex max-w-full flex-col gap-3 rounded-xl border border-line bg-surface-2 p-4">
+    <div className="mt-3 flex max-w-full flex-col gap-3 rounded-xl border border-line bg-surface-2 p-4">
       <div className="flex items-center gap-3">
         <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand-ink">
           <FileText className="size-5" aria-hidden />
