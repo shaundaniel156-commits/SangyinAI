@@ -1,5 +1,6 @@
 import { Sparkles, Wand2 } from 'lucide-react'
 import { useState } from 'react'
+import { AssistantCard, useAiChat } from '../../components/domain/AiChat'
 import { GuidanceCard } from '../../components/domain/GuidanceCard'
 import { Button, ButtonLink } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
@@ -37,6 +38,17 @@ export function GuidancePage() {
     )
   })
   const nextPending = plans.find((p) => p.status === 'pending_review')
+  // What the AI should know when the teacher asks it something on this page.
+  const chat = useAiChat({
+    context: () =>
+      `On the AI Guidance page, where guidance plans the AI drafted for students' competency gaps wait for the teacher's review. ${count('pending_review')} awaiting review, ${count('approved')} approved. Gaps awaiting review: ${
+        plans
+          .filter((p) => p.status === 'pending_review')
+          .slice(0, 15)
+          .map((p) => `${p.competencyGap} (${p.subject})`)
+          .join('; ') || 'none'
+      }. Generate guidance drafts new plans; opening a plan lets the teacher edit it, have it rewritten, or approve it, which shares it with the student and parents. You cannot create or change plans from this chat.`,
+  })
 
   return (
     <>
@@ -56,7 +68,8 @@ export function GuidancePage() {
           </>
         }
       />
-      <Card>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+      <Card className="xl:col-span-2">
         <div className="px-4 pt-2">
           <Tabs
             label="Guidance status"
@@ -108,6 +121,13 @@ export function GuidancePage() {
           />
         )}
       </Card>
+        <AssistantCard
+          chat={chat}
+          className="xl:sticky xl:top-24 xl:self-start"
+          description="Ask anything while you review — how to teach a gap, how to group students, what to tell parents."
+          emptyHint="For example “How should I teach ratio to a learner who is far behind?” or “Which of these gaps should I start with?”"
+        />
+      </div>
       {generating && <GenerateGuidanceModal open onClose={() => setGenerating(false)} />}
     </>
   )

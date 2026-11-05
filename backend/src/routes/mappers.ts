@@ -191,21 +191,35 @@ export function toDiagnostic(r: Prisma.DiagnosticReportGetPayload<object>, guida
 
 // --- Guidance ---------------------------------------------------------------
 
+// A step of a plan. Newer plans add the minutes, a worked example and a check question (ai/guidance.ts).
+interface PlanStep {
+  title: string
+  detail: string
+  minutes?: number
+  example?: string
+  check?: string
+}
 export interface PlanBody {
   teachingApproach: { method: string; rationale: string }
-  sequence: { title: string; detail: string }[]
+  sequence: PlanStep[]
   pacing: string
   practice: string[]
-  outputs: { teacherSheet: string; parentNote: string; studentSequence: string[] }
+  // Newer plans only.
+  materials?: string[]
+  commonMistakes?: { mistake: string; fix: string }[]
+  successCheck?: string
+  // studentGuide (newer plans): the learner's steps in full; studentSequence is just their titles.
+  outputs: { teacherSheet: string; parentNote: string; studentSequence: string[]; studentGuide?: PlanStep[] }
 }
 export interface PlanEdits {
   method?: string
   rationale?: string
   pacing?: string
   practice?: string[]
-  sequence?: { title: string; detail: string }[]
+  sequence?: PlanStep[]
   parentNote?: string
   studentSequence?: string[]
+  studentGuide?: PlanStep[]
 }
 
 // The plan with the teacher's edits applied, plus `edited` and `decidedAt` (as the frontend's GuidanceReviewContext shows them).
@@ -224,7 +238,16 @@ export function toGuidancePlan(g: Prisma.GuidancePlanGetPayload<object>) {
     sequence: edits?.sequence ?? plan.sequence,
     pacing: edits?.pacing ?? plan.pacing,
     practice: edits?.practice ?? plan.practice,
-    outputs: { ...plan.outputs, parentNote: edits?.parentNote ?? plan.outputs.parentNote, studentSequence: edits?.studentSequence ?? plan.outputs.studentSequence },
+    ...(plan.materials ? { materials: plan.materials } : {}),
+    ...(plan.commonMistakes ? { commonMistakes: plan.commonMistakes } : {}),
+    ...(plan.successCheck ? { successCheck: plan.successCheck } : {}),
+    outputs: {
+      ...plan.outputs,
+      parentNote: edits?.parentNote ?? plan.outputs.parentNote,
+      // An edited guide decides the titles too.
+      studentSequence: edits?.studentGuide?.map((s) => s.title) ?? edits?.studentSequence ?? plan.outputs.studentSequence,
+      ...(edits?.studentGuide ?? plan.outputs.studentGuide ? { studentGuide: edits?.studentGuide ?? plan.outputs.studentGuide } : {}),
+    },
     ...(g.teacherNote ? { teacherNote: g.teacherNote } : {}),
     edited: Boolean(edits && Object.keys(edits).length),
     ...(g.decidedAt ? { decidedAt: g.decidedAt.toISOString() } : {}),

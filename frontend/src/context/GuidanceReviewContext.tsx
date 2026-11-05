@@ -17,8 +17,9 @@ export interface PlanEdits {
   sequence?: GuidanceStep[]
   /** The home-support note parents receive. */
   parentNote?: string
-  /** The steps the student sees. */
+  /** The steps the student sees: titles only (older plans), or the guide in full. */
   studentSequence?: string[]
+  studentGuide?: GuidanceStep[]
 }
 
 interface Decision {
@@ -122,7 +123,12 @@ export function GuidanceReviewProvider({ children }: { children: ReactNode }) {
         sequence: d.edits?.sequence ?? plan.sequence,
         pacing: d.edits?.pacing ?? plan.pacing,
         practice: d.edits?.practice ?? plan.practice,
-        outputs: { ...plan.outputs, parentNote: d.edits?.parentNote ?? plan.outputs.parentNote, studentSequence: d.edits?.studentSequence ?? plan.outputs.studentSequence },
+        outputs: {
+          ...plan.outputs,
+          parentNote: d.edits?.parentNote ?? plan.outputs.parentNote,
+          studentSequence: d.edits?.studentGuide?.map((s) => s.title) ?? d.edits?.studentSequence ?? plan.outputs.studentSequence,
+          studentGuide: d.edits?.studentGuide ?? plan.outputs.studentGuide,
+        },
         edited: Boolean(d.edits),
         decidedAt: d.decidedAt,
       }

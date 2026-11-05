@@ -5,6 +5,7 @@ import type { AiDraft } from '../../lib/aiAssessment'
 import { cn } from '../../lib/cn'
 import { readStorage, writeStorage } from '../../lib/storage'
 import { Button } from '../ui/Button'
+import { Card, CardHeader } from '../ui/Card'
 
 /**
  * A conversation with the AI: the hook keeps the turns and streams replies from the server; ChatThread shows
@@ -237,5 +238,42 @@ export function ChatComposer({ onSend, busy, placeholder = 'Ask the AI anythingâ
         Send
       </Button>
     </form>
+  )
+}
+
+interface AssistantCardProps {
+  chat: ReturnType<typeof useAiChat>
+  /** The page is also waiting on the AI for something else (drafting an assessment), so the box waits too. */
+  busy?: boolean
+  description: string
+  /** Shown under "Ask me anything" before the first message: examples of what to ask on this page. */
+  emptyHint: string
+  attachment?: (turn: ChatTurn) => ReactNode
+  className?: string
+}
+
+/** "Sangyin AI" as a card beside a page: the teacher asks anything, with the page's context sent along. */
+export function AssistantCard({ chat, busy = false, description, emptyHint, attachment, className }: AssistantCardProps) {
+  return (
+    <Card className={cn('flex max-h-[calc(100vh-7rem)] min-h-[30rem] flex-col', className)}>
+      <CardHeader title="Sangyin AI" description={description} icon={<Sparkles className="size-5" aria-hidden />} />
+      <ChatThread
+        turns={chat.turns}
+        compact
+        className="flex-1 px-5 py-5"
+        attachment={attachment}
+        empty={
+          <div className="flex h-full flex-col items-center justify-center text-center">
+            <span className="grid size-12 place-items-center rounded-full bg-brand-soft text-brand-ink">
+              <Sparkles className="size-6" aria-hidden />
+            </span>
+            <p className="mt-4 text-sm font-medium text-ink">Ask me anything</p>
+            <p className="mt-1 max-w-xs text-xs text-ink-3">{emptyHint}</p>
+          </div>
+        }
+      />
+      <ChatComposer busy={busy || chat.busy} onSend={(text) => void chat.send(text)} placeholder="Ask the AI anythingâ€¦" className="border-t border-line p-3" />
+      <p className="px-4 pb-3 text-center text-xs text-ink-3">The AI can make mistakes. Check anything you will use with learners.</p>
+    </Card>
   )
 }

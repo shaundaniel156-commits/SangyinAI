@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { AssistantCard, useAiChat } from '../../components/domain/AiChat'
 import { GuidanceStatusBadge } from '../../components/domain/GuidanceStatusBadge'
 import { Avatar } from '../../components/ui/Avatar'
 import { Button, ButtonLink } from '../../components/ui/Button'
@@ -31,10 +32,11 @@ import { useToast } from '../../context/ToastContext'
 import { printSection } from '../../lib/print'
 import { getClass } from '../../data/classes'
 import { getDiagnosticForStudent } from '../../data/diagnostics'
-import { getGuidance } from '../../data/guidance'
+import { GUIDANCE_STATUS_LABEL, getGuidance } from '../../data/guidance'
 import { getStudent } from '../../data/students'
 import { cn } from '../../lib/cn'
 import { formatDate } from '../../lib/format'
+import type { GuidanceStep } from '../../types'
 import { EditPlanModal, OverrideModal, RevisionModal } from './guidance/DecisionModals'
 
 type ModalId = 'edit' | 'revision' | 'override' | null
@@ -46,6 +48,9 @@ export function GuidanceDetailPage() {
   const { notify } = useToast()
   const [modal, setModal] = useState<ModalId>(null)
   const [output, setOutput] = useState<'teacher' | 'parent' | 'student'>('teacher')
+  // What the AI should know when the teacher asks it something beside this plan (filled in below, once the plan is read).
+  let planContext = ''
+  const chat = useAiChat({ context: () => planContext })
 
   if (!base) {
     return (
@@ -61,6 +66,18 @@ export function GuidanceDetailPage() {
   const diagnostic = student && getDiagnosticForStudent(student.id)
   const gapScore = student?.competencies.find((c) => c.name === plan.competencyGap)?.score
   const decided = Boolean(decisions[plan.id])
+  // The learner's guide: newer plans carry every step in full, older ones only the titles.
+  const guide: GuidanceStep[] = plan.outputs.studentGuide ?? plan.outputs.studentSequence.map((title) => ({ title, detail: '' }))
+  planContext = [
+    `On a guidance plan in AI Guidance, for one learner in ${cls?.name ?? 'the class'} (${plan.subject}).`,
+    `Competency gap: ${plan.competencyGap}${gapScore !== undefined ? ` (mastery ${gapScore}%)` : ''}. Plan status: ${GUIDANCE_STATUS_LABEL[plan.status]}.`,
+    `Approach: ${plan.teachingApproach.method} — ${plan.teachingApproach.rationale}`,
+    `Teaching steps: ${plan.sequence.map((s, i) => `${i + 1}. ${s.title}: ${s.detail}`).join(' ')}`,
+    `Pacing: ${plan.pacing}.`,
+    'You cannot change the plan from this chat: the teacher edits it with Edit, has it rewritten with Request revision, and Approve shares it with the student and their parents.',
+  ]
+    .join(' ')
+    .slice(0, 2900)
 
   const approve = () => {
     decide(plan.id, 'approved')
@@ -122,11 +139,26 @@ export function GuidanceDetailPage() {
           <Step icon={ListOrdered} title="Suggested sequence">
             <ol className="space-y-3">
               {plan.sequence.map((s, i) => (
-                <li key={s.title} className="flex gap-3">
+                <li key={`${i}-${s.title}`} className="flex gap-3">
                   <span className="tabular grid size-6 shrink-0 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand-ink">{i + 1}</span>
-                  <div>
-                    <p className="text-sm font-medium text-ink">{s.title}</p>
-                    <p className="text-sm text-ink-2">{s.detail}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink">
+                      {s.title}
+                      {s.minutes ? <span className="tabular rounded-full bg-surface-3 px-2 py-0.5 text-xs font-normal text-ink-3">{s.minutes} min</span> : null}
+                    </p>
+                    <p className="mt-0.5 text-sm leading-relaxed text-ink-2">{s.detail}</p>
+                    {s.example && (
+                      <p className="mt-2 rounded-lg bg-surface-2 px-3 py-2 text-sm text-ink-2">
+                        <span className="font-medium text-ink">Example: </span>
+                        {s.example}
+                      </p>
+                    )}
+                    {s.check && (
+                      <p className="mt-1.5 text-sm text-ink-2">
+                        <span className="font-medium text-ink">Check before moving on: </span>
+                        {s.check}
+                      </p>
+                    )}
                   </div>
                 </li>
               ))}
@@ -148,6 +180,40 @@ export function GuidanceDetailPage() {
             </ul>
           </Step>
 
+          {plan.materials && plan.materials.length > 0 && (
+            <Step icon={ClipboardPen} title="What you need">
+              <ul className="flex flex-wrap gap-2">
+                {plan.materials.map((m) => (
+                  <li key={m} className="rounded-full border border-line bg-surface-2 px-3 py-1 text-sm text-ink-2">
+                    {m}
+                  </li>
+                ))}
+              </ul>
+            </Step>
+          )}
+
+          {plan.commonMistakes && plan.commonMistakes.length > 0 && (
+            <Step icon={ShieldAlert} title="Mistakes to watch for">
+              <ul className="space-y-3">
+                {plan.commonMistakes.map((m) => (
+                  <li key={m.mistake} className="text-sm">
+                    <p className="font-medium text-ink">{m.mistake}</p>
+                    <p className="mt-0.5 text-ink-2">
+                      <span className="font-medium text-ink">How to correct it: </span>
+                      {m.fix}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </Step>
+          )}
+
+          {plan.successCheck && (
+            <Step icon={Check} title="How you will know it worked">
+              <p className="rounded-lg bg-good-soft px-3 py-2 text-sm text-good-ink">{plan.successCheck}</p>
+            </Step>
+          )}
+
           <Step icon={ClipboardPen} title="Teacher decision" last tone="brand">
             <DecisionPanel
               status={plan.status}
@@ -167,7 +233,7 @@ export function GuidanceDetailPage() {
         </ol>
 
         <div className="space-y-6">
-          <Card className="xl:sticky xl:top-24">
+          <Card>
             <CardHeader title="Outputs from this plan" description="One plan, three versions for different readers" />
             <div className="px-4 pt-1">
               <Tabs
@@ -212,12 +278,27 @@ export function GuidanceDetailPage() {
                 </OutputBlock>
               )}
               {output === 'student' && (
-                <OutputBlock icon={GraduationCap} title="Practice sequence">
-                  <ol className="space-y-2">
-                    {plan.outputs.studentSequence.map((s, i) => (
-                      <li key={s} className="flex items-center gap-2 text-sm text-ink">
-                        <span className="tabular grid size-5 place-items-center rounded-full bg-surface-3 text-[11px] font-semibold text-ink-2">{i + 1}</span>
-                        {s}
+                <OutputBlock icon={GraduationCap} title="Step-by-step guide">
+                  <ol className="space-y-3">
+                    {guide.map((s, i) => (
+                      <li key={`${i}-${s.title}`} className="flex gap-2 text-sm text-ink">
+                        <span className="tabular mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-surface-3 text-[11px] font-semibold text-ink-2">{i + 1}</span>
+                        <div className="min-w-0">
+                          <p className="font-medium">{s.title}</p>
+                          {s.detail && <p className="mt-0.5 text-ink-2">{s.detail}</p>}
+                          {s.example && (
+                            <p className="mt-1 text-ink-2">
+                              <span className="font-medium text-ink">Example: </span>
+                              {s.example}
+                            </p>
+                          )}
+                          {s.check && (
+                            <p className="mt-1 text-ink-2">
+                              <span className="font-medium text-ink">Check yourself: </span>
+                              {s.check}
+                            </p>
+                          )}
+                        </div>
                       </li>
                     ))}
                   </ol>
@@ -225,7 +306,7 @@ export function GuidanceDetailPage() {
               )}
               </div>
               <Button variant="secondary" size="sm" className="mt-4 w-full" icon={<Printer className="size-4" aria-hidden />} onClick={printSection}>
-                Print {output === 'teacher' ? 'lesson guidance sheet' : output === 'parent' ? 'take-home note' : 'practice sequence'}
+                Print {output === 'teacher' ? 'lesson guidance sheet' : output === 'parent' ? 'take-home note' : 'step-by-step guide'}
               </Button>
               <p className={cn('mt-4 rounded-lg px-3 py-2 text-xs', plan.status === 'approved' ? 'bg-good-soft text-good-ink' : 'bg-surface-2 text-ink-3')}>
                 {plan.status === 'approved'
@@ -234,6 +315,13 @@ export function GuidanceDetailPage() {
               </p>
             </CardBody>
           </Card>
+
+          <AssistantCard
+            chat={chat}
+            className="xl:sticky xl:top-24"
+            description="Ask about this plan — how to run a step, another example, what to do if it isn’t working."
+            emptyHint="For example “Give me three more examples for step 2”, “How do I explain this with bottle tops?” or “What if the learner still gets it wrong?”"
+          />
         </div>
       </div>
 

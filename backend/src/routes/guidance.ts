@@ -16,6 +16,8 @@ const aiRoute = {
   config: { rateLimit: { max: 60, timeWindow: '1 hour', hook: 'preHandler' as const, keyGenerator: (request: FastifyRequest) => request.user?.sub ?? request.ip } },
 }
 const StatusSchema = z.enum(['pending_review', 'approved', 'revision_requested', 'overridden'])
+// A step of the plan as a teacher may edit it (the teaching steps, or the learner's guide).
+const StepSchema = z.object({ title: z.string().max(200), detail: z.string().max(2000), minutes: z.number().int().min(1).max(120).optional(), example: z.string().max(1000).optional(), check: z.string().max(1000).optional() })
 
 // A teacher's decision and/or edits on a plan — the same as GuidanceReviewContext's decide(), saveEdits() and reset().
 // `edits: null` clears the teacher's edits; `note: null` clears the note.
@@ -29,9 +31,10 @@ const DecisionSchema = z
         rationale: z.string().max(2000).optional(),
         pacing: z.string().max(500).optional(),
         practice: z.array(z.string().max(300)).max(20).optional(),
-        sequence: z.array(z.object({ title: z.string().max(200), detail: z.string().max(1000) })).max(10).optional(),
+        sequence: z.array(StepSchema).max(10).optional(),
         parentNote: z.string().max(2000).optional(),
         studentSequence: z.array(z.string().max(300)).max(10).optional(),
+        studentGuide: z.array(StepSchema).max(10).optional(),
       })
       .nullable()
       .optional(),
@@ -186,7 +189,7 @@ export async function guidanceRoutes(app: FastifyInstance) {
       data: {
         ...(status ? (resetting ? { status, decidedById: null, decidedAt: null } : { status, decidedById: user.sub, decidedAt: new Date() }) : {}),
         ...(note !== undefined ? { teacherNote: note } : {}),
-        ...(edits === null ? { edits: Prisma.DbNull } : edits ? { edits: { ...((plan.edits ?? {}) as PlanEdits), ...edits } } : {}),
+        ...(edits === null ? { edits: Prisma.DbNull } : edits ? { edits: { ...((plan.edits ?? {}) as PlanEdits), ...edits } as Prisma.InputJsonValue } : {}),
       },
     })
     const shared = toGuidancePlan(updated)

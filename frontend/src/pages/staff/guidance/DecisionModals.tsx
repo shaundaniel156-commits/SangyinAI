@@ -1,3 +1,4 @@
+import { Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '../../../components/ui/Button'
 import { SelectField, TextArea, TextField } from '../../../components/ui/Field'
@@ -6,14 +7,27 @@ import { useGuidanceReview } from '../../../context/GuidanceReviewContext'
 import { useLiveData } from '../../../context/LiveDataContext'
 import { useToast } from '../../../context/ToastContext'
 import { cn } from '../../../lib/cn'
-import type { GuidancePlan } from '../../../types'
+import type { GuidancePlan, GuidanceStep } from '../../../types'
 
 interface BaseProps {
   open: boolean
   onClose: () => void
 }
 
-/** Teacher edits to the suggested plan: the approach, the steps, the pacing and practice, and what the student and parents receive. */
+/** A step with its empty parts left out, or nothing when the step is blank. */
+function tidy(steps: GuidanceStep[]): GuidanceStep[] {
+  return steps
+    .filter((s) => s.title.trim() || s.detail.trim())
+    .map((s) => ({
+      title: s.title.trim(),
+      detail: s.detail.trim(),
+      ...(s.minutes ? { minutes: Math.min(120, Math.max(1, Math.round(s.minutes))) } : {}),
+      ...(s.example?.trim() ? { example: s.example.trim() } : {}),
+      ...(s.check?.trim() ? { check: s.check.trim() } : {}),
+    }))
+}
+
+/** Teacher edits to the suggested plan: the approach, every teaching step, the pacing and practice, the student's guide and the note for parents. */
 export function EditPlanModal({ open, onClose, plan }: BaseProps & { plan: GuidancePlan }) {
   const { saveEdits } = useGuidanceReview()
   const { notify } = useToast()
@@ -21,23 +35,19 @@ export function EditPlanModal({ open, onClose, plan }: BaseProps & { plan: Guida
   const [rationale, setRationale] = useState(plan.teachingApproach.rationale)
   const [pacing, setPacing] = useState(plan.pacing)
   const [practice, setPractice] = useState(plan.practice.join('\n'))
-  // One teaching step per line, as "Title: what to do".
-  const [sequence, setSequence] = useState(plan.sequence.map((s) => (s.detail ? `${s.title}: ${s.detail}` : s.title)).join('\n'))
-  const [studentSteps, setStudentSteps] = useState(plan.outputs.studentSequence.join('\n'))
+  const [sequence, setSequence] = useState<GuidanceStep[]>(plan.sequence)
+  // Older plans list the student's steps by title only.
+  const [guide, setGuide] = useState<GuidanceStep[]>(plan.outputs.studentGuide ?? plan.outputs.studentSequence.map((title) => ({ title, detail: '' })))
   const [parentNote, setParentNote] = useState(plan.outputs.parentNote)
 
-  const lines = (text: string) => text.split('\n').map((l) => l.trim()).filter(Boolean)
   const save = () => {
     saveEdits(plan.id, {
       method,
       rationale,
       pacing,
-      practice: lines(practice),
-      sequence: lines(sequence).map((line) => {
-        const at = line.indexOf(':')
-        return at < 0 ? { title: line, detail: '' } : { title: line.slice(0, at).trim(), detail: line.slice(at + 1).trim() }
-      }),
-      studentSequence: lines(studentSteps),
+      practice: practice.split('\n').map((l) => l.trim()).filter(Boolean),
+      sequence: tidy(sequence),
+      studentGuide: tidy(guide),
       parentNote: parentNote.trim(),
     })
     notify('Changes saved', { description: 'Your version replaces the AI’s suggestion.' })
@@ -60,16 +70,60 @@ export function EditPlanModal({ open, onClose, plan }: BaseProps & { plan: Guida
         </>
       }
     >
-      <div className="space-y-4">
+      <div className="space-y-5">
         <TextField label="Teaching approach" value={method} onChange={(e) => setMethod(e.target.value)} />
         <TextArea label="Why this approach" rows={3} value={rationale} onChange={(e) => setRationale(e.target.value)} />
-        <TextArea label="Teaching steps" hint="One step per line, written as Title: what to do" rows={6} value={sequence} onChange={(e) => setSequence(e.target.value)} />
+        <StepsEditor legend="Teaching steps" hint="What you do and say in each step, with an example for the board and a question to check understanding." steps={sequence} onChange={setSequence} minutes />
         <TextArea label="Pacing" rows={2} value={pacing} onChange={(e) => setPacing(e.target.value)} />
         <TextArea label="Practice activities" hint="One activity per line" rows={4} value={practice} onChange={(e) => setPractice(e.target.value)} />
-        <TextArea label="Steps the student sees" hint="One step per line, in simple words. Shared with the student once you approve." rows={4} value={studentSteps} onChange={(e) => setStudentSteps(e.target.value)} />
+        <StepsEditor legend="The student’s step-by-step guide" hint="Written to the student in simple words. Shared with them once you approve." steps={guide} onChange={setGuide} checkLabel="Check yourself" />
         <TextArea label="Note for parents" hint="Sent to the student’s parents once you approve." rows={3} value={parentNote} onChange={(e) => setParentNote(e.target.value)} />
       </div>
     </Modal>
+  )
+}
+
+interface StepsEditorProps {
+  legend: string
+  hint: string
+  steps: GuidanceStep[]
+  onChange: (steps: GuidanceStep[]) => void
+  /** Teaching steps carry the minutes each takes. */
+  minutes?: boolean
+  checkLabel?: string
+}
+
+/** The steps of a plan, each with its title, what to do, an example and a check; steps can be added and removed. */
+function StepsEditor({ legend, hint, steps, onChange, minutes, checkLabel = 'Check before moving on' }: StepsEditorProps) {
+  const set = (i: number, patch: Partial<GuidanceStep>) => onChange(steps.map((s, j) => (j === i ? { ...s, ...patch } : s)))
+  return (
+    <fieldset>
+      <legend className="text-sm font-medium text-ink">{legend}</legend>
+      <p className="mt-0.5 text-xs text-ink-3">{hint}</p>
+      <ol className="mt-2 space-y-3">
+        {steps.map((s, i) => (
+          <li key={i} className="rounded-lg border border-line p-3">
+            <div className="flex items-end gap-2">
+              <TextField label={`Step ${i + 1}`} value={s.title} onChange={(e) => set(i, { title: e.target.value })} className="min-w-0 flex-1" />
+              {minutes && (
+                <TextField label="Minutes" type="number" min={1} max={120} value={s.minutes ?? ''} onChange={(e) => set(i, { minutes: e.target.value ? Number(e.target.value) : undefined })} className="w-24" />
+              )}
+              <Button variant="ghost" size="sm" onClick={() => onChange(steps.filter((_, j) => j !== i))} icon={<Trash2 className="size-4" aria-hidden />}>
+                Remove
+              </Button>
+            </div>
+            <TextArea className="mt-2" label="What to do" rows={3} value={s.detail} onChange={(e) => set(i, { detail: e.target.value })} />
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              <TextArea label="Example" rows={2} value={s.example ?? ''} onChange={(e) => set(i, { example: e.target.value })} />
+              <TextArea label={checkLabel} rows={2} value={s.check ?? ''} onChange={(e) => set(i, { check: e.target.value })} />
+            </div>
+          </li>
+        ))}
+      </ol>
+      <Button variant="secondary" size="sm" className="mt-2" disabled={steps.length >= 10} onClick={() => onChange([...steps, { title: '', detail: '' }])} icon={<Plus className="size-4" aria-hidden />}>
+        Add a step
+      </Button>
+    </fieldset>
   )
 }
 

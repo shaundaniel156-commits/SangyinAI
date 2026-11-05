@@ -1,7 +1,7 @@
 import { ArrowRight, Check, FileSearch, FileText, FileUp, Plus, RefreshCw, Sparkles, Users, X } from 'lucide-react'
 import { useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChatComposer, ChatThread, useAiChat } from '../../../components/domain/AiChat'
+import { AssistantCard, useAiChat } from '../../../components/domain/AiChat'
 import { Button, ButtonLink } from '../../../components/ui/Button'
 import { Card, CardBody, CardHeader } from '../../../components/ui/Card'
 import { SelectField, TextArea, TextField } from '../../../components/ui/Field'
@@ -468,7 +468,21 @@ export function AiAssessmentNewPage() {
             )}
           </Card>
 
-          <AssistantPanel chat={chat} busy={busy} onRetry={() => void generate()} onOpen={(draft) => void open(draft)} />
+          <AssistantCard
+            chat={chat}
+            busy={busy}
+            description="Drafts assessments here, and answers anything — how to teach a topic, what a question tests, what to tell parents."
+            emptyHint="For example “How do I teach ratio better to this class?” or “What should the parents practise at home?”. Press Generate assessment and the draft appears here too."
+            attachment={(t) =>
+              t.draft ? (
+                <DraftCard draft={t.draft} onOpen={() => void open(t.draft!)} />
+              ) : t.retry ? (
+                <Button size="sm" variant="secondary" className="mt-3" disabled={busy} onClick={() => void generate()} icon={<RefreshCw className="size-4" aria-hidden />}>
+                  Try again
+                </Button>
+              ) : null
+            }
+          />
         </div>
       </div>
     </>
@@ -481,47 +495,6 @@ function SummaryLine({ ok, children }: { ok: boolean; children: ReactNode }) {
       <Check className={cn('mt-0.5 size-4 shrink-0', ok ? 'text-good' : 'text-ink-3 opacity-40')} aria-hidden />
       <span className={cn(!ok && 'text-ink-3')}>{children}</span>
     </li>
-  )
-}
-
-interface AssistantPanelProps {
-  chat: ReturnType<typeof useAiChat>
-  busy: boolean
-  onRetry: () => void
-  onOpen: (draft: AiDraft) => void
-}
-
-/** The AI beside the form: it posts the assessments it drafts here, and answers anything the teacher asks. */
-function AssistantPanel({ chat, busy, onRetry, onOpen }: AssistantPanelProps) {
-  return (
-    <Card className="flex max-h-[calc(100vh-7rem)] min-h-[30rem] flex-col">
-      <CardHeader title="Sangyin AI" description="Drafts assessments here, and answers anything — how to teach a topic, what a question tests, what to tell parents." icon={<Sparkles className="size-5" aria-hidden />} />
-      <ChatThread
-        turns={chat.turns}
-        compact
-        className="flex-1 px-5 py-5"
-        empty={
-          <div className="flex h-full flex-col items-center justify-center text-center">
-            <span className="grid size-12 place-items-center rounded-full bg-brand-soft text-brand-ink">
-              <Sparkles className="size-6" aria-hidden />
-            </span>
-            <p className="mt-4 text-sm font-medium text-ink">Ask me anything</p>
-            <p className="mt-1 max-w-xs text-xs text-ink-3">For example “How do I teach ratio better to this class?” or “What should the parents practise at home?”. Press Generate assessment and the draft appears here too.</p>
-          </div>
-        }
-        attachment={(t) =>
-          t.draft ? (
-            <DraftCard draft={t.draft} onOpen={() => onOpen(t.draft!)} />
-          ) : t.retry ? (
-            <Button size="sm" variant="secondary" className="mt-3" disabled={busy} onClick={onRetry} icon={<RefreshCw className="size-4" aria-hidden />}>
-              Try again
-            </Button>
-          ) : null
-        }
-      />
-      <ChatComposer busy={busy} onSend={(text) => void chat.send(text)} placeholder="Ask the AI anything…" className="border-t border-line p-3" />
-      <p className="px-4 pb-3 text-center text-xs text-ink-3">The AI can make mistakes. You review every question before anything is sent.</p>
-    </Card>
   )
 }
 

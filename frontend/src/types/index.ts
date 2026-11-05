@@ -151,9 +151,13 @@ export interface DiagnosticReport {
 
 export type GuidanceStatus = 'pending_review' | 'approved' | 'revision_requested' | 'overridden'
 
+/** A step of a plan. Newer plans add the minutes (teaching steps), a worked example and a check question. */
 export interface GuidanceStep {
   title: string
   detail: string
+  minutes?: number
+  example?: string
+  check?: string
 }
 
 export interface GuidancePlan {
@@ -168,11 +172,17 @@ export interface GuidancePlan {
   sequence: GuidanceStep[]
   pacing: string
   practice: string[]
+  /** Newer plans: what is needed, mistakes to watch for with how to correct them, and the sign the gap is closed. */
+  materials?: string[]
+  commonMistakes?: { mistake: string; fix: string }[]
+  successCheck?: string
   /** The three role-specific outputs produced from one plan. */
   outputs: {
     teacherSheet: string
     parentNote: string
     studentSequence: string[]
+    /** Newer plans: the learner's steps in full (studentSequence is just their titles). */
+    studentGuide?: GuidanceStep[]
   }
   teacherNote?: string
   /** From the API: whether a teacher has edited the plan, and when the last decision was made. */
