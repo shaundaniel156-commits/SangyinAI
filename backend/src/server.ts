@@ -56,6 +56,8 @@ const aiRoute = {
 // Health check: is the server up, and are the AI, sign-in and database ready?
 app.get('/health', async () => ({
   ok: true,
+  // The commit this server was built from (set by Render), to tell which version is live.
+  version: process.env.RENDER_GIT_COMMIT?.slice(0, 7) ?? 'local',
   ai: aiConfigured() ? MODEL : 'offline',
   signIn: authConfigured() ? 'ready' : 'not set up',
   database: (await databaseReachable()) ? 'connected' : 'unreachable',

@@ -41,7 +41,8 @@ const DecisionSchema = z
   })
   .refine((d) => d.status !== undefined || d.note !== undefined || d.edits !== undefined, { message: 'Send a status, a note or edits.' })
 
-// again: also draft a new version for gaps that already have an approved plan (the teacher asked for a fresh draft).
+// again: also draft a new version for gaps that already have an approved plan. On unless the page says otherwise,
+// so pressing Generate always produces a draft to edit.
 const GenerateSchema = z.object({ studentId: z.string().min(1), subject: z.string().trim().min(1).max(60).optional(), again: z.boolean().optional() })
 const RegenerateSchema = z.object({ note: z.string().trim().min(1).max(2000) })
 
@@ -125,7 +126,7 @@ export async function guidanceRoutes(app: FastifyInstance) {
     const [waitingFor, approvedFor] = [names('pending_review'), names('approved')]
     const open = found.gaps.filter((g) => !waitingFor.has(g.name.toLowerCase()))
     const fresh = open.filter((g) => !approvedFor.has(g.name.toLowerCase()))
-    const gaps = (fresh.length ? fresh : parsed.data.again ? open : []).slice(0, MAX_GAPS)
+    const gaps = (fresh.length ? fresh : (parsed.data.again ?? true) ? open : []).slice(0, MAX_GAPS)
     if (!gaps.length) {
       const waiting = existing.filter((p) => p.status === 'pending_review').map(toGuidancePlan)
       return { plans: [], waiting, reason: waiting.length ? 'A draft for this student is already waiting for your review.' : 'This student already has guidance for their current gaps.' }
