@@ -26,7 +26,7 @@ const answersOptions = { onRequest: requireRole('student'), bodyLimit: 40 * 1024
 async function findOwnAssignment(user: SessionUser, id: string) {
   return prisma.practiceAssignment.findFirst({
     where: { id, student: { userId: user.sub, schoolId: user.schoolId }, aiAssessment: { status: 'sent' } },
-    include: { aiAssessment: { include: { questions: { orderBy: { position: 'asc' } }, class: { select: { level: true } } } } },
+    include: { aiAssessment: { include: { questions: { orderBy: { position: 'asc' } }, class: { select: { level: true } }, assessment: { select: { id: true, maxScore: true } } } } },
   })
 }
 
@@ -79,6 +79,8 @@ export async function practiceRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: 'Invalid answers', issues: parsed.error.issues })
     const item = await findOwnAssignment(request.user!, request.params.id)
     if (!item) return reply.code(404).send({ error: 'Practice not found.' })
+    // A formal assessment is done once; practice can be tried again.
+    if (item.aiAssessment.oneAttempt && item.completedAt) return reply.code(409).send({ error: 'You have already done this assessment. Your result is saved.' })
 
     const questions = item.aiAssessment.questions
     const work = parsed.data.work ?? {}
@@ -109,6 +111,25 @@ export async function practiceRoutes(app: FastifyInstance) {
         return prisma.practiceUpload.upsert({ where: { assignmentId_questionId: { assignmentId: item.id, questionId: q.id } }, create: { assignmentId: item.id, questionId: q.id, ...fields }, update: fields })
       }),
     ])
+    // The score goes into the gradebook (Assessments) out of that assessment's maximum, and the assessment is
+    // complete once every student it was sent to has done it. Never allowed to fail the student's submission.
+    const graded = item.aiAssessment.assessment
+    if (graded && questions.length) {
+      try {
+        const mark = Math.round((score / questions.length) * graded.maxScore * 10) / 10
+        const remark = marked.some((m) => 'pending' in m && m.pending) ? 'Written work is waiting to be marked' : null
+        await prisma.assessmentResult.upsert({
+          where: { assessmentId_studentId: { assessmentId: graded.id, studentId: item.studentId } },
+          update: { score: mark, remark },
+          create: { assessmentId: graded.id, studentId: item.studentId, score: mark, remark },
+        })
+        const entered = await prisma.assessmentResult.count({ where: { assessmentId: graded.id } })
+        await prisma.assessment.update({ where: { id: graded.id }, data: { status: entered >= item.aiAssessment.studentIds.length ? 'completed' : 'awaiting_scores' } })
+      } catch (error) {
+        request.log.error(error, 'score not entered in the gradebook')
+      }
+    }
+
     // The result counts towards the student's mastery of these topics (their profile, the class's gaps, the reports).
     await recomputeMastery([item.studentId]).catch((error) => request.log.error(error, 'mastery not updated after practice'))
     return { score, total: questions.length, completedOn: completedAt.toISOString(), questions: marked }

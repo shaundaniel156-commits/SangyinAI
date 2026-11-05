@@ -31,7 +31,7 @@ export async function recomputeMastery(studentIds: string[]): Promise<void> {
   if (!ids.length) return
 
   const [results, reports, practice] = await Promise.all([
-    prisma.assessmentResult.findMany({ where: { studentId: { in: ids } }, include: { assessment: { select: { subject: true, topics: true, maxScore: true, date: true } } } }),
+    prisma.assessmentResult.findMany({ where: { studentId: { in: ids }, assessment: { aiAssessment: { is: null } } }, include: { assessment: { select: { subject: true, topics: true, maxScore: true, date: true } } } }),
     prisma.diagnosticReport.findMany({ where: { studentId: { in: ids } } }),
     prisma.practiceAssignment.findMany({
       where: { studentId: { in: ids }, completedAt: { not: null } },

@@ -114,7 +114,7 @@ export function toSchoolClass(c: ClassRow) {
 
 // --- Assessments ------------------------------------------------------------
 
-export const assessmentInclude = { results: { select: { score: true } } } satisfies Prisma.AssessmentInclude
+export const assessmentInclude = { results: { select: { score: true } }, aiAssessment: { select: { id: true } } } satisfies Prisma.AssessmentInclude
 type AssessmentRow = Prisma.AssessmentGetPayload<{ include: typeof assessmentInclude }>
 
 export function toAssessment(a: AssessmentRow) {
@@ -131,6 +131,8 @@ export function toAssessment(a: AssessmentRow) {
     topics: a.topics,
     ...(scores.length ? { average: Math.round((mean(scores) / a.maxScore) * 100) } : {}),
     scoresEntered: scores.length,
+    // Done online: students answer these questions and their scores are entered automatically.
+    ...(a.aiAssessment ? { aiAssessmentId: a.aiAssessment.id } : {}),
   }
 }
 
@@ -160,6 +162,8 @@ export function toAiAssessment(a: AiAssessmentRow) {
     ...(a.parentNote !== null ? { parentNote: a.parentNote } : {}),
     shareWithParents: a.shareWithParents,
     ...(a.teachingPlan ? { teachingPlan: a.teachingPlan } : {}),
+    ...(a.assessmentId ? { assessmentId: a.assessmentId } : {}),
+    oneAttempt: a.oneAttempt,
     createdOn: a.createdAt.toISOString(),
     status: a.status,
     ...(a.sentAt ? { sentOn: a.sentAt.toISOString() } : {}),

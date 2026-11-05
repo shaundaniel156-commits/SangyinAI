@@ -50,6 +50,9 @@ const DraftSchema = EditableFields.extend({
   shareWithParents: EditableFields.shape.shareWithParents.default(true),
   source: z.enum(['gemini', 'offline']).optional(),
   teachingPlan: TeachingPlanSchema.optional(),
+  // Made from Create assessment ("online"): the gradebook assessment it fills in, done once by each student.
+  assessmentId: z.string().min(1).optional(),
+  oneAttempt: z.boolean().optional(),
   // The anonymous request sent to the AI (no student names), kept for fine-tuning.
   requestSent: z.record(z.string(), z.unknown()).optional(),
 })
@@ -116,6 +119,10 @@ export async function aiAssessmentRoutes(app: FastifyInstance) {
     if (!(await prisma.schoolClass.count({ where: { id: rest.classId, ...classScope(user) } }))) return reply.code(404).send({ error: 'Class not found.' })
     const outside = await studentsOutsideClass(rest.classId, rest.studentIds)
     if (outside.length) return reply.code(400).send({ error: 'Some students are not in this class.', studentIds: outside })
+    if (rest.assessmentId) {
+      const linkable = await prisma.assessment.count({ where: { id: rest.assessmentId, classId: rest.classId, class: classScope(user), aiAssessment: { is: null } } })
+      if (!linkable) return reply.code(400).send({ error: 'That assessment cannot take these questions.' })
+    }
 
     const created = await prisma.aiAssessment.create({
       data: {
@@ -198,13 +205,24 @@ export async function aiAssessmentRoutes(app: FastifyInstance) {
     const studentLogins = await prisma.student.findMany({ where: { id: { in: item.studentIds }, userId: { not: null } }, select: { userId: true } })
     const approved = { title: item.title, messageToStudents: item.messageToStudents, parentNote: item.parentNote ?? '', rationale: item.rationale, questions: item.questions.map(({ competency, type, difficulty, prompt, options, answer, explanation }) => ({ competency, type, difficulty, prompt, options, answer, explanation })) }
 
+    // Every sent assessment has a place in the gradebook (Assessments), where each student's score is entered as
+    // they finish: the assessment it was made from, or one added now.
+    if (item.assessmentId) {
+      await prisma.assessment.update({ where: { id: item.assessmentId }, data: { status: 'awaiting_scores' } })
+    } else {
+      const graded = await prisma.assessment.create({
+        data: { classId: item.classId, createdById: request.user!.sub, title: item.title, type: 'quiz', subject: item.subject, date: new Date(), maxScore: item.questions.length, status: 'awaiting_scores', topics: item.competencies.slice(0, 20) },
+      })
+      await prisma.aiAssessment.update({ where: { id: item.id }, data: { assessmentId: graded.id } })
+    }
+
     const [sent] = await prisma.$transaction([
       prisma.aiAssessment.update({ where: { id: item.id }, data: { status: 'sent', sentAt: new Date() }, include: aiAssessmentInclude }),
       prisma.practiceAssignment.createMany({ data: item.studentIds.map((studentId) => ({ aiAssessmentId: item.id, studentId })), skipDuplicates: true }),
       ...(item.requestSent ? [prisma.trainingExample.create({ data: { task: 'assessment', request: item.requestSent as Prisma.InputJsonValue, approved } })] : []),
     ])
     // Tell students (in the app, plus an email copy) and, if shared, their parents (app, email and SMS). Failures are logged and never block the send.
-    void notifyUsers(studentLogins.map((s) => s.userId!), { kind: 'practice_update', title: 'New practice ready', body: `“${item.title}” has been added to your practice list.`, link: '/student/practice' })
+    void notifyUsers(studentLogins.map((s) => s.userId!), { kind: 'practice_update', title: item.oneAttempt ? 'New assessment from your teacher' : 'New practice ready', body: item.oneAttempt ? `“${item.title}” is ready for you to do. You can do it once, so take your time.` : `“${item.title}” has been added to your practice list.`, link: '/student/practice' })
       .catch((error) => request.log.error(error, 'student notifications failed'))
     if (item.shareWithParents && item.parentNote?.trim()) {
       void notifyParents(item.studentIds, { title: 'new practice from school', focus: item.competencies.slice(0, 2).join(' and ') || item.subject, note: item.parentNote.trim() })

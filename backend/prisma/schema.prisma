@@ -337,6 +337,8 @@ model Assessment {
   topics      String[]
   createdAt   DateTime           @default(now())
   results     AssessmentResult[]
+  // The questions students answer online, when it is done that way (its scores are then entered automatically).
+  aiAssessment AiAssessment?
 }
 
 // Only scores that have been entered are stored; students without a row have no score yet.
@@ -421,6 +423,12 @@ model AiAssessment {
   // gemini or offline, when known; and the anonymous request sent to the AI (kept for fine-tuning).
   source            AiSource?
   requestSent       Json?
+  // Its place in the gradebook (Assessments), where each student's score is entered as they finish: the assessment
+  // it was made from (Create assessment, "online"), or one added when a builder assessment is sent.
+  assessmentId      String?              @unique
+  assessment        Assessment?          @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+  // A formal assessment: each student does it once. (Practice from the builder can be tried again.)
+  oneAttempt        Boolean              @default(false)
   status            AiAssessmentStatus   @default(draft)
   createdAt         DateTime             @default(now())
   sentAt            DateTime?

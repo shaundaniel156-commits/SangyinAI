@@ -40,7 +40,7 @@ export function FromTeacherSection() {
                   </StatusBadge>
                 ) : (
                   <StatusBadge tone="info" icon={Sparkles}>
-                    New
+                    {a.oneAttempt ? 'Assessment' : 'New'}
                   </StatusBadge>
                 )}
               </div>
@@ -56,9 +56,14 @@ export function FromTeacherSection() {
                 </span>
               </p>
               <div className="mt-4">
-                <Button size="sm" variant={attempt ? 'secondary' : 'primary'} onClick={() => setOpen(a)}>
-                  {attempt ? 'Try again' : 'Start'}
-                </Button>
+                {/* A formal assessment is done once; practice can be tried again. */}
+                {attempt && a.oneAttempt ? (
+                  <p className="text-sm text-ink-3">Done. Your teacher has your result.</p>
+                ) : (
+                  <Button size="sm" variant={attempt ? 'secondary' : 'primary'} onClick={() => setOpen(a)}>
+                    {attempt ? 'Try again' : 'Start'}
+                  </Button>
+                )}
               </div>
             </article>
           )

@@ -111,6 +111,8 @@ export interface Assessment {
   /** Class average as a percentage, when scores exist. */
   average?: number
   scoresEntered: number
+  /** Done online: the questions students answer (their scores are then entered automatically). */
+  aiAssessmentId?: string
 }
 
 export interface AssessmentResult {
@@ -257,6 +259,10 @@ export interface AiAssessment {
   /** Who wrote the draft (the AI or the offline bank) and the anonymous request sent to the AI (kept for fine-tuning). */
   source?: 'gemini' | 'offline'
   requestSent?: Record<string, unknown>
+  /** Its place in the gradebook (Assessments), where each student's score is entered as they finish. */
+  assessmentId?: string
+  /** A formal assessment (made from Create assessment): each student does it once. */
+  oneAttempt?: boolean
   /** From the API, for a student: their own copy to take, and their result once done. */
   practiceId?: string
   attempt?: { score: number; total: number; completedOn: string }

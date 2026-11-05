@@ -11,7 +11,7 @@ import { StatusBadge } from '../../../components/ui/StatusBadge'
 import { useAiAssessments } from '../../../context/AiAssessmentsContext'
 import { useToast } from '../../../context/ToastContext'
 import { getClass } from '../../../data/classes'
-import { getStudent } from '../../../data/students'
+import { getStudent, getStudentsByClass } from '../../../data/students'
 import { ROLE_USERS } from '../../../data/users'
 import { FrameworkBadge } from '../../../components/domain/FrameworkBadge'
 import { CURRICULUM_DISCLAIMER } from '../../../data/curriculum'
@@ -56,7 +56,9 @@ function Review({ assessment: a }: { assessment: AiAssessment }) {
   const draft = a.status === 'draft'
   const cls = getClass(a.classId)
   const used = new Set(a.questions.map((q) => q.sourceId))
-  const candidates = studentsWithGaps(a.classId, a.subject, a.competencies, true)
+  // Who can receive it: for a class assessment (made from Create assessment) the whole class, otherwise the
+  // students with these gaps.
+  const candidates = a.oneAttempt ? getStudentsByClass(a.classId) : studentsWithGaps(a.classId, a.subject, a.competencies, true)
   const chosen = new Set(a.studentIds)
   const canAdd = extraQuestion(a.competencies, used) !== null
   const ready = a.questions.length > 0 && a.studentIds.length > 0 && a.title.trim().length > 0
@@ -243,7 +245,9 @@ function Review({ assessment: a }: { assessment: AiAssessment }) {
               title="Recipients"
               description={
                 draft
-                  ? `${a.studentIds.length} selected · tick more to include students who are still developing`
+                  ? a.oneAttempt
+                    ? `${a.studentIds.length} selected · the whole class; untick anyone who should not receive it`
+                    : `${a.studentIds.length} selected · tick more to include students who are still developing`
                   : `${a.studentIds.length} student${a.studentIds.length === 1 ? '' : 's'} · ${a.competencies.join(', ')}`
               }
               icon={<Users className="size-5" aria-hidden />}

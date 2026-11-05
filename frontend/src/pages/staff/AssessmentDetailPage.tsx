@@ -59,6 +59,7 @@ export function AssessmentDetailPage() {
           <>
             <AssessmentStatusBadge status={assessment.status} />
             <StatusBadge>{assessment.type}</StatusBadge>
+            {assessment.aiAssessmentId && <StatusBadge tone="accent">Done online · scores entered automatically</StatusBadge>}
             <StatusBadge icon={CalendarDays}>{formatDate(assessment.date)}</StatusBadge>
             {assessment.topics.map((t) => (
               <StatusBadge key={t} tone="info">
@@ -68,9 +69,15 @@ export function AssessmentDetailPage() {
           </>
         }
         actions={
-          <ButtonLink to="/assessments/import" variant="secondary" icon={<FileUp className="size-4" aria-hidden />}>
-            Import results
-          </ButtonLink>
+          assessment.aiAssessmentId ? (
+            <ButtonLink to={`/ai-assessments/${assessment.aiAssessmentId}`} variant="secondary" icon={<ClipboardList className="size-4" aria-hidden />}>
+              Questions and who has done it
+            </ButtonLink>
+          ) : (
+            <ButtonLink to="/assessments/import" variant="secondary" icon={<FileUp className="size-4" aria-hidden />}>
+              Import results
+            </ButtonLink>
+          )
         }
       />
 
