@@ -31,6 +31,8 @@ interface Options {
   storageKey?: string
   /** Where the user is and what they are doing, for the AI to take into account (sent with each message). */
   context?: () => string
+  /** Called when the AI has finished a reply, with the conversation so far (for a page that saves it). */
+  onReply?: (turns: { role: 'user' | 'ai'; text: string }[]) => void
 }
 
 let seq = 0
@@ -47,7 +49,7 @@ function load(key: string): ChatTurn[] {
   }
 }
 
-export function useAiChat({ storageKey, context }: Options = {}) {
+export function useAiChat({ storageKey, context, onReply }: Options = {}) {
   const [turns, setTurns] = useState<ChatTurn[]>(() => (storageKey ? load(storageKey) : []))
   const [busy, setBusy] = useState(false)
 
@@ -68,7 +70,8 @@ export function useAiChat({ storageKey, context }: Options = {}) {
   const append = useCallback((id: number, piece: string) => {
     setTurns((list) => list.map((t) => (t.id === id ? { ...t, text: t.text + piece } : t)))
   }, [])
-  const reset = useCallback(() => setTurns([]), [])
+  /** Clears the conversation, or replaces it with a saved one. */
+  const reset = useCallback((to?: ChatTurn[]) => setTurns(Array.isArray(to) ? to : []), [])
 
   /** Shows text a few characters at a time, like someone typing (for replies made locally, not streamed). */
   const typeOut = useCallback(
@@ -97,6 +100,9 @@ export function useAiChat({ storageKey, context }: Options = {}) {
       const history = [...turns, { id: nextId(), role: 'user' as const, text: question }]
       const aiId = nextId()
       setTurns([...history, { id: aiId, role: 'ai', text: '', streaming: true }])
+      // The reply as it arrives, kept here too so the finished conversation can be handed to onReply.
+      let reply = ''
+      let answered = false
       try {
         const res = await fetch(`${API_URL}/ai/chat`, {
           method: 'POST',
@@ -116,17 +122,21 @@ export function useAiChat({ storageKey, context }: Options = {}) {
           for (;;) {
             const { done, value } = await reader.read()
             if (done) break
-            append(aiId, decoder.decode(value, { stream: true }))
+            const piece = decoder.decode(value, { stream: true })
+            reply += piece
+            append(aiId, piece)
           }
+          answered = true
         }
       } catch {
         append(aiId, 'I can’t reach the Sangyin server. Check your connection and try again.')
       } finally {
         update(aiId, { streaming: false })
         setBusy(false)
+        if (answered && reply.trim()) onReply?.([...history.map(({ role, text }) => ({ role, text })), { role: 'ai', text: reply }])
       }
     },
-    [turns, busy, context, append, update],
+    [turns, busy, context, onReply, append, update],
   )
 
   return { turns, busy, send, push, update, append, typeOut, reset }

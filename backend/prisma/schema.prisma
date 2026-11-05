@@ -167,6 +167,7 @@ model User {
   studentProfile     Student?
   children           StudentGuardian[]
   notifications      Notification[]
+  aiConversations    AiConversation[]
   aiAssessments      AiAssessment[]
   assessments        Assessment[]
   guidanceDecided    GuidancePlan[]
@@ -476,6 +477,20 @@ model PracticeUpload {
   createdAt    DateTime           @default(now())
 
   @@unique([assignmentId, questionId])
+}
+
+// A saved conversation with the AI (Ask Sangyin AI), kept for the user who had it so they can reopen it later.
+// The id is made by the browser when the conversation starts. messages: [{ role: user | ai, text }].
+model AiConversation {
+  id        String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  messages  Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, updatedAt])
 }
 
 model Notification {
