@@ -3,48 +3,83 @@ import { z } from 'zod'
 
 // The model can be changed in .env without touching code.
 export const MODEL = process.env.GEMINI_MODEL ?? 'gemini-3.8-flash'
-// How much the model thinks before answering: MINIMAL is fastest. See askGeminiForJson.
-const THINKING = (Object.values(ThinkingLevel) as string[]).includes(process.env.GEMINI_THINKING ?? '') ? (process.env.GEMINI_THINKING as ThinkingLevel) : ThinkingLevel.LOW
-// Set once the model has refused THINKING (see askGeminiForJson).
-let thinkingRefused = false
- 
+// Models to try, in order, when MODEL is overloaded ("high demand") even after retries. Empty string: none.
+export const FALLBACK_MODELS = (process.env.GEMINI_FALLBACK_MODELS ?? 'gemini-3.6-flash,gemini-3.5-flash-lite')
+  .split(',')
+  .map((m) => m.trim())
+  .filter((m) => m && m !== MODEL)
+// How much the model thinks before answering: LOW is the fastest most models allow. See askGeminiForJson.
+export const THINKING = (Object.values(ThinkingLevel) as string[]).includes(process.env.GEMINI_THINKING ?? '') ? (process.env.GEMINI_THINKING as ThinkingLevel) : ThinkingLevel.LOW
+// Models that have refused THINKING (see askGeminiForJson).
+const thinkingRefused = new Set<string>()
+// Give up on a request after this long, so an unanswered call can't hang a teacher's page for minutes.
+const REQUEST_TIMEOUT_MS = 60_000
+
 // True when a key is set. Without one, the app uses the offline question bank.
 export function aiConfigured(): boolean {
   return Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY)
 }
- 
+
 let client: GoogleGenAI | undefined
- 
+
 // One shared client. It reads GEMINI_API_KEY from the environment automatically.
 export function getGemini(): GoogleGenAI {
-  client ??= new GoogleGenAI({})
+  client ??= new GoogleGenAI({ httpOptions: { timeout: REQUEST_TIMEOUT_MS } })
   return client
 }
- 
+
 // Turns a Zod shape into the JSON schema Gemini understands (Gemini does not use the "$schema" line).
 export function toGeminiSchema(schema: z.ZodType): Record<string, unknown> {
   const { $schema: _unused, ...jsonSchema } = z.toJSONSchema(schema) as Record<string, unknown>
   return jsonSchema
 }
- 
+
 // Waits before each retry when Gemini is busy: about 2 seconds, then about 5. A little randomness
 // stops many teachers' retries from all hitting Google at the same moment.
 const RETRY_DELAYS_MS = [2000, 5000]
 const BUSY_STATUSES = new Set([500, 503, 504])
 
-// Runs a Gemini call, trying again up to twice if Google says it is busy or had a temporary fault.
-// Other errors (wrong key, quota used up, bad request) are not retried — waiting won't fix them.
-async function withBusyRetry<R>(label: string, call: () => Promise<R>): Promise<R> {
+// Why a call failed, when another model (or waiting) might help. null: it won't (wrong key, bad request…).
+// busy: Google says the model is overloaded. quota: this key's allowance for the model is used up (free tier).
+// silent: no answer at all (a dropped connection or the timeout above).
+type Setback = 'busy' | 'quota' | 'silent' | null
+function setback(error: unknown): Setback {
+  if (error instanceof ApiError) return BUSY_STATUSES.has(error.status) ? 'busy' : error.status === 429 ? 'quota' : null
+  return error instanceof Error && /fetch failed|timeout|timed out|aborted/i.test(error.message) ? 'silent' : null
+}
+const SETBACK_TEXT: Record<Exclude<Setback, null>, string> = { busy: 'is still busy', quota: 'is over its quota for today', silent: 'did not answer' }
+
+// Runs a Gemini call with MODEL. When Google says it is busy, tries again up to twice; when that still fails,
+// or the model is over quota or doesn't answer, tries each fallback model once. Other errors (wrong key, bad
+// request) are not retried — waiting won't fix them. The call gets the model to use.
+export async function withBusyRetry<R>(label: string, call: (model: string) => Promise<R>): Promise<R> {
   for (let attempt = 0; ; attempt++) {
     try {
-      return await call()
+      return await call(MODEL)
     } catch (error) {
+      const why = setback(error)
+      if (!why) throw error
       const delay = RETRY_DELAYS_MS[attempt]
-      if (!(error instanceof ApiError) || !BUSY_STATUSES.has(error.status) || delay === undefined) throw error
-      console.log(`[ai] ${label} Gemini busy (${error.status}), retrying in ${Math.round(delay / 1000)}s (attempt ${attempt + 2} of ${RETRY_DELAYS_MS.length + 1})`)
-      await new Promise((resolve) => setTimeout(resolve, delay + Math.random() * 1000))
+      if (why === 'busy' && delay !== undefined) {
+        console.log(`[ai] ${label} Gemini busy (${(error as ApiError).status}), retrying in ${Math.round(delay / 1000)}s (attempt ${attempt + 2} of ${RETRY_DELAYS_MS.length + 1})`)
+        await new Promise((resolve) => setTimeout(resolve, delay + Math.random() * 1000))
+        continue
+      }
+      if (!FALLBACK_MODELS.length) throw error
+      console.log(`[ai] ${label} ${MODEL} ${SETBACK_TEXT[why]}; trying ${FALLBACK_MODELS.join(', then ')}`)
+      break
     }
   }
+  for (const [i, model] of FALLBACK_MODELS.entries()) {
+    try {
+      return await call(model)
+    } catch (error) {
+      const why = setback(error)
+      if (!why || i === FALLBACK_MODELS.length - 1) throw error
+      console.log(`[ai] ${label} ${model} ${SETBACK_TEXT[why]}`)
+    }
+  }
+  throw new Error('unreachable')
 }
 
 // Asks Gemini for JSON in an exact shape, then checks the answer really fits that shape.
@@ -63,27 +98,29 @@ export async function askGeminiForJson<T>(
     responseMimeType: 'application/json',
     responseJsonSchema: toGeminiSchema(schema),
   }
-  const response = await withBusyRetry(label, async () => {
-    if (thinkingRefused) return getGemini().models.generateContent({ model: MODEL, contents, config })
+  let used = MODEL
+  const response = await withBusyRetry(label, async (model) => {
+    used = model
+    if (thinkingRefused.has(model)) return getGemini().models.generateContent({ model, contents, config })
     try {
       // Thinking is the slow part of a Gemini reply, and these tasks are well specified, so keep it low
       // (GEMINI_THINKING in .env picks another level, e.g. MEDIUM or HIGH, when answers need more care).
-      return await getGemini().models.generateContent({ model: MODEL, contents, config: { ...config, thinkingConfig: { thinkingLevel: THINKING } } })
+      return await getGemini().models.generateContent({ model, contents, config: { ...config, thinkingConfig: { thinkingLevel: THINKING } } })
     } catch (error) {
       // A model that doesn't take this thinking level refuses the whole request: ask again without it, and
       // remember, so later calls don't pay for a refused request each time.
       if (!(error instanceof ApiError) || error.status !== 400 || !/thinking/i.test(error.message)) throw error
-      thinkingRefused = true
-      console.log(`[ai] ${label} ${MODEL} does not accept thinkingLevel ${THINKING}; using the model's default thinking from now on`)
-      return getGemini().models.generateContent({ model: MODEL, contents, config })
+      thinkingRefused.add(model)
+      console.log(`[ai] ${label} ${model} does not accept thinkingLevel ${THINKING}; using the model's default thinking from now on`)
+      return getGemini().models.generateContent({ model, contents, config })
     }
   })
- 
+
   // Log what it cost (token counts) and why it stopped — never log student data.
   const usage = response.usageMetadata
   const finish = response.candidates?.[0]?.finishReason ?? response.promptFeedback?.blockReason ?? 'none'
-  console.log(`[ai] ${label} ${MODEL} in=${usage?.promptTokenCount ?? 0} out=${usage?.candidatesTokenCount ?? 0} thinking=${usage?.thoughtsTokenCount ?? 0} finish=${finish}`)
- 
+  console.log(`[ai] ${label} ${used} in=${usage?.promptTokenCount ?? 0} out=${usage?.candidatesTokenCount ?? 0} thinking=${usage?.thoughtsTokenCount ?? 0} finish=${finish}`)
+
   if (!response.text) return null
   let json: unknown
   try {

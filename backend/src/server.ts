@@ -10,6 +10,7 @@ import { authConfigured, requireRole } from './auth/session.ts'
 import { authRoutes } from './auth/routes.ts'
 import { databaseReachable } from './db/client.ts'
 import { aiAssessmentRoutes } from './routes/aiAssessments.ts'
+import { aiChatRoutes } from './routes/aiChat.ts'
 import { assessmentRoutes } from './routes/assessments.ts'
 import { classRoutes } from './routes/classes.ts'
 import { curriculumRoutes } from './routes/curriculum.ts'
@@ -66,6 +67,7 @@ await app.register(classRoutes)
 await app.register(studentRoutes)
 await app.register(assessmentRoutes)
 await app.register(aiAssessmentRoutes)
+await app.register(aiChatRoutes)
 await app.register(guidanceRoutes)
 await app.register(practiceRoutes)
 await app.register(notificationRoutes)

@@ -15,6 +15,7 @@ import { PerformancePage } from './pages/staff/PerformancePage'
 import { DiagnosticsPage } from './pages/staff/DiagnosticsPage'
 import { DiagnosticDetailPage } from './pages/staff/DiagnosticDetailPage'
 import { AnalyseExamPage } from './pages/staff/AnalyseExamPage'
+import { AskAiPage } from './pages/staff/AskAiPage'
 import { GuidancePage } from './pages/staff/GuidancePage'
 import { GuidanceDetailPage } from './pages/staff/GuidanceDetailPage'
 import { AcademicStructurePage } from './pages/admin/AcademicStructurePage'
@@ -65,6 +66,7 @@ export default function App() {
         <Route path="/assessments/new" element={<CreateAssessmentPage />} />
         <Route path="/assessments/import" element={<ImportResultsPage />} />
         <Route path="/assessments/:id" element={<AssessmentDetailPage />} />
+        <Route path="/ask-ai" element={<AskAiPage />} />
         <Route path="/ai-assessments" element={<AiAssessmentsPage />} />
         <Route path="/ai-assessments/new" element={<AiAssessmentNewPage />} />
         <Route path="/ai-assessments/:id" element={<AiAssessmentReviewPage />} />
