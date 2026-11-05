@@ -65,7 +65,7 @@ export const NAVIGATION: Record<Role, NavGroup[]> = {
         { label: 'Performance', to: '/performance', icon: LineChart },
         { label: 'Diagnostics', to: '/diagnostics', icon: Stethoscope },
         { label: 'Analyse exam results', to: '/diagnostics/new', icon: FileSearch },
-        { label: 'Ask the AI', to: '/ask-ai', icon: MessageSquareText },
+        { label: 'Ask Sangyin AI', to: '/ask-ai', icon: MessageSquareText },
         { label: 'AI Guidance', to: '/guidance', icon: Sparkles },
         { label: 'AI Assessment Builder', to: '/ai-assessments', icon: Wand2 },
       ],
@@ -95,7 +95,7 @@ export const NAVIGATION: Record<Role, NavGroup[]> = {
     {
       label: 'Academics',
       items: [
-        { label: 'Ask the AI', to: '/ask-ai', icon: MessageSquareText },
+        { label: 'Ask Sangyin AI', to: '/ask-ai', icon: MessageSquareText },
         { label: 'Curriculum', to: '/curriculum', icon: Library },
         { label: 'Manual feed', to: '/data', icon: DatabaseZap },
         { label: 'Reports', to: '/reports', icon: FileBarChart2 },

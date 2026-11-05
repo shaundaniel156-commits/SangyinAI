@@ -9,7 +9,7 @@ import { Card, CardHeader } from '../ui/Card'
 
 /**
  * A conversation with the AI: the hook keeps the turns and streams replies from the server; ChatThread shows
- * them; ChatComposer is the box to type in. Used by Ask the AI and by the AI Assessment Builder's panel.
+ * them; ChatComposer is the box to type in. Used by Ask Sangyin AI and by the AI Assessment Builder's panel.
  */
 
 export interface ChatTurn {
@@ -200,7 +200,7 @@ interface ChatComposerProps {
 }
 
 /** The box to write to the AI. */
-export function ChatComposer({ onSend, busy, placeholder = 'Ask the AI anything…', multiline, className }: ChatComposerProps) {
+export function ChatComposer({ onSend, busy, placeholder = 'Ask Sangyin AI anything…', multiline, className }: ChatComposerProps) {
   const [draft, setDraft] = useState('')
   const send = () => {
     const text = draft.trim()
@@ -272,7 +272,7 @@ export function AssistantCard({ chat, busy = false, description, emptyHint, atta
           </div>
         }
       />
-      <ChatComposer busy={busy || chat.busy} onSend={(text) => void chat.send(text)} placeholder="Ask the AI anything…" className="border-t border-line p-3" />
+      <ChatComposer busy={busy || chat.busy} onSend={(text) => void chat.send(text)} placeholder="Ask Sangyin AI anything…" className="border-t border-line p-3" />
       <p className="px-4 pb-3 text-center text-xs text-ink-3">The AI can make mistakes. Check anything you will use with learners.</p>
     </Card>
   )

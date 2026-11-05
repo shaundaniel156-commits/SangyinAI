@@ -13,7 +13,7 @@ const SUGGESTIONS = [
 ]
 
 /**
- * Ask the AI: an open conversation with the AI about teaching, learners and the app. The reply streams in
+ * Ask Sangyin AI: an open conversation with the AI about teaching, learners and the app. The reply streams in
  * as the AI writes it. The conversation stays in this browser (per account); nothing is kept on the server.
  */
 export function AskAiPage() {
@@ -23,7 +23,7 @@ export function AskAiPage() {
   return (
     <div className="mx-auto flex min-h-[calc(100vh-8rem)] max-w-3xl flex-col">
       <PageHeader
-        title="Ask the AI"
+        title="Ask Sangyin AI"
         description="Ask anything about teaching, your learners or the app — explain a topic, plan a lesson, write questions or a note to parents."
         actions={
           chat.turns.length > 0 && (
@@ -61,7 +61,7 @@ export function AskAiPage() {
         multiline
         busy={chat.busy}
         onSend={(text) => void chat.send(text)}
-        placeholder="Ask the AI anything… (Enter to send, Shift+Enter for a new line)"
+        placeholder="Ask Sangyin AI anything… (Enter to send, Shift+Enter for a new line)"
         className="sticky bottom-4 rounded-2xl border border-line bg-surface p-2 shadow-lg"
       />
       <p className="mt-3 text-center text-xs text-ink-3">The AI can make mistakes — check anything you will use with learners. This conversation is kept only in this browser.</p>
