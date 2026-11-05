@@ -110,8 +110,8 @@ export function StudentProfilePage() {
         <Card className="flex flex-col">
           <CardHeader title="Current learning focus" icon={<Target className="size-5" aria-hidden />} />
           <CardBody className="flex flex-1 flex-col">
-            <p className="text-xl font-semibold text-ink">{student.currentFocus}</p>
-            <p className="mt-1 text-sm text-ink-3">Mathematics</p>
+            <p className="text-xl font-semibold text-ink">{student.currentFocus || 'No results yet'}</p>
+            <p className="mt-1 text-sm text-ink-3">{student.competencies.find((c) => c.name === student.currentFocus)?.subject ?? 'Enter marks or analyse an exam to find it'}</p>
             {guidance ? (
               <div className="mt-4 rounded-lg border border-line bg-surface-2 p-4">
                 <div className="flex items-center justify-between gap-2">

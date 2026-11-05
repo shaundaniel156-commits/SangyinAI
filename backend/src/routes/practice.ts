@@ -5,6 +5,8 @@ import { requireRole, requireUser } from '../auth/session.ts'
 import { markWrittenWork } from '../ai/markWork.ts'
 import { prisma } from '../db/client.ts'
 import { studentScope } from './access.ts'
+import { isCorrect } from './marking.ts'
+import { recomputeMastery } from './mastery.ts'
 import { practiceInclude, toPracticeActivity } from './mappers.ts'
 
 const studentOnly = { onRequest: requireRole('student') }
@@ -19,15 +21,6 @@ const AnswersSchema = z.object({
 })
 // The photos make this request far bigger than the server's usual limit.
 const answersOptions = { onRequest: requireRole('student'), bodyLimit: 40 * 1024 * 1024 }
-
-// Marking rules from the frontend's TakeAssessmentModal: ignore case, spaces, commas and full stops;
-// "a / b" accepts either; open-ended items ("Answers will vary") count as done when attempted.
-const normalise = (s: string) => s.toLowerCase().replace(/[\s,.]/g, '')
-function isCorrect(answer: string, given: string): boolean {
-  if (!given.trim()) return false
-  if (answer === 'Answers will vary') return true
-  return answer.split('/').some((a) => normalise(a) === normalise(given)) || normalise(answer) === normalise(given)
-}
 
 // The signed-in student's own practice copy, or null.
 async function findOwnAssignment(user: SessionUser, id: string) {
@@ -116,6 +109,8 @@ export async function practiceRoutes(app: FastifyInstance) {
         return prisma.practiceUpload.upsert({ where: { assignmentId_questionId: { assignmentId: item.id, questionId: q.id } }, create: { assignmentId: item.id, questionId: q.id, ...fields }, update: fields })
       }),
     ])
+    // The result counts towards the student's mastery of these topics (their profile, the class's gaps, the reports).
+    await recomputeMastery([item.studentId]).catch((error) => request.log.error(error, 'mastery not updated after practice'))
     return { score, total: questions.length, completedOn: completedAt.toISOString(), questions: marked }
   })
 }

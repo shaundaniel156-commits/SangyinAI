@@ -4,6 +4,7 @@ import { requireRole, requireUser } from '../auth/session.ts'
 import { prisma } from '../db/client.ts'
 import { studentScope } from './access.ts'
 import { byName, studentInclude, toDiagnostic, toStudent } from './mappers.ts'
+import { recomputeMastery } from './mastery.ts'
 
 export async function studentRoutes(app: FastifyInstance) {
   // Every student the user may see: a teacher's classes, an admin's school, a parent's children, or the student themselves.
@@ -77,6 +78,8 @@ export async function studentRoutes(app: FastifyInstance) {
         basis: 'exam',
       }
       const report = await prisma.diagnosticReport.create({ data: { studentId: student.id, subject: r.subject, summary } })
+      // The diagnosis becomes the student's mastery of these topics: their profile, "needs support", the class's gaps.
+      await recomputeMastery([student.id]).catch((error) => request.log.error(error, 'mastery not updated after exam analysis'))
       return reply.code(201).send(toDiagnostic(report))
     },
   )

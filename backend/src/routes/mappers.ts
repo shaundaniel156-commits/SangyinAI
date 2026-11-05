@@ -54,8 +54,8 @@ export function toStudent(s: StudentRow) {
   const competencies = s.competencyScores
     .sort((a, b) => a.competency.position - b.competency.position)
     .map((c) => ({ competencyId: c.competencyId, name: c.competency.name, topic: c.competency.topic, subject: c.competency.subject, score: c.score, level: c.level }))
-  const maths = competencies.filter((c) => c.subject === 'Mathematics')
-  const weakest = [...(maths.length ? maths : competencies)].sort((a, b) => a.score - b.score)[0]
+  // The topic to work on next: the weakest, in whatever subject it is.
+  const weakest = [...competencies].sort((a, b) => a.score - b.score)[0]
   return {
     id: s.id,
     name: s.name,
@@ -65,7 +65,7 @@ export function toStudent(s: StudentRow) {
     subjects: s.class.subjects,
     average: Math.round(mean(competencies.map((c) => c.score))),
     trend: s.trend,
-    needsSupport: maths.some((c) => c.level === 'needs_support'),
+    needsSupport: competencies.some((c) => c.level === 'needs_support'),
     currentFocus: weakest?.name ?? '',
     competencies,
     guardianName: s.guardianName ?? '',

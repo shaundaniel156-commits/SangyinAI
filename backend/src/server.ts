@@ -16,6 +16,7 @@ import { classRoutes } from './routes/classes.ts'
 import { curriculumRoutes } from './routes/curriculum.ts'
 import { feedRoutes } from './routes/feed.ts'
 import { guidanceRoutes } from './routes/guidance.ts'
+import { backfillMastery } from './routes/mastery.ts'
 import { notificationRoutes } from './routes/notifications.ts'
 import { practiceRoutes } from './routes/practice.ts'
 import { studentRoutes } from './routes/students.ts'
@@ -93,6 +94,11 @@ app.post('/ai/guidance/generate', aiRoute, async (request, reply) => {
   }
   return generateGuidance(parsed.data, request.user?.schoolId)
 })
+
+// Students whose work was entered before mastery was worked out from it are caught up once, in the background.
+void backfillMastery()
+  .then((count) => count && app.log.info(`mastery worked out for ${count} student(s) with earlier results`))
+  .catch((error) => app.log.error(error, 'mastery catch-up failed'))
 
 // 0.0.0.0 = accept connections from outside this machine (needed on Railway, which sets PORT).
 await app.listen({ port: Number(process.env.PORT ?? 4000), host: '0.0.0.0' })

@@ -7,8 +7,19 @@ import { useSession } from './SessionContext'
 /**
  * Loads the signed-in user's data from the backend once after sign-in (lib/liveData.ts) and shows the
  * pages on top of it. If loading fails, it says so and offers to try again. After a change is saved,
- * refresh() reloads the data and redraws the pages.
+ * refresh() reloads the data and redraws the pages. It also reloads when the user comes back to the tab after a
+ * while, so work entered by others meanwhile (a student's practice, a colleague's marks) shows up.
  */
+// Data older than this is reloaded when the user returns to the tab.
+const STALE_MS = 60_000
+
+/** Reloading redraws the page, so it waits while the user is in the middle of something that would be lost. */
+function busyWithSomething(): boolean {
+  if (document.querySelector('[role="dialog"], [data-keep]')) return true
+  return [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('main input, main textarea')].some(
+    (field) => field.type !== 'checkbox' && field.type !== 'radio' && field.value !== '',
+  )
+}
 interface LiveDataValue {
   /** True when the pages show data loaded from the backend. */
   live: boolean
@@ -26,6 +37,7 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
   // `loadedFor` is the token whose data has finished loading (or failed to); a newer token means "loading".
   const [state, setState] = useState<{ loadedFor: string | null; live: boolean; version: number }>({ loadedFor: null, live: false, version: 0 })
   const wasLive = useRef(false)
+  const loadedAt = useRef(0)
 
   const load = useCallback(
     async (forToken: string) => {
@@ -34,6 +46,7 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
         await loadLiveData(accountRole)
         live = true
         wasLive.current = true
+        loadedAt.current = Date.now()
       } catch (error) {
         // An expired or invalid sign-in: ask the user to sign in again. Anything else: offer to try again.
         if (error instanceof ApiError && error.status === 401) signOut()
@@ -51,6 +64,16 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
       window.location.reload()
     }
   }, [token, state.loadedFor, load])
+
+  useEffect(() => {
+    if (!token) return
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - loadedAt.current < STALE_MS || busyWithSomething()) return
+      void load(token)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [token, load])
 
   const refresh = useCallback(async () => {
     if (token) await load(token)

@@ -152,7 +152,7 @@ export function ChatThread({ turns, empty, attachment, compact, className }: Cha
   }, [turns])
 
   return (
-    <div ref={listRef} className={cn('space-y-6 overflow-y-auto', className)}>
+    <div ref={listRef} data-keep={turns.length ? '' : undefined} className={cn('space-y-6 overflow-y-auto', className)}>
       {turns.length === 0
         ? empty
         : turns.map((t) =>

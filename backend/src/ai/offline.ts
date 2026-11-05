@@ -2,7 +2,7 @@ import { AI_QUESTION_BANK, type QuestionBank } from '../data/aiQuestionBank.ts'
 import type { AssessmentDraft, GenerateAssessmentRequest } from './schemas.ts'
  
 // "ratio and proportions", "RATIO & PROPORTION" and "Ratio and Proportion" are the same topic: compare names without case, punctuation, "and" or a final s.
-const topicKey = (name: string) =>
+export const topicKey = (name: string) =>
   name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')

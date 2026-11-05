@@ -4,6 +4,7 @@ import { Button } from '../../../components/ui/Button'
 import { inputClasses } from '../../../components/ui/Field'
 import { Modal } from '../../../components/ui/Modal'
 import { useAiAssessments, type MarkedAttempt, type WorkUpload } from '../../../context/AiAssessmentsContext'
+import { useLiveData } from '../../../context/LiveDataContext'
 import { cn } from '../../../lib/cn'
 import { readBase64, shrinkPhoto } from '../../../lib/photo'
 import type { AiAssessment, AiQuestion } from '../../../types'
@@ -32,6 +33,7 @@ interface PickedPhoto {
  */
 export function TakeAssessmentModal({ assessment: a, onClose }: { assessment: AiAssessment | null; onClose: () => void }) {
   const { recordAttempt, submitAnswers } = useAiAssessments()
+  const { refresh } = useLiveData()
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [photos, setPhotos] = useState<Record<string, PickedPhoto>>({})
   const [checked, setChecked] = useState(false)
@@ -61,12 +63,15 @@ export function TakeAssessmentModal({ assessment: a, onClose }: { assessment: Ai
   }
 
   const close = () => {
+    // Marked by the server: the result now counts in the student's progress and topics, so reload them.
+    const saved = marked !== null
     setAnswers({})
     clearPhotos()
     setChecked(false)
     setMarked(null)
     setError(null)
     onClose()
+    if (saved) void refresh()
   }
 
   const pickPhoto = (questionId: string, file: File) => {

@@ -6,6 +6,7 @@ import { prisma } from '../db/client.ts'
 import { column, readSpreadsheet } from '../feed/spreadsheet.ts'
 import { assessmentScope, classScope, studentScope } from './access.ts'
 import { ASSESSMENT_TYPE_FROM_LABEL, assessmentInclude, byName, toAssessment } from './mappers.ts'
+import { recomputeMastery } from './mastery.ts'
 
 const teacherOrAdmin = { onRequest: requireRole('teacher', 'admin') }
 
@@ -60,6 +61,8 @@ async function saveResults(assessment: { id: string; classId: string; maxScore: 
           create: { assessmentId: assessment.id, studentId: r.studentId, score: r.score, remark: r.remark ?? null },
         }),
   ))
+  // The marks count towards each student's mastery of the topics this assessment covers.
+  await recomputeMastery(rows.map((r) => r.studentId)).catch((error) => console.error('[mastery] not updated after scores were saved', error))
   const entered = await prisma.assessmentResult.count({ where: { assessmentId: assessment.id } })
   if (entered > 0) {
     await prisma.assessment.update({ where: { id: assessment.id }, data: { status: entered >= classStudents.size ? 'completed' : 'awaiting_scores' } })
