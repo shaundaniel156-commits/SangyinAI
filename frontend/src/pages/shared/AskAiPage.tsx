@@ -10,14 +10,52 @@ import { api } from '../../lib/api'
 import { cn } from '../../lib/cn'
 import { formatShortDate } from '../../lib/format'
 import { readStorage, writeStorage } from '../../lib/storage'
+import type { Role } from '../../types'
 
-const SUGGESTIONS = [
-  'Explain long division to a Primary 4 class in simple steps, with two examples.',
-  'Plan a 40-minute lesson on photosynthesis for Senior 2 with a quick check at the end.',
-  'Write a short note to parents about a learner who is behind in reading, and how they can help at home.',
-  'Give me five word problems about money in shillings for Primary 6, with answers.',
-  'How do I use Analyse exam results and the AI Assessment Builder together?',
-]
+// What the page says, and the questions it suggests, for whoever is signed in. The AI is told who is asking too
+// (backend ai/chat.ts): a teaching assistant for staff, a tutor for a student, home-support help for a parent.
+const FOR_ROLE: Record<Role, { description: string; suggestions: string[] }> = {
+  teacher: {
+    description: 'Ask anything about teaching, your learners or the app — explain a topic, plan a lesson, write questions or a note to parents.',
+    suggestions: [
+      'Explain long division to a Primary 4 class in simple steps, with two examples.',
+      'Plan a 40-minute lesson on photosynthesis for Senior 2 with a quick check at the end.',
+      'Write a short note to parents about a learner who is behind in reading, and how they can help at home.',
+      'Give me five word problems about money in shillings for Primary 6, with answers.',
+      'How do I use Analyse exam results and the AI Assessment Builder together?',
+    ],
+  },
+  admin: {
+    description: 'Ask anything about running the school in Sangyin, supporting your teachers, or teaching and learning.',
+    suggestions: [
+      'How do I add a new teacher and give them a class?',
+      'What should I look at each week to see which classes need help?',
+      'Write a short message to parents explaining how to use Sangyin to follow their child’s progress.',
+      'How can teachers use Analyse exam results and AI Guidance after end-of-term exams?',
+      'Suggest a simple plan for a class that is behind in reading.',
+    ],
+  },
+  student: {
+    description: 'Your study helper. Ask about anything you are learning: it explains step by step and helps you work things out yourself.',
+    suggestions: [
+      'Explain fractions to me with an example.',
+      'I don’t understand ratio. Can you show me step by step?',
+      'Give me three practice questions on what I find hard, one at a time.',
+      'How do I write a good composition?',
+      'Help me make a plan to revise for my exams.',
+    ],
+  },
+  parent: {
+    description: 'Ask how to help your child learn at home: what a topic means, what to practise, and how to encourage them.',
+    suggestions: [
+      'What can I do at home in 10 minutes a day to help my child with maths?',
+      'My child says they hate reading. How can I help?',
+      'Explain what my child is working on in simple words.',
+      'What should I ask the teacher at the next parents’ meeting?',
+      'How do I help my child when they are stuck on homework, without doing it for them?',
+    ],
+  },
+}
 
 /** A saved conversation, as listed under "Recent chats" (backend GET /ai/chats). */
 interface ChatSummary {
@@ -43,12 +81,13 @@ function when(iso: string): string {
 }
 
 /**
- * Ask Sangyin AI: an open conversation with the AI about teaching, learners and the app. The reply streams in
+ * Ask Sangyin AI, for every signed-in user: an open conversation with the AI. The reply streams in
  * as the AI writes it. Each conversation is saved to the user's account once the AI has answered, and listed
  * under "Recent chats" to reopen and carry on, on any device.
  */
 export function AskAiPage() {
-  const { user } = useSession()
+  const { user, role } = useSession()
+  const { description, suggestions } = FOR_ROLE[role]
   const { live } = useLiveData()
   const { notify } = useToast()
   const [chats, setChats] = useState<ChatSummary[]>([])
@@ -171,7 +210,7 @@ export function AskAiPage() {
       <div className="flex min-h-[calc(100vh-8rem)] min-w-0 flex-col">
         <PageHeader
           title="Ask Sangyin AI"
-          description="Ask anything about teaching, your learners or the app — explain a topic, plan a lesson, write questions or a note to parents."
+          description={description}
         />
 
         <ChatThread
@@ -181,7 +220,7 @@ export function AskAiPage() {
             <div className="rounded-2xl border border-dashed border-line px-5 py-6">
               <p className="text-sm font-medium text-ink">Try asking</p>
               <ul className="mt-3 flex flex-wrap gap-2">
-                {SUGGESTIONS.map((s) => (
+                {suggestions.map((s) => (
                   <li key={s}>
                     <button
                       type="button"
@@ -202,10 +241,12 @@ export function AskAiPage() {
           busy={chat.busy}
           onSend={(text) => void chat.send(text)}
           placeholder="Ask Sangyin AI anything… (Enter to send, Shift+Enter for a new line)"
-          className="sticky bottom-4 rounded-2xl border border-line bg-surface p-2 shadow-lg"
+          // On a phone, students and parents have a tab bar along the bottom: the box sits above it.
+          className={cn('sticky rounded-2xl border border-line bg-surface p-2 shadow-lg', role === 'student' || role === 'parent' ? 'bottom-20 lg:bottom-4' : 'bottom-4')}
         />
         <p className="mt-3 text-center text-xs text-ink-3">
-          The AI can make mistakes — check anything you will use with learners. {live ? 'Your conversations are saved to your account.' : 'This conversation is kept only in this browser.'}
+          {role === 'student' ? 'The AI can make mistakes. If something does not look right, ask your teacher.' : role === 'parent' ? 'The AI can make mistakes. For anything important, check with your child’s teacher.' : 'The AI can make mistakes — check anything you will use with learners.'}{' '}
+          {live ? 'Your conversations are saved to your account.' : 'This conversation is kept only in this browser.'}
         </p>
       </div>
     </div>
