@@ -52,7 +52,7 @@ export function SplashScreen() {
       <div className="splash-rise relative flex flex-col items-center">
         <div className="relative">
           <div className="splash-pulse absolute -inset-6 rounded-full bg-brand-600/50 blur-2xl" aria-hidden />
-          <LogoMark className="relative size-20" />
+          <LogoMark className="relative size-20" onDark />
         </div>
         <p className="mt-6 text-3xl font-bold tracking-tight text-[#5b93e6]">Sangyin AI</p>
         <p className="mt-1.5 text-sm text-white/60">AI-Guided Adaptive Education System</p>

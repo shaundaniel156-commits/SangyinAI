@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { LogoMark } from '../../components/layout/Logo'
 import { Link } from 'react-router-dom'
 import heroImage from '../../assets/hero-ai-learner.jpg'
 
@@ -56,7 +57,8 @@ export function AuthHeader({ children }: { children: ReactNode }) {
   return (
     <header className="sticky top-0 z-20 border-b border-white/10 bg-black/70 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-8">
-        <Link to="/" className="text-lg font-bold tracking-tight" style={{ color: ACCENT }}>
+        <Link to="/" className="flex items-center gap-2.5 text-lg font-bold tracking-tight" style={{ color: ACCENT }}>
+          <LogoMark className="size-8" onDark />
           Sangyin AI
         </Link>
         <nav className="flex items-center gap-6 text-sm text-white/90">{children}</nav>
