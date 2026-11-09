@@ -10,10 +10,12 @@ import { PageHeader } from '../../components/ui/PageHeader'
 import { ProgressBar, toneForScore } from '../../components/ui/ProgressBar'
 import { SearchBar } from '../../components/ui/SearchBar'
 import { StatusBadge } from '../../components/ui/StatusBadge'
+import { useLiveData } from '../../context/LiveDataContext'
 import { useSession } from '../../context/SessionContext'
 import { getClass } from '../../data/classes'
 import { classesInScope, studentsInScope } from '../../data/selectors'
 import { COMPETENCIES } from '../../data/students'
+import { NO_RESULTS, hasResults } from '../../lib/competency'
 import { formatSignedPoints } from '../../lib/format'
 import { cn } from '../../lib/cn'
 
@@ -36,6 +38,8 @@ export function StudentsPage() {
 
   const all = studentsInScope(role)
   const classes = classesInScope(role)
+  // In the list below: it is worked out again each time the data is reloaded.
+  const { version } = useLiveData()
   const rows = useMemo(
     () =>
       all.filter(
@@ -45,7 +49,8 @@ export function StudentsPage() {
           (status === 'all' || (status === 'support' ? s.needsSupport : !s.needsSupport)) &&
           s.name.toLowerCase().includes(query.trim().toLowerCase()),
       ),
-    [all, classId, focus, status, query],
+    // `version` is here on purpose: the data lists are refilled in place on a reload, so nothing else changes.
+    [all, classId, focus, status, query, version],
   )
 
   return (
@@ -124,8 +129,14 @@ export function StudentsPage() {
               header: 'Average',
               cell: (s) => (
                 <div className="flex min-w-24 items-center gap-2.5">
-                  <ProgressBar value={s.average} tone={toneForScore(s.average)} size="sm" className="hidden flex-1 sm:block" srLabel={`${s.name} average`} />
-                  <span className="tabular w-9 text-right font-medium">{s.average}%</span>
+                  {hasResults(s) ? (
+                    <>
+                      <ProgressBar value={s.average} tone={toneForScore(s.average)} size="sm" className="hidden flex-1 sm:block" srLabel={`${s.name} average`} />
+                      <span className="tabular w-9 text-right font-medium">{s.average}%</span>
+                    </>
+                  ) : (
+                    <span className="text-ink-3">{NO_RESULTS}</span>
+                  )}
                 </div>
               ),
             },

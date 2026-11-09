@@ -12,7 +12,8 @@ import { StatusBadge } from '../../components/ui/StatusBadge'
 import { useAiAssessments } from '../../context/AiAssessmentsContext'
 import { PRACTICE_ACTIVITIES, practiceStreakDays, recentAchievements, teacherMessages, teacherPracticeDone } from '../../data/practice'
 import { ROLE_USERS } from '../../data/users'
-import { formatShortDate } from '../../lib/format'
+import { NO_RESULTS, averageLabel, hasResults } from '../../lib/competency'
+import { formatDue, formatShortDate } from '../../lib/format'
 import type { PracticeActivity } from '../../types'
 import { FeedbackControl } from './components/FeedbackControl'
 import { PracticeActivityCard } from './components/PracticeActivityCard'
@@ -71,7 +72,7 @@ export function StudentDashboard() {
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <Clock className="size-4" aria-hidden />
-                    Due {formatShortDate(pendingFromTeacher.dueDate)}
+                    {formatDue(pendingFromTeacher.dueDate, true)}
                   </span>
                 </p>
                 <div className="mt-auto pt-6">
@@ -114,7 +115,7 @@ export function StudentDashboard() {
               <BookOpenCheck className="size-4" aria-hidden />
               Current focus
             </span>
-            <h2 className="mt-2 text-xl font-bold tracking-tight text-ink">{student.currentFocus}</h2>
+            <h2 className="mt-2 text-xl font-bold tracking-tight text-ink">{student.currentFocus || NO_RESULTS}</h2>
             {focusScore && <p className="text-sm text-ink-3">{focusScore.subject}</p>}
             {focusScore && (
               <div className="mt-4">
@@ -145,7 +146,7 @@ export function StudentDashboard() {
           <div className="stagger grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             <StatCard size="sm" label="Practice completed" value={completed.length} icon={CheckCircle2} tone="good" hint="activities" />
             <StatCard size="sm" label="Questions answered" value={questionsAnswered} icon={ListChecks} hint="so far" />
-            <StatCard size="sm" label="Average score" value={`${student.average}%`} icon={TrendingUp} tone="accent" hint="recent work" />
+            <StatCard size="sm" label="Average score" value={averageLabel(student)} icon={TrendingUp} tone="accent" hint={hasResults(student) ? 'recent work' : 'nothing marked yet'} />
             <StatCard size="sm" label="Time practising" value={`${minutes} min`} icon={Timer} tone="warn" hint="estimated" />
           </div>
         </section>

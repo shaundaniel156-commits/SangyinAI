@@ -8,6 +8,7 @@ import { SelectField } from '../../components/ui/Field'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { SegmentedControl } from '../../components/ui/Tabs'
+import { useLiveData } from '../../context/LiveDataContext'
 import { useToast } from '../../context/ToastContext'
 import { CLASSES } from '../../data/classes'
 import { CURRICULUM_FRAMEWORKS, FRAMEWORK_LABEL } from '../../data/curriculum'
@@ -22,6 +23,8 @@ const INITIAL_CLASS_FRAMEWORKS = Object.fromEntries(CLASSES.map((c) => [c.id, c.
 
 export function AcademicStructurePage() {
   const { notify } = useToast()
+  // In the lists below: they are worked out again each time the data is reloaded.
+  const { version } = useLiveData()
   const [schoolFramework, setSchoolFramework] = useState<CurriculumFramework>(SCHOOL.primaryFramework)
   const [classFrameworks, setClassFrameworks] = useState(INITIAL_CLASS_FRAMEWORKS)
 
@@ -29,7 +32,8 @@ export function AcademicStructurePage() {
     const map = new Map<string, typeof CLASSES>()
     for (const c of CLASSES) map.set(c.level, [...(map.get(c.level) ?? []), c])
     return [...map.entries()]
-  }, [])
+    // `version` is here on purpose: the data lists are refilled in place on a reload, so nothing else changes.
+  }, [version])
 
   const dirty =
     schoolFramework !== SCHOOL.primaryFramework || CLASSES.some((c) => classFrameworks[c.id] !== c.framework)

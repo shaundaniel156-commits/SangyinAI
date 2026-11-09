@@ -16,7 +16,8 @@ import { ROLE_USERS } from '../../../data/users'
 import { FrameworkBadge } from '../../../components/domain/FrameworkBadge'
 import { CURRICULUM_DISCLAIMER } from '../../../data/curriculum'
 import { DIFFICULTY_LABEL, curriculumRefsFor, extraQuestion, replacementQuestion, studentsWithGaps } from '../../../lib/aiAssessment'
-import { formatDate } from '../../../lib/format'
+import { averageLabel } from '../../../lib/competency'
+import { formatDate, formatDue } from '../../../lib/format'
 import type { AiAssessment, Student } from '../../../types'
 import { QuestionItem } from './QuestionItem'
 import { StudentWorkModal } from './StudentWorkModal'
@@ -61,7 +62,9 @@ function Review({ assessment: a }: { assessment: AiAssessment }) {
   const candidates = a.oneAttempt ? getStudentsByClass(a.classId) : studentsWithGaps(a.classId, a.subject, a.competencies, true)
   const chosen = new Set(a.studentIds)
   const canAdd = extraQuestion(a.competencies, used) !== null
-  const ready = a.questions.length > 0 && a.studentIds.length > 0 && a.title.trim().length > 0
+  // Students and parents are shown when it is due, so it can't be sent without a date.
+  const hasDueDate = formatDate(a.dueDate) !== ''
+  const ready = a.questions.length > 0 && a.studentIds.length > 0 && a.title.trim().length > 0 && hasDueDate
 
   const setQuestions = (questions: AiAssessment['questions']) => update(a.id, { questions })
 
@@ -88,7 +91,7 @@ function Review({ assessment: a }: { assessment: AiAssessment }) {
           <CheckCircle2 className="mt-0.5 size-5 shrink-0" aria-hidden />
           <p>
             Sent to {a.studentIds.length} students{a.shareWithParents && ' and their parents'}. Students will find it under{' '}
-            <span className="font-semibold">Practice → From your teacher</span>, due {formatDate(a.dueDate)}.
+            <span className="font-semibold">Practice → From your teacher</span>. {formatDue(a.dueDate)}.
           </p>
         </div>
       )}
@@ -147,7 +150,11 @@ function Review({ assessment: a }: { assessment: AiAssessment }) {
                 Discard draft
               </Button>
               <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
-                <span className="text-xs text-ink-3 sm:mr-2">Changes save automatically</span>
+                {hasDueDate ? (
+                  <span className="text-xs text-ink-3 sm:mr-2">Changes save automatically</span>
+                ) : (
+                  <span role="status" className="text-xs font-medium text-bad-ink sm:mr-2">Choose a due date before you send it</span>
+                )}
                 <Button size="lg" disabled={!ready} icon={<SendHorizontal className="size-4" aria-hidden />} onClick={() => setConfirmSend(true)}>
                   Approve & send to {a.studentIds.length} student{a.studentIds.length === 1 ? '' : 's'}
                 </Button>
@@ -222,14 +229,21 @@ function Review({ assessment: a }: { assessment: AiAssessment }) {
               {draft ? (
                 <>
                   <TextField label="Title" value={a.title} onChange={(e) => update(a.id, { title: e.target.value })} />
-                  <TextField label="Due date" type="date" value={a.dueDate} onChange={(e) => update(a.id, { dueDate: e.target.value })} />
+                  <TextField
+                    label="Due date"
+                    type="date"
+                    required
+                    value={a.dueDate}
+                    onChange={(e) => update(a.id, { dueDate: e.target.value })}
+                    hint={hasDueDate ? undefined : <span className="text-bad-ink">A due date is needed before this can be sent.</span>}
+                  />
                   <TextArea label="Message to students" rows={4} value={a.messageToStudents} onChange={(e) => update(a.id, { messageToStudents: e.target.value })} />
                 </>
               ) : (
                 <dl className="space-y-3 text-sm">
                   <div>
                     <dt className="text-ink-3">Due</dt>
-                    <dd className="text-ink">{formatDate(a.dueDate)}</dd>
+                    <dd className="text-ink">{formatDate(a.dueDate) || 'No due date'}</dd>
                   </div>
                   <div>
                     <dt className="text-ink-3">Message</dt>
@@ -281,7 +295,7 @@ function Review({ assessment: a }: { assessment: AiAssessment }) {
                           </StatusBadge>
                         </span>
                       ) : (
-                        <span className="tabular text-xs text-ink-3">{draft ? `${s.average}%` : 'Not started'}</span>
+                        <span className="tabular text-xs text-ink-3">{draft ? averageLabel(s) : 'Not started'}</span>
                       )}
                     </label>
                   </li>

@@ -17,13 +17,14 @@ const NotificationsContext = createContext<NotificationsValue | null>(null)
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
   const { role } = useSession()
-  const { live } = useLiveData()
+  const { live, version } = useLiveData()
   const [readIds, setReadIds] = useState<Set<string>>(() => new Set(NOTIFICATIONS.filter((n) => n.read).map((n) => n.id)))
 
   const items = useMemo(
     // Notifications from the backend are already the signed-in user's own.
-    () => NOTIFICATIONS.filter((n) => live || n.roles.includes(role)).map((n) => ({ ...n, read: readIds.has(n.id) })),
-    [role, live, readIds],
+    // `version` is here on purpose: NOTIFICATIONS is refilled in place on a reload, so nothing else changes.
+    () => NOTIFICATIONS.filter((n) => live || n.roles.includes(role)).map((n) => ({ ...n, read: n.read || readIds.has(n.id) })),
+    [role, live, readIds, version],
   )
 
   const markRead = useCallback((id: string) => {

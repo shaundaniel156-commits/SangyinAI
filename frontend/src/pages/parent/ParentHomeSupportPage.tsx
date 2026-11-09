@@ -3,6 +3,7 @@ import { Button } from '../../components/ui/Button'
 import { Card, CardBody, CardHeader } from '../../components/ui/Card'
 import { DemoNotice } from '../../components/ui/DemoNotice'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { NO_RESULTS } from '../../lib/competency'
 import { formatDate } from '../../lib/format'
 import { ChildSwitcher } from './components/ChildSwitcher'
 import { getChildSummary } from './components/childSummary'
@@ -14,7 +15,7 @@ export function ParentHomeSupportPage() {
   const today = formatDate(new Date().toISOString())
   const tip = summary.tips[0]
   // Kept within a single 160-character SMS for low-cost delivery.
-  const sms = `Sangyin AI: ${child.name} is working on ${summary.focus}.${tip ? ` Tip: ${tip.title}, about ${tip.minutes} min a day.` : ''} Reply STOP to opt out.`.slice(0, 160)
+  const sms = `Sangyin AI: ${summary.focus ? `${child.name} is working on ${summary.focus}.` : `No results are recorded for ${child.name} yet.`}${tip ? ` Tip: ${tip.title}, about ${tip.minutes} min a day.` : ''} Reply STOP to opt out.`.slice(0, 160)
 
   return (
     <>
@@ -46,7 +47,7 @@ export function ParentHomeSupportPage() {
             <CardBody className="space-y-5">
               <div>
                 <p className="text-sm text-ink-3">Current Learning Focus</p>
-                <p className="text-base font-semibold text-ink">{summary.focus}</p>
+                <p className="text-base font-semibold text-ink">{summary.focus || NO_RESULTS}</p>
               </div>
 
               <div>

@@ -1,6 +1,7 @@
 import { Avatar } from '../../../components/ui/Avatar'
 import { getClass } from '../../../data/classes'
 import { cn } from '../../../lib/cn'
+import { NO_RESULTS, hasResults } from '../../../lib/competency'
 import type { Student } from '../../../types'
 
 interface ChildPickerProps {
@@ -35,8 +36,14 @@ export function ChildPicker({ childList, value, onChange }: ChildPickerProps) {
               <span className="block truncate text-xs text-white/60">{getClass(c.classId)?.name}</span>
             </span>
             <span className="text-right">
-              <span className="tabular block text-lg font-bold text-white">{c.average}%</span>
-              <span className="block text-[11px] text-white/55">overall</span>
+              {hasResults(c) ? (
+                <>
+                  <span className="tabular block text-lg font-bold text-white">{c.average}%</span>
+                  <span className="block text-[11px] text-white/55">overall</span>
+                </>
+              ) : (
+                <span className="block text-xs text-white/60">{NO_RESULTS}</span>
+              )}
             </span>
           </button>
         )

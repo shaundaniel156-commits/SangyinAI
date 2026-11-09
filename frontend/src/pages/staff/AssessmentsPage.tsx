@@ -11,6 +11,7 @@ import { PageHeader } from '../../components/ui/PageHeader'
 import { ProgressBar } from '../../components/ui/ProgressBar'
 import { SearchBar } from '../../components/ui/SearchBar'
 import { Tabs } from '../../components/ui/Tabs'
+import { useLiveData } from '../../context/LiveDataContext'
 import { useSession } from '../../context/SessionContext'
 import { getClass } from '../../data/classes'
 import { assessmentsInScope, classesInScope } from '../../data/selectors'
@@ -27,6 +28,8 @@ export function AssessmentsPage() {
   const [query, setQuery] = useState('')
   const [classId, setClassId] = useState('all')
   const [type, setType] = useState('all')
+  // In the list below: it is worked out again each time the data is reloaded.
+  const { version } = useLiveData()
 
   const all = assessmentsInScope(role)
   const count = (s: AssessmentStatus) => all.filter((a) => a.status === s).length
@@ -41,7 +44,8 @@ export function AssessmentsPage() {
             a.title.toLowerCase().includes(query.trim().toLowerCase()),
         )
         .sort((a, b) => b.date.localeCompare(a.date)),
-    [all, tab, classId, type, query],
+    // `version` is here on purpose: the data lists are refilled in place on a reload, so nothing else changes.
+    [all, tab, classId, type, query, version],
   )
 
   return (

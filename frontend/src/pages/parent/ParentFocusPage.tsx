@@ -4,6 +4,7 @@ import { Card, CardBody, CardHeader } from '../../components/ui/Card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { StatusBadge, type Tone } from '../../components/ui/StatusBadge'
+import { NO_RESULTS } from '../../lib/competency'
 import { PRACTICE_ACTIVITIES } from '../../data/practice'
 import type { PracticeStatus } from '../../types'
 import { ChildSwitcher } from './components/ChildSwitcher'
@@ -39,10 +40,16 @@ export function ParentFocusPage() {
             </span>
             <div className="min-w-0">
               <p className="text-sm text-ink-3">Current Learning Focus</p>
-              <p className="text-xl font-semibold text-ink">{summary.focus}</p>
+              <p className="text-xl font-semibold text-ink">{summary.focus || NO_RESULTS}</p>
               <p className="mt-2 text-sm text-ink-2">
-                Recent classwork shows that a little more practice with {summary.focus.toLowerCase()} will help. Your child’s teacher is
-                guiding this work in class, and short practice activities are set along the way.
+                {summary.focus ? (
+                  <>
+                    Recent classwork shows that a little more practice with {summary.focus.toLowerCase()} will help. Your child’s teacher is
+                    guiding this work in class, and short practice activities are set along the way.
+                  </>
+                ) : (
+                  <>The school has not recorded any results for your child yet. The topic to work on will show here once it has.</>
+                )}
               </p>
             </div>
           </div>

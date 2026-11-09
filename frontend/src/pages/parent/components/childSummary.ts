@@ -1,6 +1,6 @@
 import { getClass } from '../../../data/classes'
 import { getGuidanceForStudent } from '../../../data/guidance'
-import { levelFromScore } from '../../../lib/competency'
+import { hasResults, levelFromScore } from '../../../lib/competency'
 import type { CompetencyScore, Student } from '../../../types'
 
 export interface HomeTip {
@@ -26,8 +26,10 @@ export function getChildSummary(child: Student) {
 
   return {
     className: getClass(child.classId)?.name ?? 'Class not set',
-    overallLevel: levelFromScore(child.average),
-    progressWords: trendWords(child.trend),
+    // null: nothing has been assessed yet, so there is no level to show (not "needs more practice").
+    overallLevel: hasResults(child) ? levelFromScore(child.average) : null,
+    // '' when there are no results: there is no term to compare with.
+    progressWords: hasResults(child) ? trendWords(child.trend) : '',
     focus: child.currentFocus,
     strengths,
     needsPractice,

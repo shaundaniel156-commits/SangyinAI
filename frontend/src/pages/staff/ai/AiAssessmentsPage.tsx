@@ -9,7 +9,7 @@ import { StatusBadge } from '../../../components/ui/StatusBadge'
 import { Tabs } from '../../../components/ui/Tabs'
 import { useAiAssessments } from '../../../context/AiAssessmentsContext'
 import { getClass } from '../../../data/classes'
-import { formatDate } from '../../../lib/format'
+import { formatDate, formatDue } from '../../../lib/format'
 import type { AiAssessmentStatus } from '../../../types'
 import { WorkflowSteps } from './WorkflowSteps'
 
@@ -74,7 +74,7 @@ export function AiAssessmentsPage() {
                   <span className="hidden text-right sm:block">
                     {a.status === 'draft' ? <StatusBadge tone="warn">Needs review</StatusBadge> : <StatusBadge tone="good">Sent</StatusBadge>}
                     <span className="mt-1 block text-xs text-ink-3">
-                      {a.status === 'draft' ? `Drafted ${formatDate(a.createdOn)}` : `Due ${formatDate(a.dueDate)}`}
+                      {a.status === 'draft' ? `Drafted ${formatDate(a.createdOn)}` : formatDue(a.dueDate)}
                     </span>
                   </span>
                   <ChevronRight className="size-4 shrink-0 text-ink-3" aria-hidden />

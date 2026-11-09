@@ -24,7 +24,7 @@ export const DraftQuestionSchema = z.object({
   difficulty: z.enum(['foundation', 'core', 'stretch']),
   prompt: z.string(),
   options: z.array(z.string()).describe('Exactly 4 options for multiple_choice; an empty list otherwise'),
-  answer: z.string().describe('For multiple_choice, copy the correct option exactly. For written_work, the model answer with the working or points a marker should look for'),
+  answer: z.string().describe('For multiple_choice, copy the correct option exactly. For short_answer, the bare value with no unit or currency word (e.g. "15000", "3/4", "went"); separate alternative right answers with " / ". For written_work, the model answer with the working or points a marker should look for'),
   explanation: z.string(),
 })
  

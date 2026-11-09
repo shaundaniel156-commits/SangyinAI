@@ -63,6 +63,7 @@ export function toStudent(s: StudentRow) {
     classId: s.classId,
     framework: s.class.framework,
     subjects: s.class.subjects,
+    // 0 when nothing has been assessed yet: the frontend shows "No results yet" (it has no competencies either).
     average: Math.round(mean(competencies.map((c) => c.score))),
     trend: s.trend,
     needsSupport: competencies.some((c) => c.level === 'needs_support'),
@@ -101,7 +102,8 @@ export function toSchoolClass(c: ClassRow) {
     teacherName: c.teacher?.name ?? '',
     subjects: c.subjects,
     studentCount: students.length,
-    average: Math.round(mean(students.map((s) => s.average))),
+    // Learners with no results yet are left out: they have no average, which is not the same as 0%.
+    average: Math.round(mean(students.filter((s) => s.competencies.length).map((s) => s.average))),
     trend: c.trend,
     ...(c.curriculumLevelId ? { curriculumLevelId: c.curriculumLevelId } : {}),
     // The four gaps affecting most students; ties in catalogue order.

@@ -1,6 +1,7 @@
 import { ChevronRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { getClass } from '../../data/classes'
+import { NO_RESULTS, hasResults } from '../../lib/competency'
 import type { Student } from '../../types'
 import { Avatar } from '../ui/Avatar'
 import { StatusBadge } from '../ui/StatusBadge'
@@ -14,12 +15,16 @@ export function StudentCard({ student, showClass = true }: { student: Student; s
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-ink">{student.name}</p>
         <p className="truncate text-sm text-ink-3">
-          {showClass && `${cls?.name} · `}Focus: {student.currentFocus}
+          {showClass && `${cls?.name} · `}Focus: {student.currentFocus || 'not set yet'}
         </p>
       </div>
-      <StatusBadge tone={student.average >= 70 ? 'good' : student.average >= 50 ? 'warn' : 'bad'} className="tabular">
-        {student.average}% avg
-      </StatusBadge>
+      {hasResults(student) ? (
+        <StatusBadge tone={student.average >= 70 ? 'good' : student.average >= 50 ? 'warn' : 'bad'} className="tabular">
+          {student.average}% avg
+        </StatusBadge>
+      ) : (
+        <StatusBadge tone="neutral">{NO_RESULTS}</StatusBadge>
+      )}
       <ChevronRight className="size-4 shrink-0 text-ink-3 group-hover:text-ink" aria-hidden />
     </Link>
   )

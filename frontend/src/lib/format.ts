@@ -1,12 +1,24 @@
 const dateFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 const shortDateFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' })
 
-export function formatDate(iso: string): string {
-  return dateFmt.format(new Date(iso))
+// A missing date, or one that can't be read, gives '' instead of an error, so it never breaks a page.
+function readable(fmt: Intl.DateTimeFormat, iso: string | null | undefined): string {
+  const date = new Date(iso || NaN)
+  return Number.isNaN(date.getTime()) ? '' : fmt.format(date)
 }
 
-export function formatShortDate(iso: string): string {
-  return shortDateFmt.format(new Date(iso))
+export function formatDate(iso: string | null | undefined): string {
+  return readable(dateFmt, iso)
+}
+
+export function formatShortDate(iso: string | null | undefined): string {
+  return readable(shortDateFmt, iso)
+}
+
+/** "Due 12 Nov 2026" ("Due 12 Nov" when short), or "No due date" when none was set. */
+export function formatDue(iso: string | null | undefined, short = false): string {
+  const date = short ? formatShortDate(iso) : formatDate(iso)
+  return date ? `Due ${date}` : 'No due date'
 }
 
 export function formatPercent(value: number): string {

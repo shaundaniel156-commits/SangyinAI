@@ -60,13 +60,27 @@ function load<T>(key: string, fallback: T): T {
 }
 
 export function AiAssessmentsProvider({ children }: { children: ReactNode }) {
-  const { live } = useLiveData()
+  const { live, version } = useLiveData()
   const { notify } = useToast()
   const [items, setItems] = useState<AiAssessment[]>(() => (live ? [...LIVE_AI_ASSESSMENTS] : load(ITEMS_KEY, [])))
   const [attempts, setAttempts] = useState<Record<string, AttemptResult>>(() =>
     live ? Object.fromEntries(LIVE_AI_ASSESSMENTS.filter((a) => a.attempt).map((a) => [a.id, a.attempt!])) : load(ATTEMPTS_KEY, {}),
   )
   const pending = useRef(new Map<string, { patch: Partial<AiAssessment>; timer: ReturnType<typeof setTimeout> }>())
+  // Drafts edited here since the data was last reloaded.
+  const edited = useRef(new Set<string>())
+
+  // The data was reloaded (LiveDataContext): take the server's list. A draft edited here meanwhile keeps this
+  // page's copy, which may be newer than the one the reload read; a result just handed in is kept too.
+  const loaded = useRef(version)
+  useEffect(() => {
+    if (!live || loaded.current === version) return
+    loaded.current = version
+    const mine = edited.current
+    edited.current = new Set()
+    setItems((list) => LIVE_AI_ASSESSMENTS.map((a) => (mine.has(a.id) ? (list.find((x) => x.id === a.id) ?? a) : a)))
+    setAttempts((a) => ({ ...a, ...Object.fromEntries(LIVE_AI_ASSESSMENTS.filter((x) => x.attempt).map((x) => [x.id, x.attempt!])) }))
+  }, [live, version])
 
   useEffect(() => { if (!live) writeStorage(ITEMS_KEY, JSON.stringify(items)) }, [items, live])
   useEffect(() => { if (!live) writeStorage(ATTEMPTS_KEY, JSON.stringify(attempts)) }, [attempts, live])
@@ -97,6 +111,7 @@ export function AiAssessmentsProvider({ children }: { children: ReactNode }) {
   const update = useCallback((id: string, patch: Partial<AiAssessment>) => {
     setItems((list) => list.map((a) => (a.id === id ? { ...a, ...patch } : a)))
     if (!live) return
+    edited.current.add(id)
     // Typing calls this on every key; save once the teacher pauses.
     const prev = pending.current.get(id)
     if (prev) clearTimeout(prev.timer)

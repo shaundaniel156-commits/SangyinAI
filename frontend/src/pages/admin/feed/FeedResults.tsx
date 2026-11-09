@@ -24,7 +24,8 @@ export function FeedResults({ result, onDismiss }: { result: CommitResult; onDis
         </div>
       )}
       {result.accounts && result.accounts.length > 0 && (
-        <div className="rounded-lg border border-warn/40 bg-warn-soft p-3">
+        // data-keep: while these passwords show, the data is not reloaded on coming back to the tab (LiveDataContext).
+        <div data-keep className="rounded-lg border border-warn/40 bg-warn-soft p-3">
           <p className="flex items-center gap-2 font-medium text-warn-ink">
             <KeyRound className="size-4" aria-hidden />
             New accounts — one-time passwords

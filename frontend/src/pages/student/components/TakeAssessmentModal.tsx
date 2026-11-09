@@ -6,19 +6,12 @@ import { Modal } from '../../../components/ui/Modal'
 import { useAiAssessments, type MarkedAttempt, type WorkUpload } from '../../../context/AiAssessmentsContext'
 import { useLiveData } from '../../../context/LiveDataContext'
 import { cn } from '../../../lib/cn'
+import { isCorrect } from '../../../lib/marking'
 import { readBase64, shrinkPhoto } from '../../../lib/photo'
 import type { AiAssessment, AiQuestion } from '../../../types'
 
-const normalise = (s: string) => s.toLowerCase().replace(/[\s,.]/g, '')
 // Photos of written work are shrunk to this before upload: readable, and small enough to send several at once.
 const WORK_PHOTO_PX = 1600
-
-/** Open-ended items ("Answers will vary") count as done when attempted; the teacher reads them. */
-function isCorrect(q: AiQuestion, given: string): boolean {
-  if (!given.trim()) return false
-  if (q.answer === 'Answers will vary') return true
-  return q.answer.split('/').some((a) => normalise(a) === normalise(given)) || normalise(q.answer) === normalise(given)
-}
 
 /** A photo the student picked for a written-work question, with a preview address for this page. */
 interface PickedPhoto {
@@ -40,6 +33,8 @@ export function TakeAssessmentModal({ assessment: a, onClose }: { assessment: Ai
   const [marked, setMarked] = useState<MarkedAttempt | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // "Hand in" was pressed on a once-only assessment and the student is being asked if they are sure.
+  const [confirming, setConfirming] = useState(false)
 
   if (!a) return null
 
@@ -51,11 +46,14 @@ export function TakeAssessmentModal({ assessment: a, onClose }: { assessment: Ai
     const m = marked?.questions.find((x) => x.id === q.id)
     if (m) return { ...q, answer: m.answer, explanation: m.explanation, correct: m.correct, feedback: m.feedback, pending: m.pending ?? false }
     const given = givenFor(q)
-    return { ...q, correct: q.type === 'written_work' ? false : isCorrect(q, given), feedback: undefined, pending: q.type === 'written_work' && given !== '' }
+    return { ...q, correct: q.type === 'written_work' ? false : isCorrect(q.answer, given, q.type === 'multiple_choice' ? q.options : null), feedback: undefined, pending: q.type === 'written_work' && given !== '' }
   })
   const score = marked ? marked.score : questions.filter((q) => q.correct).length
   const pending = questions.filter((q) => q.pending).length
   const answered = a.questions.filter((q) => givenFor(q).trim()).length
+  const unanswered = a.questions.length - answered
+  // A formal assessment is done once: the student is told so, and asked to confirm before handing in.
+  const once = a.oneAttempt === true
 
   const clearPhotos = () => {
     for (const p of Object.values(photos)) URL.revokeObjectURL(p.url)
@@ -70,6 +68,7 @@ export function TakeAssessmentModal({ assessment: a, onClose }: { assessment: Ai
     setChecked(false)
     setMarked(null)
     setError(null)
+    setConfirming(false)
     onClose()
     if (saved) void refresh()
   }
@@ -89,6 +88,7 @@ export function TakeAssessmentModal({ assessment: a, onClose }: { assessment: Ai
   }
 
   const check = async () => {
+    setConfirming(false)
     setBusy(true)
     setError(null)
     try {
@@ -118,6 +118,29 @@ export function TakeAssessmentModal({ assessment: a, onClose }: { assessment: Ai
       footer={
         checked ? (
           <Button onClick={close}>Done</Button>
+        ) : confirming ? (
+          <>
+            <p role="alert" className="w-full text-sm text-ink">
+              {unanswered > 0 ? (
+                <>
+                  <span className="font-semibold">
+                    You have not answered {unanswered} question{unanswered === 1 ? '' : 's'}.
+                  </span>{' '}
+                  If you hand in now, {unanswered === 1 ? 'it' : 'they'} will be marked wrong. You cannot change your answers after you hand in.
+                </>
+              ) : (
+                <>
+                  <span className="font-semibold">Hand in your answers now?</span> You cannot change them after you hand in.
+                </>
+              )}
+            </p>
+            <Button variant="secondary" disabled={busy} onClick={() => setConfirming(false)}>
+              Go back to my answers
+            </Button>
+            <Button disabled={busy} onClick={check}>
+              {busy ? 'Handing in…' : 'Yes, hand in'}
+            </Button>
+          </>
         ) : (
           <>
             <span className="mr-auto self-center text-sm text-ink-3">
@@ -126,13 +149,20 @@ export function TakeAssessmentModal({ assessment: a, onClose }: { assessment: Ai
             <Button variant="secondary" onClick={close}>
               Finish later
             </Button>
-            <Button disabled={answered === 0 || busy} onClick={check}>
-              {busy ? (Object.keys(photos).length ? 'Sending your work…' : 'Checking…') : 'Check my answers'}
+            {/* An assessment done once is handed in, after the student confirms; practice is checked straight away. */}
+            <Button disabled={answered === 0 || busy} onClick={once ? () => setConfirming(true) : check}>
+              {busy ? (Object.keys(photos).length ? 'Sending your work…' : once ? 'Handing in…' : 'Checking…') : once ? 'Hand in' : 'Check my answers'}
             </Button>
           </>
         )
       }
     >
+      {once && !checked && (
+        <div role="note" className="mb-5 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-warn-ink">
+          <p className="text-base font-semibold">You can do this assessment only once.</p>
+          <p className="mt-0.5">Answer every question and check your answers. Then press Hand in. After you hand in, you cannot change your answers or try again.</p>
+        </div>
+      )}
       {checked && (
         <div role="status" className="mb-5 rounded-xl bg-brand-soft px-4 py-3 text-sm text-brand-ink">
           <p className="text-base font-semibold">

@@ -4,7 +4,7 @@ import { Button, ButtonLink } from '../../../components/ui/Button'
 import { StatusBadge } from '../../../components/ui/StatusBadge'
 import { useAiAssessments } from '../../../context/AiAssessmentsContext'
 import { ROLE_USERS } from '../../../data/users'
-import { formatShortDate } from '../../../lib/format'
+import { formatDue } from '../../../lib/format'
 import type { AiAssessment } from '../../../types'
 import { TakeAssessmentModal } from './TakeAssessmentModal'
 
@@ -52,7 +52,7 @@ export function FromTeacherSection() {
                 </span>
                 <span className="inline-flex items-center gap-1">
                   <CalendarClock className="size-3.5" aria-hidden />
-                  Due {formatShortDate(a.dueDate)}
+                  {formatDue(a.dueDate, true)}
                 </span>
               </p>
               <div className="mt-4">
@@ -92,7 +92,7 @@ export function TeacherAssessmentBanner() {
             New from your teacher{pending.length > 1 ? ` (${pending.length})` : ''}: {first.title}
           </p>
           <p className="text-sm text-ink-2">
-            {first.questions.length} questions · due {formatShortDate(first.dueDate)}
+            {first.questions.length} questions · {formatDue(first.dueDate, true)}
           </p>
         </div>
       </div>

@@ -94,7 +94,7 @@ export async function practiceRoutes(app: FastifyInstance) {
     const answers = { ...parsed.data.answers, ...Object.fromEntries(uploaded.map((q) => [q.id, 'photo'])) }
     const marked = questions.map((q) => {
       const given = answers[q.id] ?? ''
-      if (q.type !== 'written_work') return { id: q.id, given, correct: isCorrect(q.answer, given), answer: q.answer, explanation: q.explanation }
+      if (q.type !== 'written_work') return { id: q.id, given, correct: isCorrect(q.answer, given, q.type === 'multiple_choice' ? q.options : null), answer: q.answer, explanation: q.explanation }
       const mark = markOf.get(q.id)
       return { id: q.id, given, correct: mark?.correct ?? false, answer: q.answer, explanation: q.explanation, ...(mark ? { feedback: mark.feedback } : {}), pending: Boolean(work[q.id]) && !mark }
     })

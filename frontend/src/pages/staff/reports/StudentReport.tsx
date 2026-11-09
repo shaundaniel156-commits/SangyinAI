@@ -1,6 +1,7 @@
 import { LevelBadge, StatusBadge } from '../../../components/ui/StatusBadge'
 import { FRAMEWORK_LABEL } from '../../../data/curriculum'
 import { getStudentAssessmentHistory } from '../../../data/assessments'
+import { averageLabel } from '../../../lib/competency'
 import { formatDate, formatSignedPoints } from '../../../lib/format'
 import type { SchoolClass, Student } from '../../../types'
 import { DocSection, DocStats, DocTable } from './ReportDocument'
@@ -20,7 +21,7 @@ export function StudentReport({ student, cls, filters }: { student: Student; cls
       </p>
       <DocStats
         items={[
-          { label: 'Overall average', value: `${student.average}%`, hint: 'Recent assessments' },
+          { label: 'Overall average', value: averageLabel(student), hint: 'Recent assessments' },
           { label: 'Change vs last term', value: formatSignedPoints(student.trend) },
           { label: 'Status', value: student.needsSupport ? 'Needs support' : 'On track' },
           { label: 'Results in period', value: history.filter((h) => h.percent !== null).length },

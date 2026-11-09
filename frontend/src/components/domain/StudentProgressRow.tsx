@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { getClass } from '../../data/classes'
+import { NO_RESULTS, hasResults } from '../../lib/competency'
 import type { Student } from '../../types'
 import { Avatar } from '../ui/Avatar'
 import { ProgressBar, toneForScore } from '../ui/ProgressBar'
@@ -26,12 +27,20 @@ export function StudentProgressRow({ student, action }: { student: Student; acti
         {focus && <span className="block text-xs text-ink-3">{focus.subject}</span>}
       </span>
       <span className="col-span-2 flex items-center gap-2 md:col-span-1">
-        <ProgressBar value={student.average} tone={toneForScore(student.average)} size="sm" className="flex-1" srLabel={`${student.name} average`} />
-        <span className="tabular w-9 text-right text-xs font-semibold text-ink">{student.average}%</span>
+        {hasResults(student) ? (
+          <>
+            <ProgressBar value={student.average} tone={toneForScore(student.average)} size="sm" className="flex-1" srLabel={`${student.name} average`} />
+            <span className="tabular w-9 text-right text-xs font-semibold text-ink">{student.average}%</span>
+          </>
+        ) : (
+          <span className="text-xs text-ink-3">{NO_RESULTS}</span>
+        )}
       </span>
       <span>
         {student.needsSupport ? (
           <StatusBadge tone="bad">Needs support</StatusBadge>
+        ) : !hasResults(student) ? (
+          <StatusBadge tone="neutral">{NO_RESULTS}</StatusBadge>
         ) : student.average >= 70 ? (
           <StatusBadge tone="good">On track</StatusBadge>
         ) : (

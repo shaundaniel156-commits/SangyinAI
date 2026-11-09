@@ -9,7 +9,7 @@ import { authConfigured, requireUser, signToken } from './session.ts'
 const LoginSchema = z.object({
   email: z.string().trim().min(1).max(200),
   password: z.string().min(1).max(200),
-  // The school level and curriculum picked before signing in. Only an administrator's choice is saved to the school.
+  // The school level and curriculum picked before signing in. Saved only for a school's very first administrator sign-in (see below).
   school: z.object({ type: z.enum(['primary', 'secondary']), framework: z.enum(['uganda', 'cambridge']) }).optional(),
 })
 
@@ -31,8 +31,16 @@ export async function authRoutes(app: FastifyInstance) {
     const ok = user?.passwordHash && user.status === 'active' && (await verify(user.passwordHash, parsed.data.password))
     if (!user || !ok) return reply.code(401).send({ error: 'Wrong email or password.' })
 
+    // The choice fills in a school that has never been set up, and only then: no administrator has signed in
+    // before, it has no classes, and its type and curriculum are still the starting ones. After that, signing in
+    // never changes them; the Manual feed's institution details do. (Checked before this sign-in is recorded.)
+    if (user.role === 'admin' && parsed.data.school) {
+      await prisma.school.updateMany({
+        where: { id: user.schoolId, type: 'primary', framework: 'uganda', classes: { none: {} }, users: { none: { role: 'admin', lastActiveAt: { not: null } } } },
+        data: parsed.data.school,
+      })
+    }
     await prisma.user.update({ where: { id: user.id }, data: { lastActiveAt: new Date() } })
-    if (user.role === 'admin' && parsed.data.school) await prisma.school.update({ where: { id: user.schoolId }, data: parsed.data.school })
     return {
       token: signToken(user),
       user: { id: user.id, name: user.name, email: user.email, role: user.role },

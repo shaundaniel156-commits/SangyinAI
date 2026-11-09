@@ -16,6 +16,7 @@ import { ACCOUNT_STATUS_LABEL, AccountStatusBadge } from './components/AccountSt
 import { DeleteUserModal } from './components/DeleteUserModal'
 import { InviteModal } from './components/InviteModal'
 import { SetPasswordModal } from './components/SetPasswordModal'
+import { useLiveData } from '../../context/LiveDataContext'
 import { useSession } from '../../context/SessionContext'
 
 const ROLES: Role[] = ['teacher', 'admin', 'parent', 'student']
@@ -28,6 +29,8 @@ export function UsersPage() {
   const [toDelete, setToDelete] = useState<UserAccount | null>(null)
   const [toReset, setToReset] = useState<UserAccount | null>(null)
   const { user: me } = useSession()
+  // In the list below: it is worked out again each time the data is reloaded.
+  const { version } = useLiveData()
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -37,7 +40,8 @@ export function UsersPage() {
         (status === 'all' || u.status === status) &&
         (!q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)),
     )
-  }, [query, role, status])
+    // `version` is here on purpose: the data lists are refilled in place on a reload, so nothing else changes.
+  }, [query, role, status, version])
 
   const counts = ROLES.map((r) => ({ role: r, count: USER_ACCOUNTS.filter((u) => u.role === r).length }))
 

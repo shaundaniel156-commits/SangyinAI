@@ -1,7 +1,9 @@
 import { BarList } from '../../../components/charts/BarList'
 import { toneForScore } from '../../../components/ui/ProgressBar'
+import { classAverageLabel, classHasResults } from '../../../data/classes'
 import { FRAMEWORK_LABEL } from '../../../data/curriculum'
 import { SUBJECT_AVERAGES } from '../../../data/performance'
+import { NO_RESULTS } from '../../../lib/competency'
 import { formatSignedPoints } from '../../../lib/format'
 import type { Assessment, SchoolClass } from '../../../types'
 import { DocSection, DocStats, DocTable } from './ReportDocument'
@@ -22,15 +24,17 @@ export function SubjectPerformanceReport({ classes, assessments, filters }: Subj
   })
   const best = [...SUBJECT_AVERAGES].sort((a, b) => b.value - a.value)[0]
   const lowest = [...SUBJECT_AVERAGES].sort((a, b) => a.value - b.value)[0]
-  const pupils = classes.reduce((n, c) => n + c.studentCount, 0)
-  const meanClass = Math.round(classes.reduce((s, c) => s + c.average * c.studentCount, 0) / Math.max(pupils, 1))
+  // Classes with no results yet have no average, so they are left out.
+  const assessed = classes.filter((c) => classHasResults(c.id))
+  const pupils = assessed.reduce((n, c) => n + c.studentCount, 0)
+  const meanClass = Math.round(assessed.reduce((s, c) => s + c.average * c.studentCount, 0) / Math.max(pupils, 1))
 
   return (
     <>
       <DocStats
         items={[
           { label: 'Classes in report', value: classes.length },
-          { label: 'Average across classes', value: `${meanClass}%`, hint: 'Weighted by class size' },
+          { label: 'Average across classes', value: assessed.length ? `${meanClass}%` : NO_RESULTS, hint: 'Weighted by class size' },
           { label: 'Highest subject', value: best ? `${best.value}%` : '—', hint: best?.subject },
           { label: 'Lowest subject', value: lowest ? `${lowest.value}%` : '—', hint: lowest?.subject },
         ]}
@@ -60,7 +64,7 @@ export function SubjectPerformanceReport({ classes, assessments, filters }: Subj
             { header: 'Class', cell: (c) => <span className="font-medium">{c.name}</span> },
             { header: 'Framework', cell: (c) => <span className="text-ink-2">{FRAMEWORK_LABEL[c.framework]}</span> },
             { header: 'Students', align: 'right', cell: (c) => c.studentCount },
-            { header: 'Average', align: 'right', cell: (c) => `${c.average}%` },
+            { header: 'Average', align: 'right', cell: (c) => classAverageLabel(c) },
             { header: 'Change', align: 'right', cell: (c) => formatSignedPoints(c.trend) },
           ]}
         />

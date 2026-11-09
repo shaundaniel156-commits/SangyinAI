@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom'
+import { classHasResults } from '../../data/classes'
 import { getTeacher } from '../../data/teachers'
 import { getStudentsByClass } from '../../data/students'
+import { NO_RESULTS } from '../../lib/competency'
 import { formatSignedPoints } from '../../lib/format'
 import { cn } from '../../lib/cn'
 import type { SchoolClass } from '../../types'
@@ -35,8 +37,14 @@ export function ClassOverviewTable({ classes, showTeacher = false }: { classes: 
           header: 'Average',
           cell: (c) => (
             <div className="flex min-w-28 items-center gap-3">
-              <ProgressBar value={c.average} tone={toneForScore(c.average)} size="sm" className="flex-1" srLabel={`${c.name} average`} />
-              <span className="tabular w-9 text-right font-medium">{c.average}%</span>
+              {classHasResults(c.id) ? (
+                <>
+                  <ProgressBar value={c.average} tone={toneForScore(c.average)} size="sm" className="flex-1" srLabel={`${c.name} average`} />
+                  <span className="tabular w-9 text-right font-medium">{c.average}%</span>
+                </>
+              ) : (
+                <span className="text-ink-3">{NO_RESULTS}</span>
+              )}
             </div>
           ),
         },

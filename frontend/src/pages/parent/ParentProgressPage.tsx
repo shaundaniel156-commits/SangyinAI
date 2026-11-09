@@ -3,7 +3,8 @@ import { ChartContainer } from '../../components/charts/ChartContainer'
 import { LineChart } from '../../components/charts/LineChart'
 import { Card, CardBody, CardHeader } from '../../components/ui/Card'
 import { PageHeader } from '../../components/ui/PageHeader'
-import { LevelBadge } from '../../components/ui/StatusBadge'
+import { LevelBadge, StatusBadge } from '../../components/ui/StatusBadge'
+import { NO_RESULTS } from '../../lib/competency'
 import { ProgressBar } from '../../components/ui/ProgressBar'
 import { getStudentTrend } from '../../data/performance'
 import type { CompetencyScore, Subject } from '../../types'
@@ -35,8 +36,8 @@ export function ParentProgressPage() {
         actions={<ChildSwitcher childList={children} value={child.id} onChange={setChildId} />}
         meta={
           <>
-            <LevelBadge level={summary.overallLevel} friendly />
-            <span className="text-sm text-ink-2">{summary.progressWords}</span>
+            {summary.overallLevel ? <LevelBadge level={summary.overallLevel} friendly /> : <StatusBadge tone="neutral">{NO_RESULTS}</StatusBadge>}
+            {summary.progressWords && <span className="text-sm text-ink-2">{summary.progressWords}</span>}
           </>
         }
       />

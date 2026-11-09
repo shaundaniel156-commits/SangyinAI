@@ -9,11 +9,15 @@ import { useSession } from './SessionContext'
  * pages on top of it. If loading fails, it says so and offers to try again. After a change is saved,
  * refresh() reloads the data and redraws the pages. It also reloads when the user comes back to the tab after a
  * while, so work entered by others meanwhile (a student's practice, a colleague's marks) shows up.
+ *
+ * A reload redraws the pages where they are: an open window, the tab the user is on, what they have typed and
+ * any message on screen all stay. Pages read the loaded lists as they draw, so they show the new data; anything
+ * that keeps its own copy of loaded data (a useMemo, a context) must also depend on `version`.
  */
 // Data older than this is reloaded when the user returns to the tab.
 const STALE_MS = 60_000
 
-/** Reloading redraws the page, so it waits while the user is in the middle of something that would be lost. */
+/** The reload on coming back to the tab waits while the user is in the middle of something, so nothing moves under them. */
 function busyWithSomething(): boolean {
   if (document.querySelector('[role="dialog"], [data-keep]')) return true
   return [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('main input, main textarea')].some(
@@ -23,11 +27,16 @@ function busyWithSomething(): boolean {
 interface LiveDataValue {
   /** True when the pages show data loaded from the backend. */
   live: boolean
-  /** Reloads everything from the backend and redraws the pages. */
-  refresh: () => Promise<void>
+  /** Goes up by one each time the data has been reloaded. */
+  version: number
+  /**
+   * Reloads everything from the backend and redraws the pages where they are. With `restart`, every page is
+   * started afresh instead: for when the page on screen was opened before the change (leaving Manual feed).
+   */
+  refresh: (restart?: boolean) => Promise<void>
 }
 
-const LiveDataContext = createContext<LiveDataValue>({ live: false, refresh: async () => {} })
+const LiveDataContext = createContext<LiveDataValue>({ live: false, version: 0, refresh: async () => {} })
 
 export function LiveDataProvider({ children }: { children: ReactNode }) {
   const { role, signedIn, signOut } = useSession()
@@ -35,12 +44,13 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
   // The role to load as: the signed-in account's own role.
   const accountRole = getAuthProfile()?.role ?? role
   // `loadedFor` is the token whose data has finished loading (or failed to); a newer token means "loading".
-  const [state, setState] = useState<{ loadedFor: string | null; live: boolean; version: number }>({ loadedFor: null, live: false, version: 0 })
+  // `starts` goes up when the pages must be started afresh (see refresh).
+  const [state, setState] = useState<{ loadedFor: string | null; live: boolean; version: number; starts: number }>({ loadedFor: null, live: false, version: 0, starts: 0 })
   const wasLive = useRef(false)
   const loadedAt = useRef(0)
 
   const load = useCallback(
-    async (forToken: string) => {
+    async (forToken: string, restart = false) => {
       let live = false
       try {
         await loadLiveData(accountRole)
@@ -52,7 +62,7 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
         if (error instanceof ApiError && error.status === 401) signOut()
         console.warn('Could not load data from the server.', error)
       }
-      setState((s) => ({ loadedFor: forToken, live, version: s.version + 1 }))
+      setState((s) => ({ loadedFor: forToken, live, version: s.version + 1, starts: s.starts + (restart ? 1 : 0) }))
     },
     [accountRole, signOut],
   )
@@ -75,11 +85,12 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [token, load])
 
-  const refresh = useCallback(async () => {
-    if (token) await load(token)
+  const refresh = useCallback(async (restart = false) => {
+    if (token) await load(token, restart)
   }, [token, load])
   const live = Boolean(token) && state.live
-  const value = useMemo<LiveDataValue>(() => ({ live, refresh }), [live, refresh])
+  const version = state.version
+  const value = useMemo<LiveDataValue>(() => ({ live, version, refresh }), [live, version, refresh])
 
   if (token && state.loadedFor !== token) {
     return (
@@ -107,10 +118,10 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
       </div>
     )
   }
-  // A new key redraws every page with the freshly loaded data.
+  // The new `version` redraws the pages in place (App reads it); a new key starts every page afresh.
   return (
     <LiveDataContext.Provider value={value}>
-      <Fragment key={state.version}>{children}</Fragment>
+      <Fragment key={state.starts}>{children}</Fragment>
     </LiveDataContext.Provider>
   )
 }

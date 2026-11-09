@@ -70,7 +70,7 @@ export function StudentLearningPage() {
       <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader
-            title={`Current Focus: ${student.currentFocus}`}
+            title={student.currentFocus ? `Current Focus: ${student.currentFocus}` : 'Current Focus'}
             description="Work through these steps in order. Your teacher chose them for you."
             icon={<Target className="size-5" aria-hidden />}
           />

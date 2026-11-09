@@ -35,7 +35,7 @@ export async function recomputeMastery(studentIds: string[]): Promise<void> {
     prisma.diagnosticReport.findMany({ where: { studentId: { in: ids } } }),
     prisma.practiceAssignment.findMany({
       where: { studentId: { in: ids }, completedAt: { not: null } },
-      include: { aiAssessment: { select: { subject: true, questions: { select: { id: true, competency: true, type: true, answer: true } } } } },
+      include: { aiAssessment: { select: { subject: true, questions: { select: { id: true, competency: true, type: true, options: true, answer: true } } } } },
     }),
   ])
   // Marks on photos of written work, by practice copy. Read apart, so that trouble here (say, a database that has
@@ -75,7 +75,7 @@ export async function recomputeMastery(studentIds: string[]): Promise<void> {
         if (mark === null || mark === undefined) continue
         right = mark
       } else {
-        right = isCorrect(q.answer, answers[q.id] ?? '')
+        right = isCorrect(q.answer, answers[q.id] ?? '', q.type === 'multiple_choice' ? q.options : null)
       }
       const t = tally.get(q.competency) ?? { right: 0, total: 0 }
       t.total++

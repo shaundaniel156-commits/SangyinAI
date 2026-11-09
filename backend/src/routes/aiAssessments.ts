@@ -201,6 +201,8 @@ export async function aiAssessmentRoutes(app: FastifyInstance) {
     if (!item) return reply.code(404).send({ error: 'Assessment not found.' })
     if (item.status !== 'draft') return reply.code(409).send({ error: 'This assessment has already been sent.' })
     if (!item.studentIds.length) return reply.code(400).send({ error: 'Choose at least one student before sending.' })
+    // Students and parents are shown when it is due.
+    if (!item.dueDate || Number.isNaN(item.dueDate.getTime())) return reply.code(400).send({ error: 'Choose a due date before sending.' })
 
     const studentLogins = await prisma.student.findMany({ where: { id: { in: item.studentIds }, userId: { not: null } }, select: { userId: true } })
     const approved = { title: item.title, messageToStudents: item.messageToStudents, parentNote: item.parentNote ?? '', rationale: item.rationale, questions: item.questions.map(({ competency, type, difficulty, prompt, options, answer, explanation }) => ({ competency, type, difficulty, prompt, options, answer, explanation })) }

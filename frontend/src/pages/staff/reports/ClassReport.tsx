@@ -2,11 +2,11 @@ import { BarList } from '../../../components/charts/BarList'
 import { LineChart } from '../../../components/charts/LineChart'
 import { toneForScore } from '../../../components/ui/ProgressBar'
 import { getAssessmentsByClass } from '../../../data/assessments'
-import { getClassCompetencyAverages } from '../../../data/classes'
+import { classAverageLabel, getClassCompetencyAverages } from '../../../data/classes'
 import { FRAMEWORK_LABEL } from '../../../data/curriculum'
 import { getClassTrend } from '../../../data/performance'
 import { getStudentsByClass } from '../../../data/students'
-import { LEVEL_LABEL, levelFromScore } from '../../../lib/competency'
+import { LEVEL_LABEL, averageLabel, levelFromScore } from '../../../lib/competency'
 import { formatDate, formatSignedPoints } from '../../../lib/format'
 import type { SchoolClass } from '../../../types'
 import { DocSection, DocStats, DocTable } from './ReportDocument'
@@ -31,7 +31,7 @@ export function ClassReport({ cls, filters }: { cls: SchoolClass; filters: Repor
       <DocStats
         items={[
           { label: 'Students', value: students.length },
-          { label: 'Class average', value: `${cls.average}%` },
+          { label: 'Class average', value: classAverageLabel(cls) },
           { label: 'Change vs last term', value: formatSignedPoints(cls.trend) },
           { label: 'Needing support', value: needing.length },
         ]}
@@ -74,7 +74,7 @@ export function ClassReport({ cls, filters }: { cls: SchoolClass; filters: Repor
           columns={[
             { header: 'Student', cell: (s) => <span className="font-medium">{s.name}</span> },
             { header: 'Current focus', cell: (s) => <span className="text-ink-2">{s.currentFocus}</span> },
-            { header: 'Average', align: 'right', cell: (s) => `${s.average}%` },
+            { header: 'Average', align: 'right', cell: (s) => averageLabel(s) },
           ]}
         />
       </DocSection>

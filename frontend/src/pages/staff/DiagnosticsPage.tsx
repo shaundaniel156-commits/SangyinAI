@@ -11,6 +11,7 @@ import { FilterBar } from '../../components/ui/FilterBar'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { SearchBar } from '../../components/ui/SearchBar'
 import { StatusBadge } from '../../components/ui/StatusBadge'
+import { useLiveData } from '../../context/LiveDataContext'
 import { useSession } from '../../context/SessionContext'
 import { getClass } from '../../data/classes'
 import { classesInScope, diagnosticsInScope } from '../../data/selectors'
@@ -24,6 +25,8 @@ export function DiagnosticsPage() {
   const [classId, setClassId] = useState('all')
   const [level, setLevel] = useState('support')
   const [area, setArea] = useState('all')
+  // In the list below: it is worked out again each time the data is reloaded.
+  const { version } = useLiveData()
 
   const reports = diagnosticsInScope(role)
   const priority = [...reports].filter((r) => r.needsSupport.length >= 2).slice(0, 3)
@@ -38,7 +41,8 @@ export function DiagnosticsPage() {
           (s?.name.toLowerCase().includes(query.trim().toLowerCase()) ?? false)
         )
       }),
-    [reports, classId, level, area, query],
+    // `version` is here on purpose: the data lists are refilled in place on a reload, so nothing else changes.
+    [reports, classId, level, area, query, version],
   )
 
   return (

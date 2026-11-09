@@ -9,7 +9,8 @@ import { StatCard } from '../../components/ui/StatCard'
 import { useAiAssessments } from '../../context/AiAssessmentsContext'
 import { useSession } from '../../context/SessionContext'
 import { practiceStreakDays, recentAchievements } from '../../data/practice'
-import { formatDate } from '../../lib/format'
+import { NO_RESULTS, averageLabel, hasResults } from '../../lib/competency'
+import { formatDate, formatDue } from '../../lib/format'
 import { timeOfDayGreeting } from '../../lib/greeting'
 import { cn } from '../../lib/cn'
 import { ChildPicker } from './components/ChildPicker'
@@ -40,11 +41,11 @@ export function ParentDashboard() {
             <StatCard
               size="sm"
               label="Overall progress"
-              value={`${child.average}%`}
+              value={averageLabel(child)}
               icon={TrendingUp}
               tone="good"
               delta={child.trend !== 0 ? { value: `${Math.abs(child.trend)} pts`, direction: child.trend > 0 ? 'up' : 'down', good: child.trend > 0 } : undefined}
-              hint="vs last term"
+              hint={hasResults(child) ? 'vs last term' : 'nothing recorded yet'}
               to="/parent/progress"
             />
             <StatCard size="sm" label="Needs attention" value={needsAttention} icon={AlertTriangle} tone={needsAttention ? 'bad' : 'good'} hint={`areas for ${firstName}`} />
@@ -60,10 +61,16 @@ export function ParentDashboard() {
               <Brain className="size-4" aria-hidden />
               Current Learning Focus
             </div>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight text-ink sm:text-3xl">{summary.focus}</h2>
+            <h2 className="mt-2 text-2xl font-bold tracking-tight text-ink sm:text-3xl">{summary.focus || NO_RESULTS}</h2>
             <p className="mt-1.5 text-[15px] text-ink-2">
-              {firstName} is currently working on understanding {summary.focus.toLowerCase()}
-              {focusScore ? ` in ${focusScore.subject}` : ''}.
+              {summary.focus ? (
+                <>
+                  {firstName} is currently working on understanding {summary.focus.toLowerCase()}
+                  {focusScore ? ` in ${focusScore.subject}` : ''}.
+                </>
+              ) : (
+                <>The school has not recorded any results for {firstName} yet. The topic to work on will show here once it has.</>
+              )}
             </p>
 
             {focusScore && (
@@ -125,7 +132,7 @@ export function ParentDashboard() {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-semibold text-ink">{a.title}</p>
                     <span className="text-xs text-ink-3">
-                      {a.questions.length} questions · due {formatDate(a.dueDate)}
+                      {a.questions.length} questions · {formatDue(a.dueDate)}
                     </span>
                   </div>
                   <p className="mt-1 text-sm text-ink-2">{a.parentNote}</p>

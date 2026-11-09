@@ -9,13 +9,14 @@ import { DataTable } from '../../components/ui/DataTable'
 import { FilterBar } from '../../components/ui/FilterBar'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toneForScore } from '../../components/ui/ProgressBar'
+import { useLiveData } from '../../context/LiveDataContext'
 import { useSession } from '../../context/SessionContext'
-import { getClass, getClassCompetencyAverages } from '../../data/classes'
+import { classAverageLabel, classHasResults, getClass, getClassCompetencyAverages } from '../../data/classes'
 import { getClassTrend } from '../../data/performance'
 import { SCHOOL } from '../../data/school'
 import { assessmentsInScope, classesInScope } from '../../data/selectors'
 import { getStudentsByClass } from '../../data/students'
-import { levelFromScore } from '../../lib/competency'
+import { NO_RESULTS, levelFromScore } from '../../lib/competency'
 import { formatDate, formatSignedPoints } from '../../lib/format'
 import { subjectChoices } from '../../lib/subjects'
 import type { Subject } from '../../types'
@@ -25,6 +26,8 @@ const SERIES_COLORS = ['var(--color-series-1)', 'var(--color-series-2)', 'var(--
 export function PerformancePage() {
   const { role } = useSession()
   const navigate = useNavigate()
+  // In the history below: it is worked out again each time the data is reloaded.
+  const { version } = useLiveData()
   const classes = classesInScope(role)
   const [classId, setClassId] = useState(classes[0]?.id ?? '')
   const [subject, setSubject] = useState<Subject>('Mathematics')
@@ -42,10 +45,15 @@ export function PerformancePage() {
   })
   const history = useMemo(
     () => assessmentsInScope(role).filter((a) => a.classId === classId).sort((a, b) => b.date.localeCompare(a.date)),
-    [role, classId],
+    // `version` is here on purpose: the data lists are refilled in place on a reload, so nothing else changes.
+    [role, classId, version],
   )
   const distribution = subjectComps.map((c) => {
-    const levels = students.map((s) => levelFromScore(s.competencies.find((x) => x.competencyId === c.id)?.score ?? 0))
+    // Only learners with a result in this competency: no result is not "needs support".
+    const levels = students.flatMap((s) => {
+      const score = s.competencies.find((x) => x.competencyId === c.id)?.score
+      return score === undefined ? [] : [levelFromScore(score)]
+    })
     return {
       ...c,
       strength: levels.filter((l) => l === 'strength').length,
@@ -74,7 +82,7 @@ export function PerformancePage() {
       />
 
       <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
-        <Indicator label="Class average" value={`${cls?.average ?? 0}%`} />
+        <Indicator label="Class average" value={cls ? classAverageLabel(cls) : NO_RESULTS} small={!cls || !classHasResults(cls.id)} />
         <Indicator label="Change since last term" value={formatSignedPoints(cls?.trend ?? 0)} tone={(cls?.trend ?? 0) >= 0 ? 'good' : 'bad'} />
         <Indicator label={`Strongest area · ${subject}`} value={[...subjectComps].sort((a, b) => b.average - a.average)[0]?.name ?? '—'} small />
         <Indicator label={`Weakest area · ${subject}`} value={[...subjectComps].sort((a, b) => a.average - b.average)[0]?.name ?? '—'} small />
@@ -107,7 +115,7 @@ export function PerformancePage() {
           description={`${subject} · class average mastery`}
           table={{ headers: ['Competency', 'Average'], rows: subjectComps.map((c) => [c.name, `${c.average}%`]) }}
         >
-          <BarList items={subjectComps.map((c) => ({ id: c.id, label: c.name, value: c.average, tone: toneForScore(c.average) }))} />
+          {subjectComps.length ? <BarList items={subjectComps.map((c) => ({ id: c.id, label: c.name, value: c.average, tone: toneForScore(c.average) }))} /> : <p className="text-sm text-ink-3">{NO_RESULTS} in {subject} for this class.</p>}
         </ChartContainer>
 
         <ChartContainer

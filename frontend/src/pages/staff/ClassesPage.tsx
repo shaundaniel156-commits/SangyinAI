@@ -9,6 +9,7 @@ import { useSession } from '../../context/SessionContext'
 import { classesInScope } from '../../data/selectors'
 import { getStudentsByClass } from '../../data/students'
 import { getTeacher } from '../../data/teachers'
+import { classAverageLabel, classHasResults } from '../../data/classes'
 import { formatSignedPoints } from '../../lib/format'
 import { cn } from '../../lib/cn'
 
@@ -44,10 +45,10 @@ export function ClassesPage() {
                     <span className="text-ink-2">Class average</span>
                     <span className="flex items-baseline gap-2">
                       <span className={cn('tabular text-xs', c.trend >= 0 ? 'text-good-ink' : 'text-bad-ink')}>{formatSignedPoints(c.trend)}</span>
-                      <span className="tabular font-semibold text-ink">{c.average}%</span>
+                      <span className="tabular font-semibold text-ink">{classAverageLabel(c)}</span>
                     </span>
                   </div>
-                  <ProgressBar value={c.average} tone={toneForScore(c.average)} srLabel={`${c.name} average`} />
+                  {classHasResults(c.id) && <ProgressBar value={c.average} tone={toneForScore(c.average)} srLabel={`${c.name} average`} />}
                 </div>
                 <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
                   <div className="rounded-lg bg-surface-2 p-3">

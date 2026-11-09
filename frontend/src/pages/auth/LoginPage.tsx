@@ -39,7 +39,8 @@ const levelSpan = (s: SchoolSetup) => {
 
 /**
  * Standalone sign-in page, reached from the landing page at /. It first asks for the school's level and curriculum
- * (remembered on this device); an administrator signing in saves that choice to the school, which sets the classes offered.
+ * (remembered on this device). The server saves that choice only at a school's very first administrator sign-in;
+ * after that the school's type and curriculum are changed in Manual feed (institution details).
  */
 export function LoginPage() {
   const { signIn } = useSession()

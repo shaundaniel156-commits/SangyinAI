@@ -10,6 +10,7 @@ interface Row {
   id: string
   name: string
   subject: string
+  // A class with no results in the competency has no entry.
   perClass: Record<string, number>
   overall: number
   needing: number
@@ -20,20 +21,21 @@ export function CompetencyReport({ classes, filters }: { classes: SchoolClass[];
   const students = classes.flatMap((c) => getStudentsByClass(c.id))
   const pupils = classes.reduce((n, c) => n + c.studentCount, 0)
 
-  const rows: Row[] = COMPETENCIES.filter((c) => filters.subject === 'all' || c.subject === filters.subject).map((comp) => {
+  const rows: Row[] = COMPETENCIES.filter((c) => filters.subject === 'all' || c.subject === filters.subject).flatMap((comp) => {
     const perClass: Record<string, number> = {}
-    let weighted = 0
     for (const c of classes) {
-      const avg = averages.get(c.id)?.find((a) => a.id === comp.id)?.average ?? 0
-      perClass[c.id] = avg
-      weighted += avg * c.studentCount
+      const avg = averages.get(c.id)?.find((a) => a.id === comp.id)?.average
+      if (avg !== undefined) perClass[c.id] = avg
     }
+    // Over the learners who have a result in it; a competency with none in these classes is left out.
+    const scores = students.flatMap((s) => s.competencies.find((sc) => sc.competencyId === comp.id)?.score ?? [])
+    if (!scores.length) return []
     return {
       id: comp.id,
       name: comp.name,
       subject: comp.subject,
       perClass,
-      overall: Math.round(weighted / Math.max(pupils, 1)),
+      overall: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
       needing: students.filter((s) => s.competencies.some((sc) => sc.competencyId === comp.id && sc.level === 'needs_support')).length,
     }
   })
@@ -51,7 +53,7 @@ export function CompetencyReport({ classes, filters }: { classes: SchoolClass[];
       ),
     },
     ...(classes.length > 1
-      ? classes.map((c) => ({ header: c.name, align: 'right' as const, cell: (r: Row) => `${r.perClass[c.id]}%` }))
+      ? classes.map((c) => ({ header: c.name, align: 'right' as const, cell: (r: Row) => (r.perClass[c.id] === undefined ? '—' : `${r.perClass[c.id]}%`) }))
       : []),
     { header: classes.length > 1 ? 'Overall' : 'Average', align: 'right', cell: (r) => <span className="font-medium">{r.overall}%</span> },
     { header: 'Level', cell: (r) => <LevelBadge level={levelFromScore(r.overall)} /> },
@@ -74,7 +76,7 @@ export function CompetencyReport({ classes, filters }: { classes: SchoolClass[];
       />
       <DocSection
         title="Competency averages across classes"
-        description="Average mastery (%). Overall is weighted by class size."
+        description="Average mastery (%), over the learners who have results. A dash means no results yet."
       >
         <DocTable caption="Competency averages across classes" rows={rows} rowKey={(r) => r.id} columns={columns} />
       </DocSection>

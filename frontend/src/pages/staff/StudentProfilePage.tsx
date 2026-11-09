@@ -20,6 +20,7 @@ import { getGuidanceForStudent } from '../../data/guidance'
 import { getStudentTrend } from '../../data/performance'
 import { getStudent } from '../../data/students'
 import { getTeacher } from '../../data/teachers'
+import { NO_RESULTS, averageLabel, hasResults } from '../../lib/competency'
 import { formatShortDate, formatSignedPoints } from '../../lib/format'
 import { cn } from '../../lib/cn'
 import type { Student, Subject } from '../../types'
@@ -88,10 +89,10 @@ export function StudentProfilePage() {
       />
 
       <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
-        <SummaryTile label="Overall average" value={`${student.average}%`} />
+        <SummaryTile label="Overall average" value={averageLabel(student)} />
         <SummaryTile
           label="Change since last term"
-          value={<span className={student.trend >= 0 ? 'text-good-ink' : 'text-bad-ink'}>{formatSignedPoints(student.trend)}</span>}
+          value={hasResults(student) ? <span className={student.trend >= 0 ? 'text-good-ink' : 'text-bad-ink'}>{formatSignedPoints(student.trend)}</span> : <span className="text-base text-ink-3">{NO_RESULTS}</span>}
         />
         <SummaryTile label="Class teacher" value={<span className="text-base">{teacher?.name ?? '—'}</span>} />
         <SummaryTile label="Parent / guardian" value={<span className="text-base">{student.guardianName}</span>} />

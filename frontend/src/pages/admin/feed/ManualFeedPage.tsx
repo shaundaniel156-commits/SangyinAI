@@ -42,7 +42,7 @@ export function ManualFeedPage() {
   // Other pages show this data too; reload it once when leaving the page if anything changed.
   const changed = useRef(false)
   const markChanged = useCallback(() => { changed.current = true }, [])
-  useEffect(() => () => { if (changed.current) void refresh() }, [refresh])
+  useEffect(() => () => { if (changed.current) void refresh(true) }, [refresh])
 
   useEffect(() => {
     if (!live) return

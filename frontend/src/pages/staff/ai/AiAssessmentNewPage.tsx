@@ -25,6 +25,7 @@ import {
   type AiDraft,
 } from '../../../lib/aiAssessment'
 import { cn } from '../../../lib/cn'
+import { averageLabel } from '../../../lib/competency'
 import { formatDate } from '../../../lib/format'
 import { subjectChoices } from '../../../lib/subjects'
 import type { AiDifficulty, AiQuestionType, Subject } from '../../../types'
@@ -91,7 +92,8 @@ export function AiAssessmentNewPage() {
   const [manualTopics, setManualTopics] = useState<string[]>([])
   const [topicInput, setTopicInput] = useState('')
   const selected = mode === 'auto' ? autoSelected : manualTopics
-  const { live } = useLiveData()
+  // `version`: the lists below are worked out again each time the data is reloaded.
+  const { live, version } = useLiveData()
   const [includeDeveloping, setIncludeDeveloping] = useState(false)
   const [excluded, setExcluded] = useState<Set<string>>(new Set())
   const [count, setCount] = useState<(typeof COUNTS)[number]>('8')
@@ -105,11 +107,13 @@ export function AiAssessmentNewPage() {
   const [lastDraft, setLastDraft] = useState<AiDraft | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const gaps = useMemo(() => detectGaps(classId, subject), [classId, subject])
+  // `version` in these two lists is there on purpose: the data lists are refilled in place on a reload, so nothing else changes.
+  const gaps = useMemo(() => detectGaps(classId, subject), [classId, subject, version])
   // Typed topics have no results to pick out the students who need them, so the whole class is offered.
   const candidates = useMemo(
     () => (mode === 'manual' ? getStudentsByClass(classId) : studentsWithGaps(classId, subject, selected, includeDeveloping)),
-    [mode, classId, subject, selected, includeDeveloping],
+    // (`version`: see above.)
+    [mode, classId, subject, selected, includeDeveloping, version],
   )
   const recipients = candidates.filter((s) => !excluded.has(s.id))
   const available = availableQuestionCount(selected, types)
@@ -389,7 +393,7 @@ export function AiAssessmentNewPage() {
                   </div>
                   <p className="mt-2 text-xs text-ink-3">Written work is done on paper: the student uploads a photo and the AI marks it against the model answer. You can read every photo.</p>
                 </fieldset>
-                <TextField label="Due date" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-48" />
+                <TextField label="Due date" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-48" hint={dueDate ? undefined : 'Needed before the draft can be sent.'} />
                 <Button size="lg" disabled={!canGenerate || busy} onClick={() => void generate()} icon={<Sparkles className="size-4" aria-hidden />}>
                   Generate assessment
                 </Button>
@@ -460,7 +464,7 @@ export function AiAssessmentNewPage() {
                         className="size-4 rounded border-line-strong accent-brand-600"
                       />
                       <span className="flex-1 truncate text-sm text-ink">{s.name}</span>
-                      <span className="tabular text-xs text-ink-3">{s.average}%</span>
+                      <span className="tabular text-xs text-ink-3">{averageLabel(s)}</span>
                     </label>
                   </li>
                 ))}

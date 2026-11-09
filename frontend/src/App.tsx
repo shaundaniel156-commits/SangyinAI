@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/layout/AppShell'
 import { SplashScreen } from './components/layout/SplashScreen'
+import { useLiveData } from './context/LiveDataContext'
 import { LandingPage } from './pages/auth/LandingPage'
 import { LoginPage } from './pages/auth/LoginPage'
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage'
@@ -48,6 +49,8 @@ import { StudentsPage } from './pages/staff/StudentsPage'
  * the account's role decides which navigation and dashboards show.
  */
 export default function App() {
+  // Reading the live data here redraws every page, in place, each time the data is reloaded.
+  useLiveData()
   return (
     <>
     <SplashScreen />

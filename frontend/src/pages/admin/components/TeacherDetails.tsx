@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { Avatar } from '../../../components/ui/Avatar'
 import { ProgressBar, toneForScore } from '../../../components/ui/ProgressBar'
 import { StatusBadge } from '../../../components/ui/StatusBadge'
-import { getClass } from '../../../data/classes'
+import { classHasResults, getClass } from '../../../data/classes'
 import { FRAMEWORK_LABEL } from '../../../data/curriculum'
 import type { SchoolClass, Teacher } from '../../../types'
 import { AccountStatusBadge } from './AccountStatusBadge'
@@ -61,8 +61,14 @@ export function TeacherDetails({ teacher }: { teacher: Teacher }) {
                   <span className="tabular shrink-0 text-xs text-ink-3">{c.studentCount} students</span>
                 </div>
                 <div className="mt-2 flex items-center gap-3">
-                  <ProgressBar value={c.average} tone={toneForScore(c.average)} size="sm" className="flex-1" srLabel={`${c.name} average`} />
-                  <span className="tabular w-9 text-right text-sm font-medium text-ink">{c.average}%</span>
+                  {classHasResults(c.id) ? (
+                    <>
+                      <ProgressBar value={c.average} tone={toneForScore(c.average)} size="sm" className="flex-1" srLabel={`${c.name} average`} />
+                      <span className="tabular w-9 text-right text-sm font-medium text-ink">{c.average}%</span>
+                    </>
+                  ) : (
+                    <span className="text-sm text-ink-3">No results yet</span>
+                  )}
                 </div>
               </li>
             ))}

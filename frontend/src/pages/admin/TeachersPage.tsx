@@ -10,6 +10,7 @@ import { Drawer } from '../../components/ui/Modal'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { SearchBar } from '../../components/ui/SearchBar'
 import { StatusBadge } from '../../components/ui/StatusBadge'
+import { useLiveData } from '../../context/LiveDataContext'
 import { getClass } from '../../data/classes'
 import { TEACHERS } from '../../data/teachers'
 import { subjectChoices } from '../../lib/subjects'
@@ -26,6 +27,8 @@ export function TeachersPage() {
   const [selected, setSelected] = useState<Teacher | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [assigning, setAssigning] = useState<Teacher | null>(null)
+  // In the list below: it is worked out again each time the data is reloaded.
+  const { version } = useLiveData()
   const subjects = subjectChoices(TEACHERS.flatMap((t) => t.subjects))
 
   const rows = useMemo(() => {
@@ -36,7 +39,8 @@ export function TeachersPage() {
         (status === 'all' || t.status === status) &&
         (!q || t.name.toLowerCase().includes(q) || t.email.toLowerCase().includes(q)),
     )
-  }, [query, subject, status])
+    // `version` is here on purpose: the data lists are refilled in place on a reload, so nothing else changes.
+  }, [query, subject, status, version])
 
   return (
     <>

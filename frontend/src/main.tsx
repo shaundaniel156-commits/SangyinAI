@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
+import { ErrorBoundary } from './components/layout/ErrorBoundary'
 import { AiAssessmentsProvider } from './context/AiAssessmentsContext'
 import { ConnectivityProvider } from './context/ConnectivityContext'
 import { GuidanceReviewProvider } from './context/GuidanceReviewContext'
@@ -16,10 +17,11 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <ThemeProvider>
+        <ErrorBoundary fullScreen>
         <SessionProvider>
           <ConnectivityProvider>
-            <LiveDataProvider>
-              <ToastProvider>
+            <ToastProvider>
+              <LiveDataProvider>
                 <NotificationsProvider>
                   <GuidanceReviewProvider>
                     <AiAssessmentsProvider>
@@ -27,10 +29,11 @@ createRoot(document.getElementById('root')!).render(
                     </AiAssessmentsProvider>
                   </GuidanceReviewProvider>
                 </NotificationsProvider>
-              </ToastProvider>
-            </LiveDataProvider>
+              </LiveDataProvider>
+            </ToastProvider>
           </ConnectivityProvider>
         </SessionProvider>
+        </ErrorBoundary>
       </ThemeProvider>
     </BrowserRouter>
   </StrictMode>,

@@ -15,10 +15,11 @@ import { ProgressBar, toneForScore } from '../../components/ui/ProgressBar'
 import { StatCard } from '../../components/ui/StatCard'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { getAssessmentsByClass } from '../../data/assessments'
-import { getClass, getClassCompetencyAverages } from '../../data/classes'
+import { classAverageLabel, getClass, getClassCompetencyAverages } from '../../data/classes'
 import { getClassTrend } from '../../data/performance'
 import { getStudentsByClass } from '../../data/students'
 import { getTeacher } from '../../data/teachers'
+import { NO_RESULTS, hasResults } from '../../lib/competency'
 import { formatSignedPoints } from '../../lib/format'
 
 export function ClassDetailPage() {
@@ -62,7 +63,7 @@ export function ClassDetailPage() {
 
       <div className="grid grid-cols-2 gap-4 sm:gap-6 xl:grid-cols-4">
         <StatCard label="Students" value={students.length} icon={GraduationCap} />
-        <StatCard label="Class average" value={`${cls.average}%`} icon={TrendingUp} hint="Recent assessments" />
+        <StatCard label="Class average" value={classAverageLabel(cls)} icon={TrendingUp} hint="Recent assessments" />
         <StatCard
           label="Change since last term"
           value={formatSignedPoints(cls.trend)}
@@ -122,14 +123,14 @@ export function ClassDetailPage() {
           description="Class average mastery · Mathematics"
           table={{ headers: ['Competency', 'Average'], rows: competencyAverages.map((c) => [c.name, `${c.average}%`]) }}
         >
-          <BarList items={competencyAverages.map((c) => ({ id: c.id, label: c.name, value: c.average, tone: toneForScore(c.average) }))} />
+          {competencyAverages.length ? <BarList items={competencyAverages.map((c) => ({ id: c.id, label: c.name, value: c.average, tone: toneForScore(c.average) }))} /> : <p className="text-sm text-ink-3">{NO_RESULTS} in Mathematics for this class.</p>}
         </ChartContainer>
 
         <Card className="xl:col-span-2">
           <CardHeader title="Students" description={`${students.length} students in this class`} />
           <DataTable
             caption={`Students in ${cls.name}`}
-            rows={[...students].sort((a, b) => a.average - b.average)}
+            rows={[...students].sort((a, b) => Number(hasResults(b)) - Number(hasResults(a)) || a.average - b.average)}
             rowKey={(s) => s.id}
             onRowClick={(s) => navigate(`/students/${s.id}`)}
             pageSize={8}
@@ -149,8 +150,14 @@ export function ClassDetailPage() {
                 header: 'Average',
                 cell: (s) => (
                   <div className="flex min-w-24 items-center gap-2.5">
-                    <ProgressBar value={s.average} tone={toneForScore(s.average)} size="sm" className="hidden flex-1 sm:block" srLabel={`${s.name} average`} />
-                    <span className="tabular w-9 text-right">{s.average}%</span>
+                    {hasResults(s) ? (
+                      <>
+                        <ProgressBar value={s.average} tone={toneForScore(s.average)} size="sm" className="hidden flex-1 sm:block" srLabel={`${s.name} average`} />
+                        <span className="tabular w-9 text-right">{s.average}%</span>
+                      </>
+                    ) : (
+                      <span className="text-ink-3">{NO_RESULTS}</span>
+                    )}
                   </div>
                 ),
               },
@@ -159,7 +166,7 @@ export function ClassDetailPage() {
                 id: 'status',
                 header: 'Status',
                 hideBelow: 'sm',
-                cell: (s) => (s.needsSupport ? <StatusBadge tone="bad">Needs support</StatusBadge> : <StatusBadge tone="good">On track</StatusBadge>),
+                cell: (s) => (s.needsSupport ? <StatusBadge tone="bad">Needs support</StatusBadge> : hasResults(s) ? <StatusBadge tone="good">On track</StatusBadge> : <StatusBadge tone="neutral">{NO_RESULTS}</StatusBadge>),
               },
             ]}
           />
