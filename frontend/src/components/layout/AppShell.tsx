@@ -16,7 +16,7 @@ export function AppShell() {
   const [navOpen, setNavOpen] = useState(false)
   const { pathname } = useLocation()
   const { role, signedIn } = useSession()
-  const { status, pendingItems } = useConnectivity()
+  const { status } = useConnectivity()
   const portal = role === 'parent' || role === 'student'
 
   useEffect(() => {
@@ -38,10 +38,7 @@ export function AppShell() {
       {status === 'offline' && (
         <div role="status" className="no-print flex items-center gap-2 border-b border-line bg-surface-3 px-4 py-2 text-sm text-ink-2 sm:px-6">
           <CloudOff className="size-4 shrink-0" aria-hidden />
-          <span>
-            You’re offline. Your work is saved on this device and will sync when a connection is available
-            {pendingItems > 0 && ` (${pendingItems} changes waiting)`}.
-          </span>
+          <span>You’re offline. You can read what is already loaded, but saving will not work until you are back online.</span>
         </div>
       )}
       <main id="main" className={cn('mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12', portal && 'pb-24 lg:pb-12')}>

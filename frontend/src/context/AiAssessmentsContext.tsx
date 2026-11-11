@@ -3,7 +3,7 @@ import type { AiDraft } from '../lib/aiAssessment'
 import { api } from '../lib/api'
 import { LIVE_AI_ASSESSMENTS } from '../lib/liveData'
 import { readStorage, writeStorage } from '../lib/storage'
-import type { AiAssessment } from '../types'
+import type { AiAssessment, PracticeConfidence, PracticeFeedback } from '../types'
 import { useLiveData } from './LiveDataContext'
 import { useToast } from './ToastContext'
 
@@ -17,6 +17,9 @@ export interface AttemptResult {
   score: number
   total: number
   completedOn: string
+  /** What the student told their teacher on their Feedback page, when they have. */
+  feedback?: PracticeFeedback
+  confidence?: PracticeConfidence
 }
 
 /** A photo of written work, as sent to the server (base64). */

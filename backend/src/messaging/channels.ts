@@ -9,6 +9,11 @@ export interface SendResult {
   error?: string
 }
 
+// Addresses and numbers are masked in the log ("j***@gmail.com", "+256…456"), and a message's text is never
+// logged: it can carry a one-time password or a reset link.
+const maskEmail = (email: string) => email.replace(/^(.).*?(@.*)$/, '$1***$2')
+const maskPhone = (phone: string) => `${phone.slice(0, 4)}…${phone.slice(-3)}`
+
 let resend: Resend | undefined
 export function emailConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM)
@@ -17,20 +22,20 @@ export function emailConfigured(): boolean {
 /** Sends one email. Never throws. */
 export async function sendEmail(to: string, subject: string, html: string, text: string): Promise<SendResult> {
   if (!emailConfigured()) {
-    console.log(`[email] not configured — would have sent "${subject}" to ${to}`)
+    console.log(`[email] skipped "${subject}" to ${maskEmail(to)}: email is not set up (RESEND_API_KEY, EMAIL_FROM)`)
     return { sent: false, error: 'Email is not set up (RESEND_API_KEY, EMAIL_FROM).' }
   }
   try {
     resend ??= new Resend(process.env.RESEND_API_KEY)
     const { error } = await resend.emails.send({ from: process.env.EMAIL_FROM!, to, subject, html, text })
     if (error) {
-      console.error(`[email] "${subject}" to ${to} failed: ${error.message}`)
+      console.error(`[email] "${subject}" to ${maskEmail(to)} failed: ${error.message}`)
       return { sent: false, error: error.message }
     }
-    console.log(`[email] sent "${subject}" to ${to}`)
+    console.log(`[email] sent "${subject}" to ${maskEmail(to)}`)
     return { sent: true }
   } catch (error) {
-    console.error(`[email] "${subject}" to ${to} failed: ${(error as Error).message}`)
+    console.error(`[email] "${subject}" to ${maskEmail(to)} failed: ${(error as Error).message}`)
     return { sent: false, error: (error as Error).message }
   }
 }
@@ -63,7 +68,7 @@ export async function sendSms(phone: string, message: string): Promise<SendResul
   const to = normalisePhone(phone)
   if (!to) return { sent: false, error: `Not a usable phone number: ${phone}` }
   if (!smsConfigured()) {
-    console.log(`[sms] not configured — would have sent to ${to}: ${message}`)
+    console.log(`[sms] skipped to ${maskPhone(to)}: SMS is not set up (AT_USERNAME, AT_API_KEY)`)
     return { sent: false, error: 'SMS is not set up (AT_USERNAME, AT_API_KEY).' }
   }
   try {
@@ -73,15 +78,15 @@ export async function sendSms(phone: string, message: string): Promise<SendResul
     const ok = recipient && recipient.statusCode >= 100 && recipient.statusCode < 200
     if (!ok) {
       const reason = recipient?.status ?? res.SMSMessageData?.Message ?? 'unknown reason'
-      console.error(`[sms] to ${to} failed: ${reason}`)
+      console.error(`[sms] to ${maskPhone(to)} failed: ${reason}`)
       return { sent: false, error: reason }
     }
-    console.log(`[sms] sent to ${to}${smsIsSandbox() ? ' (sandbox: see the Africa’s Talking simulator)' : ''}`)
+    console.log(`[sms] sent to ${maskPhone(to)}${smsIsSandbox() ? ' (sandbox: see the Africa’s Talking simulator)' : ''}`)
     return { sent: true }
   } catch (error) {
     // Only the reason: the full HTTP error carries request headers, including the API key.
     const reason = failureReason(error)
-    console.error(`[sms] to ${to} failed: ${reason}`)
+    console.error(`[sms] to ${maskPhone(to)} failed: ${reason}`)
     return { sent: false, error: reason }
   }
 }

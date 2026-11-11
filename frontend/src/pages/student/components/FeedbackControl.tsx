@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useLiveData } from '../../../context/LiveDataContext'
 import { useToast } from '../../../context/ToastContext'
 import {
   CONFIDENCE_OPTIONS,
@@ -6,44 +7,64 @@ import {
   type ConfidenceChoice,
   type DifficultyChoice,
 } from '../../../data/practice'
+import { api } from '../../../lib/api'
 import { cn } from '../../../lib/cn'
+import type { PracticeActivity } from '../../../types'
 
 interface FeedbackControlProps {
-  activityTitle: string
-  initialDifficulty?: DifficultyChoice
+  /** The practice the student is telling their teacher about. */
+  activity: PracticeActivity
 }
 
-/** Difficulty + confidence self-report. Local state only — not saved in this prototype. */
-export function FeedbackControl({ activityTitle, initialDifficulty }: FeedbackControlProps) {
+/**
+ * Difficulty + confidence self-report. Each choice is saved on the student's copy of the practice
+ * (backend PATCH /practice/:id/feedback), where the teacher sees it beside the result.
+ */
+export function FeedbackControl({ activity }: FeedbackControlProps) {
   const { notify } = useToast()
-  const [difficulty, setDifficulty] = useState<DifficultyChoice | undefined>(initialDifficulty)
-  const [confidence, setConfidence] = useState<ConfidenceChoice | undefined>()
+  const { live, refresh } = useLiveData()
+  const [difficulty, setDifficulty] = useState<DifficultyChoice | undefined>(activity.feedback)
+  const [confidence, setConfidence] = useState<ConfidenceChoice | undefined>(activity.confidence)
+  const [saving, setSaving] = useState(false)
 
-  const thank = () => notify('Thanks! Your teacher will see this.', { description: 'Feedback is not saved in this prototype.' })
+  const save = async (patch: { feedback?: DifficultyChoice; confidence?: ConfidenceChoice }) => {
+    if (!live) return notify('Not saved', { tone: 'info', description: 'Sign in while connected to tell your teacher.' })
+    setSaving(true)
+    try {
+      await api(`/practice/${activity.id}/feedback`, { method: 'PATCH', body: patch })
+      notify('Saved. Your teacher can see this.')
+      // So the rest of the page (and the teacher's view after a reload) shows the new answer.
+      void refresh()
+    } catch (error) {
+      notify('Not saved', { tone: 'info', description: (error as Error).message })
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" aria-busy={saving}>
       <ChoiceGroup
         question="How difficult was this activity?"
-        context={activityTitle}
+        context={activity.title}
         options={DIFFICULTY_OPTIONS}
         value={difficulty}
         onChange={(v) => {
           setDifficulty(v)
-          thank()
+          void save({ feedback: v })
         }}
       />
       <ChoiceGroup
         question="How confident do you feel?"
-        context={activityTitle}
+        context={activity.title}
         options={CONFIDENCE_OPTIONS}
         value={confidence}
         onChange={(v) => {
           setConfidence(v)
-          thank()
+          void save({ confidence: v })
         }}
       />
-      <p className="text-xs text-ink-3">Your answers help your teacher plan what comes next. Not saved in this prototype.</p>
+      <p className="text-xs text-ink-3">Your answers are saved for your teacher, to help them plan what comes next.</p>
     </div>
   )
 }

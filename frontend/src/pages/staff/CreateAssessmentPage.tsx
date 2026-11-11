@@ -25,6 +25,12 @@ const TYPES: AssessmentType[] = ['Test', 'Quiz', 'Assignment', 'Teacher Observat
 type Mode = 'paper' | 'online'
 const COUNTS = ['5', '8', '10', '15'] as const
 const QUESTION_TYPES: AiQuestionType[] = ['multiple_choice', 'short_answer', 'written_work']
+// What the server accepts (backend routes/assessments.ts and routes/aiAssessments.ts). Checked here before anything
+// is saved, so a refused request never leaves a half-made assessment behind.
+const MAX_AREAS = { paper: 20, online: 10 }
+const MAX_STUDENTS_ONLINE = 200
+const MAX_INSTRUCTIONS = 2000
+const MAX_CURRICULUM_REFS = 20
 
 export function CreateAssessmentPage() {
   const { role } = useSession()
@@ -58,11 +64,18 @@ export function CreateAssessmentPage() {
   const known = COMPETENCIES.filter((c) => c.subject === subject).map((c) => c.name)
   const areas = [...known, ...topics.filter((t) => !known.includes(t))]
 
-  const toggleTopic = (name: string) => setTopics((t) => (t.includes(name) ? t.filter((x) => x !== name) : [...t, name]))
+  const maxAreas = online ? MAX_AREAS.online : MAX_AREAS.paper
+  const tooManyAreas = () => notify(`Up to ${maxAreas} areas`, { tone: 'info', description: online ? 'An online assessment can cover up to 10 areas. Untick one to add another.' : 'An assessment can cover up to 20 areas. Untick one to add another.' })
+  const toggleTopic = (name: string) => {
+    if (!topics.includes(name) && topics.length >= maxAreas) return tooManyAreas()
+    setTopics((t) => (t.includes(name) ? t.filter((x) => x !== name) : [...t, name]))
+  }
   const addTopics = () => {
     const typed = topicInput.split(/[,;]/).map((t) => t.trim()).filter(Boolean)
     if (!typed.length) return
-    setTopics((ts) => [...ts, ...typed.filter((t) => !ts.some((x) => x.toLowerCase() === t.toLowerCase()))])
+    const fresh = typed.filter((t) => !topics.some((x) => x.toLowerCase() === t.toLowerCase()))
+    if (topics.length + fresh.length > maxAreas) return tooManyAreas()
+    setTopics((ts) => [...ts, ...fresh])
     setTopicInput('')
   }
   const onTopicKey = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -76,8 +89,11 @@ export function CreateAssessmentPage() {
   // the teacher reviews them. Nothing reaches the class until they press Approve & send there.
   const createOnline = async () => {
     if (!topics.length) return notify('Choose what it covers', { tone: 'info', description: 'Pick or add at least one area, so the AI knows what to ask about.' })
+    if (topics.length > MAX_AREAS.online) return notify(`Up to ${MAX_AREAS.online} areas`, { tone: 'info', description: `An online assessment can cover up to ${MAX_AREAS.online} areas; ${topics.length} are chosen. Untick some first.` })
     if (!students.length) return notify('This class has no students yet', { tone: 'info' })
+    if (students.length > MAX_STUDENTS_ONLINE) return notify(`Up to ${MAX_STUDENTS_ONLINE} students`, { tone: 'info', description: `An online assessment can go to up to ${MAX_STUDENTS_ONLINE} students at a time; this class has ${students.length}.` })
     if (!questionTypes.length) return notify('Choose at least one question type', { tone: 'info' })
+    if (instructions.trim().length > MAX_INSTRUCTIONS) return notify('Instructions are too long', { tone: 'info', description: `Up to ${MAX_INSTRUCTIONS.toLocaleString()} characters; shorten them first.` })
     setWorking('Writing the questions…')
     try {
       const draft = await generateAssessmentDraft({
@@ -100,6 +116,8 @@ export function CreateAssessmentPage() {
       })
       const saved = await create({
         ...draft,
+        // Found from the areas automatically; the server takes up to 20.
+        curriculumRefs: (draft.curriculumRefs ?? []).slice(0, MAX_CURRICULUM_REFS),
         title: title.trim(),
         dueDate: date,
         assessmentId: made.id,
@@ -126,6 +144,7 @@ export function CreateAssessmentPage() {
       return
     }
     if (!title.trim()) return notify('Add a title first', { tone: 'info' })
+    if (topics.length > MAX_AREAS.paper) return notify(`Up to ${MAX_AREAS.paper} areas`, { tone: 'info', description: `An assessment can cover up to ${MAX_AREAS.paper} areas; ${topics.length} are chosen. Untick some first.` })
     if (online && !draft) return createOnline()
     setWorking('Saving…')
     try {
@@ -154,6 +173,7 @@ export function CreateAssessmentPage() {
                 placeholder="e.g. Ratio and Proportion Quiz"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
+                maxLength={200}
                 required
               />
               <fieldset className="sm:col-span-2">
@@ -251,6 +271,8 @@ export function CreateAssessmentPage() {
                 rows={3}
                 value={instructions}
                 onChange={(e) => setInstructions(e.target.value)}
+                maxLength={MAX_INSTRUCTIONS}
+                hint={`Up to ${MAX_INSTRUCTIONS.toLocaleString()} characters${instructions.length > MAX_INSTRUCTIONS - 200 ? ` (${instructions.length.toLocaleString()} used)` : ''}.`}
                 placeholder={online ? 'Shown to students when they open the assessment, e.g. “Work alone. Show your working on paper before you answer.”' : 'Notes for learners or for recording results…'}
               />
             </CardBody>
@@ -263,7 +285,8 @@ export function CreateAssessmentPage() {
             />
             <CardBody>
               <p className="mb-3 text-sm text-ink-2">
-                {online ? 'Choose or add the areas this assessment covers. The AI writes the questions on these, and results are mapped to them.' : 'Select the competency areas this assessment covers. Results will be mapped to these areas.'}
+                {online ? 'Choose or add the areas this assessment covers. The AI writes the questions on these, and results are mapped to them.' : 'Select the competency areas this assessment covers. Results will be mapped to these areas.'}{' '}
+                Up to {maxAreas} areas ({topics.length} chosen).
               </p>
               <div className="flex flex-wrap gap-2">
                 {areas.map((name) => {
@@ -312,7 +335,7 @@ export function CreateAssessmentPage() {
                 <SummaryRow label="Type" value={type} />
                 <SummaryRow label="Done" value={online ? 'Online, in Sangyin' : 'On paper'} />
                 <SummaryRow label="Class" value={cls?.name ?? '—'} />
-                <SummaryRow label="Students" value={String(cls?.studentCount ?? 0)} />
+                <SummaryRow label="Students" value={online && students.length > MAX_STUDENTS_ONLINE ? `${students.length} (online: up to ${MAX_STUDENTS_ONLINE})` : String(cls?.studentCount ?? 0)} />
                 {online && <SummaryRow label="Questions" value={count} />}
                 <SummaryRow label="Areas" value={topics.length ? topics.join(', ') : 'None selected'} />
               </dl>

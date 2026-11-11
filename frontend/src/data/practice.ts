@@ -1,18 +1,23 @@
 /** Practice activities for the signed-in student (or a parent's child), loaded from the backend (lib/liveData.ts). */
-import type { AiAssessment, PracticeActivity } from '../types'
+import type { AiAssessment, PracticeActivity, PracticeConfidence, PracticeFeedback } from '../types'
 import { getClass } from './classes'
 
 export const PRACTICE_ACTIVITIES: PracticeActivity[] = []
+
+/** A parent's children's practice, keyed by child id: everything their teacher has sent them (lib/liveData.ts). */
+export const PRACTICE_BY_CHILD = new Map<string, PracticeActivity[]>()
+export const childPractice = (studentId: string): PracticeActivity[] => PRACTICE_BY_CHILD.get(studentId) ?? []
 
 /**
  * The teacher's assessments (AI Assessment Builder) a student has answered, as practice records. They are listed
  * apart from PRACTICE_ACTIVITIES ("From your teacher"), so the record views add them with this.
  */
-export function teacherPracticeDone(items: AiAssessment[], attempts: Record<string, { score: number; total: number; completedOn: string } | undefined>, studentId: string): PracticeActivity[] {
+export function teacherPracticeDone(items: AiAssessment[], attempts: Record<string, { score: number; total: number; completedOn: string; feedback?: PracticeFeedback; confidence?: PracticeConfidence } | undefined>, studentId: string): PracticeActivity[] {
   return items.flatMap((a) => {
     const attempt = attempts[a.id]
     if (a.status !== 'sent' || !a.studentIds.includes(studentId) || !attempt) return []
-    return [{ id: `ai-${a.id}`, aiAssessmentId: a.id, title: a.title, focus: a.competencies.join(', '), subject: a.subject, status: 'completed' as const, questions: attempt.total, estimatedMinutes: Math.max(5, Math.round(attempt.total * 1.5)), completedOn: attempt.completedOn, score: attempt.score }]
+    // The id is the student's own copy on the server (practiceId), so the Feedback page can save how they found it.
+    return [{ id: a.practiceId ?? `ai-${a.id}`, aiAssessmentId: a.id, title: a.title, focus: a.competencies.join(', '), subject: a.subject, status: 'completed' as const, questions: attempt.total, estimatedMinutes: Math.max(5, Math.round(attempt.total * 1.5)), completedOn: attempt.completedOn, score: attempt.score, ...(attempt.feedback ? { feedback: attempt.feedback } : {}), ...(attempt.confidence ? { confidence: attempt.confidence } : {}) }]
   })
 }
 

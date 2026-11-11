@@ -356,6 +356,7 @@ export function AiAssessmentNewPage() {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="e.g. Many learners mix up the order in a ratio. Word problems with money were the weakest items in last week's quiz."
+                hint="Your notes and any uploaded file go to the AI as they are, including any names in them. Leave learners’ names out: say “some learners” instead."
               />
               <div className="flex flex-wrap items-center gap-3">
                 <input ref={fileRef} type="file" accept=".txt,.csv,text/plain,text/csv" className="sr-only" onChange={onFile} tabIndex={-1} />

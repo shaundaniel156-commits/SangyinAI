@@ -19,6 +19,9 @@ const AnswersSchema = z.object({
   work: z.record(z.string(), WorkSchema).refine((w) => Object.keys(w).length <= 15, { message: 'At most 15 photos' }).optional(),
   feedback: z.enum(['easy', 'okay', 'difficult']).optional(),
 })
+const FeedbackSchema = z
+  .object({ feedback: z.enum(['easy', 'okay', 'difficult']).optional(), confidence: z.enum(['confident', 'unsure', 'need_help']).optional() })
+  .refine((f) => f.feedback || f.confidence, { message: 'Nothing to save' })
 // The photos make this request far bigger than the server's usual limit.
 const answersOptions = { onRequest: requireRole('student'), bodyLimit: 40 * 1024 * 1024 }
 
@@ -43,16 +46,29 @@ export async function practiceRoutes(app: FastifyInstance) {
     return items.map(toPracticeActivity)
   })
 
-  // A child's practice list, for their parent (or teachers). Same items as /me/practice.
+  // A child's practice list, for their parent (or teachers): everything sent to the child, including assessments
+  // from the AI Assessment Builder (title, subject, due date, how many questions, done or not, score), with no questions.
   app.get<{ Params: { id: string } }>('/students/:id/practice', { onRequest: requireUser }, async (request, reply) => {
     const student = await prisma.student.findFirst({ where: { id: request.params.id, ...studentScope(request.user!) }, select: { id: true } })
     if (!student) return reply.code(404).send({ error: 'Student not found.' })
     const items = await prisma.practiceAssignment.findMany({
-      where: { studentId: student.id, aiAssessment: { status: 'sent', source: null } },
+      where: { studentId: student.id, aiAssessment: { status: 'sent' } },
       include: practiceInclude,
       orderBy: { aiAssessment: { sentAt: 'desc' } },
     })
     return items.map(toPracticeActivity)
+  })
+
+  // "How difficult was this activity?" and "How confident do you feel?" on the student's Feedback page: saved on
+  // their own copy, where the teacher sees it beside the result (AI Assessment Builder, the assessment's recipients).
+  app.patch<{ Params: { id: string } }>('/practice/:id/feedback', studentOnly, async (request, reply) => {
+    const parsed = FeedbackSchema.safeParse(request.body)
+    if (!parsed.success) return reply.code(400).send({ error: 'Choose an answer first.' })
+    const user = request.user!
+    const item = await prisma.practiceAssignment.findFirst({ where: { id: request.params.id, student: { userId: user.sub, schoolId: user.schoolId } }, select: { id: true } })
+    if (!item) return reply.code(404).send({ error: 'Practice not found.' })
+    const saved = await prisma.practiceAssignment.update({ where: { id: item.id }, data: parsed.data, select: { feedback: true, confidence: true } })
+    return { feedback: saved.feedback, confidence: saved.confidence }
   })
 
   // One practice to take: the teacher's message and the questions, without the answers (those come back after marking).

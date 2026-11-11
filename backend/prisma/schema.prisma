@@ -464,6 +464,8 @@ model PracticeAssignment {
   score          Float?
   // How the student found it: easy, okay or difficult.
   feedback       String?
+  // How confident they feel about it: confident, unsure or need_help.
+  confidence     String?
   startedAt      DateTime?
   completedAt    DateTime?
   uploads        PracticeUpload[]

@@ -215,6 +215,7 @@ export function AskAiPage() {
 
         <ChatThread
           turns={chat.turns}
+          onRetry={() => void chat.retry()}
           className="flex-1 space-y-8 pb-8"
           empty={
             <div className="rounded-2xl border border-dashed border-line px-5 py-6">

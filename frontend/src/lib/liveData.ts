@@ -13,7 +13,7 @@ import { GUIDANCE_PLANS } from '../data/guidance'
 import { liveState } from '../data/liveState'
 import { NOTIFICATIONS } from '../data/notifications'
 import { deriveFromLoadedData } from '../data/performance'
-import { PRACTICE_ACTIVITIES } from '../data/practice'
+import { PRACTICE_ACTIVITIES, PRACTICE_BY_CHILD } from '../data/practice'
 import { SCHOOL } from '../data/school'
 import { COMPETENCIES, PARENT_CHILD_IDS, STUDENTS } from '../data/students'
 import { TEACHERS } from '../data/teachers'
@@ -64,11 +64,9 @@ export async function loadLiveData(role: Role): Promise<void> {
   const [staffList, accounts] = role === 'admin' ? await Promise.all([api<StaffRow[]>('/feed/staff'), api<AccountRow[]>('/feed/users')]) : [null, null]
   const results = await Promise.all(assessments.map((a) => api<AssessmentResult[]>(`/assessments/${a.id}/results`).then((r) => [a.id, r] as const)))
 
-  // Practice: the student's own list, or a parent's first child's.
-  const practice =
-    role === 'student' ? await api<PracticeActivity[]>('/me/practice')
-    : role === 'parent' && students[0] ? await api<PracticeActivity[]>(`/students/${students[0].id}/practice`)
-    : null
+  // Practice: the student's own list, or each of a parent's children's (kept apart, for whichever child is chosen).
+  const practice = role === 'student' ? await api<PracticeActivity[]>('/me/practice') : null
+  const byChild = role === 'parent' ? await Promise.all(students.map((s) => api<PracticeActivity[]>(`/students/${s.id}/practice`).then((list) => [s.id, list] as const))) : []
 
   // Everything loaded: swap it in.
   Object.assign(SCHOOL, {
@@ -95,6 +93,8 @@ export async function loadLiveData(role: Role): Promise<void> {
   }
   if (diagnostics) replace(DIAGNOSTIC_REPORTS, diagnostics)
   if (practice) replace(PRACTICE_ACTIVITIES, practice)
+  PRACTICE_BY_CHILD.clear()
+  for (const [id, list] of byChild) PRACTICE_BY_CHILD.set(id, list)
 
   // Competencies found in the students' records, for filters and reports.
   const competencies = new Map<string, (typeof COMPETENCIES)[number]>()

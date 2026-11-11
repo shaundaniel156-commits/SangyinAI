@@ -5,16 +5,19 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { useAiAssessments } from '../../context/AiAssessmentsContext'
-import { DIFFICULTY_OPTIONS, PRACTICE_ACTIVITIES, teacherMessages } from '../../data/practice'
+import { CONFIDENCE_OPTIONS, DIFFICULTY_OPTIONS, PRACTICE_ACTIVITIES, teacherMessages, teacherPracticeDone } from '../../data/practice'
 import { ROLE_USERS } from '../../data/users'
 import { formatShortDate, initialsFrom } from '../../lib/format'
 import { FeedbackControl } from './components/FeedbackControl'
 
 export function StudentFeedbackPage() {
-  const { items } = useAiAssessments()
+  const { items, attempts } = useAiAssessments()
   const messages = teacherMessages(items, ROLE_USERS.student.id)
-  const current = PRACTICE_ACTIVITIES.find((a) => a.status === 'in_progress')
-  const answered = PRACTICE_ACTIVITIES.filter((a) => a.status === 'completed' && a.feedback)
+  // Everything finished (regular practice, plus the teacher's assessments this student has answered), newest first.
+  // The student tells the teacher about the practice being done now, or else the one finished most recently.
+  const completed = [...PRACTICE_ACTIVITIES.filter((a) => a.status === 'completed'), ...teacherPracticeDone(items, attempts, ROLE_USERS.student.id)].sort((a, b) => (b.completedOn ?? '').localeCompare(a.completedOn ?? ''))
+  const current = PRACTICE_ACTIVITIES.find((a) => a.status === 'in_progress') ?? completed[0]
+  const answered = completed.filter((a) => a.feedback || a.confidence)
 
   return (
     <>
@@ -48,7 +51,7 @@ export function StudentFeedbackPage() {
             <Card>
               <CardHeader title="Tell your teacher" description={current.title} />
               <CardBody>
-                <FeedbackControl activityTitle={current.title} />
+                <FeedbackControl key={current.id} activity={current} />
               </CardBody>
             </Card>
           )}
@@ -65,9 +68,9 @@ export function StudentFeedbackPage() {
                   <li key={a.id} className="flex items-center justify-between gap-3 px-5 py-3">
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-medium text-ink">{a.title}</span>
-                      <span className="block text-xs text-ink-3">How difficult was it?</span>
+                      <span className="block text-xs text-ink-3">{CONFIDENCE_OPTIONS.find((o) => o.id === a.confidence)?.label ?? 'How difficult was it?'}</span>
                     </span>
-                    <StatusBadge tone="info">{DIFFICULTY_OPTIONS.find((o) => o.id === a.feedback)?.label}</StatusBadge>
+                    {a.feedback && <StatusBadge tone="info">{DIFFICULTY_OPTIONS.find((o) => o.id === a.feedback)?.label}</StatusBadge>}
                   </li>
                 ))}
               </ul>

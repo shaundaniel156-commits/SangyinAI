@@ -4,6 +4,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../db/client.ts'
 import { sendPasswordReset } from '../messaging/messages.ts'
+import { attemptKeys, clearFailures, lockedMessage, recordFailure } from './attempts.ts'
 import { authConfigured, requireUser, signToken } from './session.ts'
 
 const LoginSchema = z.object({
@@ -15,11 +16,14 @@ const LoginSchema = z.object({
 
 export async function authRoutes(app: FastifyInstance) {
   // Sign-in: checks the email and password against the User table and returns a token.
-  // Limited to 10 tries per 15 minutes to slow password guessing.
-  app.post('/auth/login', { config: { rateLimit: { max: 10, timeWindow: '15 minutes' } } }, async (request, reply) => {
+  // Wrong passwords are limited per account and address, and per account overall (auth/attempts.ts), to slow password guessing.
+  app.post('/auth/login', async (request, reply) => {
     if (!authConfigured()) return reply.code(503).send({ error: 'Sign-in is not set up on the server. Add JWT_SECRET to backend/.env.' })
     const parsed = LoginSchema.safeParse(request.body)
     if (!parsed.success) return reply.code(400).send({ error: 'Enter your email and password.' })
+    const keys = attemptKeys(request, parsed.data.email)
+    const locked = lockedMessage(keys, 'sign-in attempts')
+    if (locked) return reply.code(429).send({ error: locked })
 
     let user
     try {
@@ -29,7 +33,11 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(503).send({ error: 'Sign-in is unavailable right now. Please try again shortly.' })
     }
     const ok = user?.passwordHash && user.status === 'active' && (await verify(user.passwordHash, parsed.data.password))
-    if (!user || !ok) return reply.code(401).send({ error: 'Wrong email or password.' })
+    if (!user || !ok) {
+      recordFailure(keys)
+      return reply.code(401).send({ error: 'Wrong email or password.' })
+    }
+    clearFailures(keys)
 
     // The choice fills in a school that has never been set up, and only then: no administrator has signed in
     // before, it has no classes, and its type and curriculum are still the starting ones. After that, signing in
@@ -48,7 +56,7 @@ export async function authRoutes(app: FastifyInstance) {
   })
 
   // Change your own password (e.g. after signing in with a one-time password).
-  app.post('/auth/change-password', { onRequest: requireUser, config: { rateLimit: { max: 10, timeWindow: '15 minutes' } } }, async (request, reply) => {
+  app.post('/auth/change-password', { onRequest: requireUser, config: { rateLimit: { max: 10, timeWindow: '15 minutes', keyGenerator: (request) => request.user?.sub ?? request.ip } } }, async (request, reply) => {
     const parsed = z.object({ currentPassword: z.string().min(1).max(200), newPassword: z.string().min(8).max(200) }).safeParse(request.body)
     if (!parsed.success) return reply.code(400).send({ error: 'The new password must be at least 8 characters.' })
     const user = await prisma.user.findUnique({ where: { id: request.user!.sub } })
@@ -58,10 +66,15 @@ export async function authRoutes(app: FastifyInstance) {
   })
 
   // Forgot password: emails a single-use reset link that expires in 30 minutes. Always gives the same reply,
-  // so nobody can use this to find out which emails have accounts.
-  app.post('/auth/forgot-password', { config: { rateLimit: { max: 5, timeWindow: '15 minutes' } } }, async (request, reply) => {
+  // so nobody can use this to find out which emails have accounts. Every request counts towards the limits
+  // (auth/attempts.ts), per account and visitor address, so one inbox cannot be flooded with reset emails.
+  app.post('/auth/forgot-password', async (request, reply) => {
     const parsed = z.object({ email: z.string().trim().min(3).max(200) }).safeParse(request.body)
     if (!parsed.success) return reply.code(400).send({ error: 'Enter your email address.' })
+    const keys = attemptKeys(request, parsed.data.email)
+    const locked = lockedMessage(keys, 'password reset requests')
+    if (locked) return reply.code(429).send({ error: locked })
+    recordFailure(keys)
     const done = { sent: true, message: 'If that email has an account, a reset link is on its way. It expires in 30 minutes.' }
     try {
       const user = await prisma.user.findUnique({ where: { email: parsed.data.email.toLowerCase() } })
@@ -77,12 +90,17 @@ export async function authRoutes(app: FastifyInstance) {
     return done
   })
 
-  // Sets a new password with a reset link's token. Each link works once.
-  app.post('/auth/reset-password', { config: { rateLimit: { max: 10, timeWindow: '15 minutes' } } }, async (request, reply) => {
+  // Sets a new password with a reset link's token. Each link works once. A bad token counts as a failed attempt
+  // per address (the request names no account; the token itself cannot be guessed).
+  app.post('/auth/reset-password', async (request, reply) => {
     const parsed = z.object({ token: z.string().min(20).max(200), newPassword: z.string().min(8).max(200) }).safeParse(request.body)
     if (!parsed.success) return reply.code(400).send({ error: 'The new password must be at least 8 characters.' })
+    const keys = attemptKeys(request)
+    const locked = lockedMessage(keys, 'attempts')
+    if (locked) return reply.code(429).send({ error: locked })
     const reset = await prisma.passwordReset.findUnique({ where: { tokenHash: sha256(parsed.data.token) } })
     if (!reset || reset.usedAt || reset.expiresAt < new Date()) {
+      recordFailure(keys)
       return reply.code(400).send({ error: 'This reset link has expired or was already used. Ask for a new one.' })
     }
     await prisma.$transaction([

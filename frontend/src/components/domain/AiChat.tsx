@@ -1,4 +1,4 @@
-import { Loader2, SendHorizontal, Sparkles } from 'lucide-react'
+import { Loader2, RefreshCw, SendHorizontal, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { API_URL, apiHeaders } from '../../lib/api'
 import type { AiDraft } from '../../lib/aiAssessment'
@@ -24,6 +24,8 @@ export interface ChatTurn {
   draft?: AiDraft
   /** AI turns in the assessment builder: the attempt failed and can be tried again. */
   retry?: boolean
+  /** AI turns: no answer came (the AI was empty, busy or unreachable). The text is a note to the user, not an answer: it is never sent back as history or saved. */
+  failed?: boolean
 }
 
 interface Options {
@@ -42,8 +44,8 @@ function load(key: string): ChatTurn[] {
   try {
     const raw = readStorage(key)
     const turns = raw ? (JSON.parse(raw) as ChatTurn[]) : []
-    // A reply cut off by a page reload is kept as far as it got.
-    return turns.filter((t) => t.text).map((t) => ({ ...t, streaming: false }))
+    // A reply cut off by a page reload is kept as far as it got. Empty turns and failed ones are dropped.
+    return turns.filter((t) => t.text?.trim() && !t.failed).map((t) => ({ ...t, streaming: false }))
   } catch {
     return []
   }
@@ -55,7 +57,10 @@ export function useAiChat({ storageKey, context, onReply }: Options = {}) {
 
   useEffect(() => {
     if (!storageKey) return
-    const kept = turns.slice(-40).map(({ id, role, text }) => ({ id, role, text }))
+    const kept = turns
+      .filter((t) => !t.failed)
+      .slice(-40)
+      .map(({ id, role, text }) => ({ id, role, text }))
     writeStorage(storageKey, kept.length ? JSON.stringify(kept) : null)
   }, [turns, storageKey])
 
@@ -91,18 +96,18 @@ export function useAiChat({ storageKey, context, onReply }: Options = {}) {
     [append],
   )
 
-  /** Sends the user's message and streams the AI's reply into a new turn. */
-  const send = useCallback(
-    async (text: string) => {
-      const question = text.trim()
-      if (!question || busy) return
+  /** Asks the question after the turns given, and streams the AI's reply into a new turn. */
+  const ask = useCallback(
+    async (before: ChatTurn[], question: string) => {
       setBusy(true)
-      const history = [...turns, { id: nextId(), role: 'user' as const, text: question }]
+      // Only real turns go to the AI: a failed turn's note, or a reply that never came, would be refused or mislead it.
+      const history = [...before.filter((t) => t.text.trim() && !t.failed), { id: nextId(), role: 'user' as const, text: question }]
       const aiId = nextId()
-      setTurns([...history, { id: aiId, role: 'ai', text: '', streaming: true }])
+      setTurns([...before, history[history.length - 1]!, { id: aiId, role: 'ai', text: '', streaming: true }])
       // The reply as it arrives, kept here too so the finished conversation can be handed to onReply.
       let reply = ''
-      let answered = false
+      // A note instead of an answer: shown with a Try again button, and never kept as part of the conversation.
+      let failed: string | undefined
       try {
         const res = await fetch(`${API_URL}/ai/chat`, {
           method: 'POST',
@@ -114,7 +119,7 @@ export function useAiChat({ storageKey, context, onReply }: Options = {}) {
         })
         if (!res.ok || !res.body) {
           const body = (await res.json().catch(() => ({}))) as { error?: string; message?: string }
-          append(aiId, body.message ?? body.error ?? `The server replied ${res.status}. Please try again.`)
+          failed = body.message ?? body.error ?? `The server replied ${res.status}. Please try again.`
         } else {
           // The reply arrives in pieces as the AI writes it.
           const reader = res.body.getReader()
@@ -126,20 +131,38 @@ export function useAiChat({ storageKey, context, onReply }: Options = {}) {
             reply += piece
             append(aiId, piece)
           }
-          answered = true
+          if (!reply.trim()) failed = 'The AI did not answer. Please try again.'
         }
       } catch {
-        append(aiId, 'I can’t reach the Sangyin server. Check your connection and try again.')
+        failed = 'I can’t reach the Sangyin server. Check your connection and try again.'
       } finally {
-        update(aiId, { streaming: false })
+        update(aiId, failed ? { streaming: false, failed: true, text: failed } : { streaming: false })
         setBusy(false)
-        if (answered && reply.trim()) onReply?.([...history.map(({ role, text }) => ({ role, text })), { role: 'ai', text: reply }])
+        if (!failed) onReply?.([...history.map(({ role, text }) => ({ role, text })), { role: 'ai', text: reply }])
       }
     },
-    [turns, busy, context, onReply, append, update],
+    [context, onReply, append, update],
   )
 
-  return { turns, busy, send, push, update, append, typeOut, reset }
+  /** Sends the user's message and streams the AI's reply into a new turn. */
+  const send = useCallback(
+    async (text: string) => {
+      const question = text.trim()
+      if (!question || busy) return
+      await ask(turns, question)
+    },
+    [turns, busy, ask],
+  )
+
+  /** Asks the last question again, when the AI gave no answer to it. */
+  const retry = useCallback(async () => {
+    const last = turns.at(-1)
+    const asked = turns.at(-2)
+    if (busy || !last?.failed || asked?.role !== 'user') return
+    await ask(turns.slice(0, -2), asked.text)
+  }, [turns, busy, ask])
+
+  return { turns, busy, send, retry, push, update, append, typeOut, reset }
 }
 
 interface ChatThreadProps {
@@ -148,13 +171,15 @@ interface ChatThreadProps {
   empty: ReactNode
   /** Something to show under a finished AI turn (the drafted assessment, a Try again button). */
   attachment?: (turn: ChatTurn) => ReactNode
+  /** Asks the last question again; shown as a Try again button when the AI gave no answer to it. */
+  onRetry?: () => void
   /** Smaller type, for a side panel. */
   compact?: boolean
   className?: string
 }
 
 /** The turns of a conversation, newest at the bottom; scrolls itself to the newest as replies arrive. */
-export function ChatThread({ turns, empty, attachment, compact, className }: ChatThreadProps) {
+export function ChatThread({ turns, empty, attachment, onRetry, compact, className }: ChatThreadProps) {
   const listRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const list = listRef.current
@@ -182,7 +207,7 @@ export function ChatThread({ turns, empty, attachment, compact, className }: Cha
                       {t.status ?? 'Thinking'}…
                     </p>
                   ) : (
-                    <p className={cn('whitespace-pre-line leading-relaxed text-ink', compact ? 'text-sm' : 'text-[15px]')}>
+                    <p className={cn('whitespace-pre-line leading-relaxed', t.failed ? 'text-ink-3' : 'text-ink', compact ? 'text-sm' : 'text-[15px]')} role={t.failed ? 'status' : undefined}>
                       {t.text}
                       {t.streaming && (
                         <span className="animate-pulse text-brand-600" aria-hidden>
@@ -191,7 +216,12 @@ export function ChatThread({ turns, empty, attachment, compact, className }: Cha
                       )}
                     </p>
                   )}
-                  {!t.streaming && attachment?.(t)}
+                  {t.failed && onRetry && t === turns[turns.length - 1] && (
+                    <Button size="sm" variant="secondary" className="mt-3" onClick={onRetry} icon={<RefreshCw className="size-4" aria-hidden />}>
+                      Try again
+                    </Button>
+                  )}
+                  {!t.streaming && !t.failed && attachment?.(t)}
                 </div>
               </div>
             ),
@@ -272,6 +302,7 @@ export function AssistantCard({ chat, busy = false, description, emptyHint, atta
         compact
         className="flex-1 px-5 py-5"
         attachment={attachment}
+        onRetry={() => void chat.retry()}
         empty={
           <div className="flex h-full flex-col items-center justify-center text-center">
             <span className="grid size-12 place-items-center rounded-full bg-brand-soft text-brand-ink">

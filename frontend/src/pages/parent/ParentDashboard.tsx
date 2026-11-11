@@ -8,7 +8,7 @@ import { ProgressBar, toneForScore } from '../../components/ui/ProgressBar'
 import { StatCard } from '../../components/ui/StatCard'
 import { useAiAssessments } from '../../context/AiAssessmentsContext'
 import { useSession } from '../../context/SessionContext'
-import { practiceStreakDays, recentAchievements } from '../../data/practice'
+import { childPractice, practiceStreakDays, recentAchievements } from '../../data/practice'
 import { NO_RESULTS, averageLabel, hasResults } from '../../lib/competency'
 import { formatDate, formatDue } from '../../lib/format'
 import { timeOfDayGreeting } from '../../lib/greeting'
@@ -22,8 +22,10 @@ export function ParentDashboard() {
   const { user } = useSession()
   const { children, child, setChildId } = useSelectedChild()
   const summary = getChildSummary(child)
-  const streak = practiceStreakDays()
-  const achievements = recentAchievements()
+  // The chosen child's practice: everything their teacher has sent them, with what they have finished.
+  const practice = childPractice(child.id)
+  const streak = practiceStreakDays(practice)
+  const achievements = recentAchievements(practice)
   const firstTip = summary.tips[0]
   const { items } = useAiAssessments()
   const fromTeacher = items.filter((a) => a.status === 'sent' && a.shareWithParents && a.parentNote && a.studentIds.includes(child.id))
@@ -44,7 +46,8 @@ export function ParentDashboard() {
               value={averageLabel(child)}
               icon={TrendingUp}
               tone="good"
-              delta={child.trend !== 0 ? { value: `${Math.abs(child.trend)} pts`, direction: child.trend > 0 ? 'up' : 'down', good: child.trend > 0 } : undefined}
+              // No results yet: no change to show either, however the record's trend was set.
+              delta={hasResults(child) && child.trend !== 0 ? { value: `${Math.abs(child.trend)} pts`, direction: child.trend > 0 ? 'up' : 'down', good: child.trend > 0 } : undefined}
               hint={hasResults(child) ? 'vs last term' : 'nothing recorded yet'}
               to="/parent/progress"
             />
@@ -127,17 +130,24 @@ export function ParentDashboard() {
               icon={<HeartHandshake aria-hidden />}
             />
             <ul className="divide-y divide-line">
-              {fromTeacher.map((a) => (
-                <li key={a.id} className="px-6 py-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-ink">{a.title}</p>
-                    <span className="text-xs text-ink-3">
-                      {a.questions.length} questions · {formatDue(a.dueDate)}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-sm text-ink-2">{a.parentNote}</p>
-                </li>
-              ))}
+              {fromTeacher.map((a) => {
+                const questions = a.questionCount ?? a.questions.length
+                const done = a.attempts?.[child.id]
+                return (
+                  <li key={a.id} className="px-6 py-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-ink">{a.title}</p>
+                      <span className="text-xs text-ink-3">
+                        {a.subject} · {questions} {questions === 1 ? 'question' : 'questions'} · {formatDue(a.dueDate)}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-ink-2">{a.parentNote}</p>
+                    <p className={cn('mt-1.5 text-xs font-medium', done ? 'text-good-ink' : 'text-ink-3')}>
+                      {done ? `${firstName} has done it: ${done.score} out of ${done.total} right, on ${formatDate(done.completedOn)}.` : `${firstName} has not done it yet.`}
+                    </p>
+                  </li>
+                )
+              })}
             </ul>
           </Card>
         )}

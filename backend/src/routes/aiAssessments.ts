@@ -60,9 +60,14 @@ const DraftSchema = EditableFields.extend({
 const questionRows = (questions: z.infer<typeof QuestionSchema>[]) =>
   questions.map((q, i) => ({ ...q, position: i, options: q.type === 'multiple_choice' ? q.options ?? [] : [] }))
 
-// Each student's result on a sent assessment (frontend AttemptResult), keyed by student id.
-function attemptsByStudent(assignments: { studentId: string; score: number | null; completedAt: Date | null }[], total: number) {
-  return Object.fromEntries(assignments.filter((p) => p.completedAt).map((p) => [p.studentId, { score: p.score ?? 0, total, completedOn: p.completedAt!.toISOString() }]))
+// Each student's result on a sent assessment (frontend AttemptResult), keyed by student id, with how they said
+// they found it (feedback) and how confident they feel (confidence), when they have said.
+function attemptsByStudent(assignments: { studentId: string; score: number | null; completedAt: Date | null; feedback: string | null; confidence: string | null }[], total: number) {
+  return Object.fromEntries(
+    assignments
+      .filter((p) => p.completedAt)
+      .map((p) => [p.studentId, { score: p.score ?? 0, total, completedOn: p.completedAt!.toISOString(), ...(p.feedback ? { feedback: p.feedback } : {}), ...(p.confidence ? { confidence: p.confidence } : {}) }]),
+  )
 }
 
 // The students must all be in the assessment's class.
@@ -75,7 +80,10 @@ export async function aiAssessmentRoutes(app: FastifyInstance) {
   // Replaces AiAssessmentsContext's list. Newest first.
   // - Teachers: their drafts and sent assessments (admins: the school's), with each student's result once they have answered.
   // - Students: assessments sent to them — without answers — with their own practice copy (practiceId) and result.
-  // - Parents: assessments sent to their children that the teacher shared with parents (for the parent note).
+  // - Parents: assessments sent to their children that the teacher shared with parents (for the parent note), with
+  //   how many questions and each child's result, but not the questions themselves.
+  // The teacher's own notes (reportNotes, rationale, curriculumRefs, teachingPlan) go to staff only: students and
+  // parents get the fields the frontend's AiAssessment type needs, with those left empty.
   app.get('/ai/assessments', { onRequest: requireUser }, async (request) => {
     const user = request.user!
     if (user.role === 'teacher' || user.role === 'admin') {
@@ -97,15 +105,32 @@ export async function aiAssessmentRoutes(app: FastifyInstance) {
     })
     return items.map((a) => {
       const full = toAiAssessment(a)
-      const studentIds = a.studentIds.filter((id) => myStudents.includes(id))
-      if (user.role === 'parent') return { ...full, studentIds, questions: [] }
+      const shared = {
+        id: full.id,
+        title: full.title,
+        classId: full.classId,
+        subject: full.subject,
+        competencies: full.competencies,
+        studentIds: a.studentIds.filter((id) => myStudents.includes(id)),
+        difficulty: full.difficulty,
+        dueDate: full.dueDate,
+        reportNotes: '',
+        rationale: [],
+        oneAttempt: full.oneAttempt,
+        createdOn: full.createdOn,
+        status: full.status,
+        ...(full.sentOn ? { sentOn: full.sentOn } : {}),
+      }
+      if (user.role === 'parent') {
+        return { ...shared, questions: [], questionCount: a.questions.length, messageToStudents: '', parentNote: full.parentNote ?? '', shareWithParents: true, attempts: attemptsByStudent(a.assignments, a.questions.length) }
+      }
       const mine = a.assignments[0]
       return {
-        ...full,
-        studentIds,
+        ...shared,
         questions: full.questions.map(({ answer: _answer, explanation: _explanation, ...q }) => ({ ...q, answer: '', explanation: '' })),
+        messageToStudents: full.messageToStudents,
         ...(mine ? { practiceId: mine.id } : {}),
-        ...(mine?.completedAt ? { attempt: { score: mine.score ?? 0, total: a.questions.length, completedOn: mine.completedAt.toISOString() } } : {}),
+        ...(mine?.completedAt ? { attempt: attemptsByStudent([mine], a.questions.length)[mine.studentId] } : {}),
       }
     })
   })

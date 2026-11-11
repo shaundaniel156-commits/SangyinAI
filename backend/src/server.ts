@@ -21,12 +21,14 @@ import { notificationRoutes } from './routes/notifications.ts'
 import { practiceRoutes } from './routes/practice.ts'
 import { studentRoutes } from './routes/students.ts'
 
-// trustProxy: behind Railway's proxy, use the visitor's real address (rate limits are per visitor, not shared).
-const app = Fastify({ logger: true, trustProxy: true })
+// trustProxy: only the proxy connected to this server (Render's, hop 0) is trusted, so request.ip is the address
+// it saw, not whatever a client wrote in X-Forwarded-For. The sign-in limits read the headers themselves (auth/attempts.ts).
+const app = Fastify({ logger: true, trustProxy: (_address, hop) => hop === 0 })
 
 // Allow the frontend to call this server. Several addresses can be listed, separated by commas.
+// Every method the frontend uses is allowed (the default is GET, HEAD and POST only, which blocks saving edits and deleting when the site calls this server directly).
 const origins = (process.env.FRONTEND_ORIGIN ?? 'http://localhost:5173').split(',').map((o) => o.trim())
-await app.register(cors, { origin: origins })
+await app.register(cors, { origin: origins, methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'] })
 
 // Limits are set per route (below), so nothing is limited unless a route asks for it.
 await app.register(rateLimit, {

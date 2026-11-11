@@ -281,7 +281,9 @@ export function toPracticeActivity(p: PracticeRow) {
     estimatedMinutes: Math.max(5, Math.round(questions * 1.5)),
     ...(due && p.status !== 'completed' ? { dueLabel: `Due ${due.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })}` } : {}),
     ...(p.completedAt ? { completedOn: day(p.completedAt) } : {}),
+    ...(p.completedAt && p.score !== null ? { score: p.score } : {}),
     ...(p.feedback ? { feedback: p.feedback } : {}),
+    ...(p.confidence ? { confidence: p.confidence } : {}),
   }
 }
 

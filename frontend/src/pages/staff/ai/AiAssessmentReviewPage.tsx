@@ -11,6 +11,7 @@ import { StatusBadge } from '../../../components/ui/StatusBadge'
 import { useAiAssessments } from '../../../context/AiAssessmentsContext'
 import { useToast } from '../../../context/ToastContext'
 import { getClass } from '../../../data/classes'
+import { DIFFICULTY_OPTIONS } from '../../../data/practice'
 import { getStudent, getStudentsByClass } from '../../../data/students'
 import { ROLE_USERS } from '../../../data/users'
 import { FrameworkBadge } from '../../../components/domain/FrameworkBadge'
@@ -23,6 +24,9 @@ import { QuestionItem } from './QuestionItem'
 import { StudentWorkModal } from './StudentWorkModal'
 import { TeachingPlanCard } from './TeachingPlanCard'
 import { WorkflowSteps } from './WorkflowSteps'
+
+// How a student's confidence choice (their Feedback page) reads beside their result.
+const CONFIDENCE_WORDS = { confident: 'feels confident', unsure: 'a little unsure', need_help: 'needs more help' } as const
 
 export function AiAssessmentReviewPage() {
   const { id } = useParams()
@@ -284,7 +288,12 @@ function Review({ assessment: a }: { assessment: AiAssessment }) {
                       )}
                       <span className="flex-1 truncate text-sm text-ink">{s.name}</span>
                       {attempt ? (
-                        <span className="flex items-center gap-3">
+                        <span className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
+                          {(attempt.feedback || attempt.confidence) && (
+                            <span className="text-right text-xs text-ink-3" title="What the student said on their Feedback page">
+                              {[attempt.feedback && `Found it ${DIFFICULTY_OPTIONS.find((o) => o.id === attempt.feedback)?.label.toLowerCase()}`, attempt.confidence && CONFIDENCE_WORDS[attempt.confidence]].filter(Boolean).join(' · ')}
+                            </span>
+                          )}
                           {hasWrittenWork && (
                             <button type="button" onClick={() => setWorkFor(s)} className="text-xs font-medium text-brand-ink hover:underline">
                               View work

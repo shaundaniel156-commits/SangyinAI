@@ -195,7 +195,7 @@ export function StudentDashboard() {
           <Card className="md:col-span-2 xl:col-span-7">
             <CardHeader title="How did it go?" description={`Tell your teacher about “${lastCompleted.title}”`} icon={<Sparkles aria-hidden />} />
             <CardBody>
-              <FeedbackControl activityTitle={lastCompleted.title} initialDifficulty={lastCompleted.feedback} />
+              <FeedbackControl key={lastCompleted.id} activity={lastCompleted} />
             </CardBody>
           </Card>
         )}

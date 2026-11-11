@@ -5,7 +5,7 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { StatusBadge, type Tone } from '../../components/ui/StatusBadge'
 import { NO_RESULTS } from '../../lib/competency'
-import { PRACTICE_ACTIVITIES } from '../../data/practice'
+import { childPractice } from '../../data/practice'
 import type { PracticeStatus } from '../../types'
 import { ChildSwitcher } from './components/ChildSwitcher'
 import { getChildSummary } from './components/childSummary'
@@ -21,7 +21,8 @@ const STATUS_WORDS: Record<PracticeStatus, { label: string; tone: Tone; icon: ty
 export function ParentFocusPage() {
   const { children, child, setChildId } = useSelectedChild()
   const summary = getChildSummary(child)
-  const activities = PRACTICE_ACTIVITIES.filter((a) => a.focus === summary.focus)
+  // Everything the teacher has sent this child, practice for the current focus first.
+  const activities = [...childPractice(child.id)].sort((a, b) => Number(b.focus === summary.focus) - Number(a.focus === summary.focus))
   const otherAreas = summary.needsPractice.filter((c) => c.name !== summary.focus)
 
   return (
@@ -60,7 +61,7 @@ export function ParentFocusPage() {
         <Card>
           <CardHeader title="What your child is practising" icon={<ListChecks className="size-5" aria-hidden />} />
           {activities.length === 0 ? (
-            <EmptyState icon={ListChecks} title="No practice shared yet" description="Practice activities for this focus will appear here once the teacher shares them." />
+            <EmptyState icon={ListChecks} title="No practice sent yet" description="Practice and assessments the teacher sends your child will appear here." />
           ) : (
             <ul className="divide-y divide-line">
               {activities.map((a) => {
@@ -69,7 +70,10 @@ export function ParentFocusPage() {
                   <li key={a.id} className="flex items-center justify-between gap-3 px-5 py-3">
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-medium text-ink">{a.title}</span>
-                      <span className="block text-xs text-ink-3">About {a.estimatedMinutes} minutes</span>
+                      <span className="block text-xs text-ink-3">
+                        {a.subject} · {a.questions} {a.questions === 1 ? 'question' : 'questions'} · {a.dueLabel ?? `About ${a.estimatedMinutes} minutes`}
+                        {a.status === 'completed' && a.score !== undefined ? ` · ${a.score} of ${a.questions} right` : ''}
+                      </span>
                     </span>
                     <StatusBadge tone={s.tone} icon={s.icon}>
                       {s.label}

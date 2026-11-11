@@ -36,6 +36,7 @@ For each piece of work:
 - correct: true only when the final answer is right and the method is sound. Small presentation slips (spelling, untidy layout) do not make it wrong. A different valid method is fine.
 - feedback: one to three sentences to the learner in simple English. Say what they did well first. If something is wrong, point to the exact step and show how to fix it, in the style of the explanation given.
 - If the photo is unreadable, shows no work, or is for a different task, mark it not correct and say what to upload instead.
+- A learner may have written their name on the paper. Never repeat it: speak to them as "you".
 Never guess marks you cannot see. The teacher can read the photo too.`
 
 /**

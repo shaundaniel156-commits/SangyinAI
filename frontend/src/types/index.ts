@@ -266,8 +266,10 @@ export interface AiAssessment {
   /** From the API, for a student: their own copy to take, and their result once done. */
   practiceId?: string
   attempt?: { score: number; total: number; completedOn: string }
-  /** From the API, for a teacher: each student's result, keyed by student id. */
-  attempts?: Record<string, { score: number; total: number; completedOn: string }>
+  /** From the API, for a teacher (or a parent, for their own children): each student's result, keyed by student id, with how they said they found it. */
+  attempts?: Record<string, { score: number; total: number; completedOn: string; feedback?: PracticeFeedback; confidence?: PracticeConfidence }>
+  /** From the API, for a parent: how many questions there are (the questions themselves are not sent to parents). */
+  questionCount?: number
 }
 
 // ---------------------------------------------------------------------------
@@ -382,5 +384,9 @@ export interface PracticeActivity {
   completedOn?: string
   /** Questions right, for practice the server marked (out of `questions`). */
   score?: number
-  feedback?: 'easy' | 'okay' | 'difficult'
+  /** What the student told their teacher on the Feedback page: how difficult it was, and how confident they feel. */
+  feedback?: PracticeFeedback
+  confidence?: PracticeConfidence
 }
+export type PracticeFeedback = 'easy' | 'okay' | 'difficult'
+export type PracticeConfidence = 'confident' | 'unsure' | 'need_help'
