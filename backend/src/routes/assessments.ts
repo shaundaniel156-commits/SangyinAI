@@ -88,12 +88,39 @@ export async function assessmentRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: 'Invalid assessment', issues: parsed.error.issues })
     const user = request.user!
     const { type, date, ...rest } = parsed.data
+    // Marks only reach a learner's mastery (and the dashboards) through the areas the assessment covers.
+    if (rest.status !== 'draft' && !rest.topics.length) return reply.code(400).send({ error: 'Choose at least one curriculum area. Results only count towards learners’ progress through the areas an assessment covers.' })
     if (!(await prisma.schoolClass.count({ where: { id: rest.classId, ...classScope(user) } }))) return reply.code(404).send({ error: 'Class not found.' })
     const created = await prisma.assessment.create({
       data: { ...rest, type: ASSESSMENT_TYPE_FROM_LABEL[type]!, date: new Date(date), createdById: user.sub },
       include: assessmentInclude,
     })
     return reply.code(201).send(toAssessment(created))
+  })
+
+  // The scores of every assessment the user may see, in one request (the same rows as the route below gives for
+  // one assessment), so a page load does not ask for each assessment in turn. Parents and students only get their own rows.
+  app.get('/assessments/results', { onRequest: requireUser }, async (request) => {
+    const user = request.user!
+    const [assessments, students] = await Promise.all([
+      prisma.assessment.findMany({ where: assessmentScope(user), select: { id: true, classId: true } }),
+      prisma.student.findMany({ where: studentScope(user), select: { id: true, name: true, classId: true } }),
+    ])
+    const results = await prisma.assessmentResult.findMany({ where: { assessmentId: { in: assessments.map((a) => a.id) }, studentId: { in: students.map((s) => s.id) } } })
+    const byClass = new Map<string, typeof students>()
+    for (const s of students) byClass.set(s.classId, [...(byClass.get(s.classId) ?? []), s])
+    const byAssessment = new Map<string, Map<string, (typeof results)[number]>>()
+    for (const r of results) byAssessment.set(r.assessmentId, (byAssessment.get(r.assessmentId) ?? new Map()).set(r.studentId, r))
+    return assessments.map((a) => {
+      const rows = byAssessment.get(a.id)
+      return {
+        assessmentId: a.id,
+        results: (byClass.get(a.classId) ?? []).sort(byName).map((s) => {
+          const r = rows?.get(s.id)
+          return { studentId: s.id, score: r?.score ?? null, ...(r?.remark ? { remark: r.remark } : {}) }
+        }),
+      }
+    })
   })
 
   // Scores for every student in the class (null = not entered yet). Parents and students only get their own rows.

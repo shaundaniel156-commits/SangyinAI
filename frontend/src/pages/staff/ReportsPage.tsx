@@ -1,5 +1,5 @@
 import { FileSpreadsheet, FileText, Printer, SlidersHorizontal, Users } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Button } from '../../components/ui/Button'
 import { Card, CardBody, CardHeader } from '../../components/ui/Card'
 import { DemoNotice } from '../../components/ui/DemoNotice'
@@ -7,9 +7,9 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { useSession } from '../../context/SessionContext'
 import { useToast } from '../../context/ToastContext'
-import { SCHOOL } from '../../data/school'
 import { assessmentsInScope, classesInScope } from '../../data/selectors'
 import { getStudentsByClass } from '../../data/students'
+import { downloadCsv } from '../../lib/csv'
 import { formatDate } from '../../lib/format'
 import { ClassReport } from './reports/ClassReport'
 import { CompetencyReport } from './reports/CompetencyReport'
@@ -20,16 +20,15 @@ import { StudentReport } from './reports/StudentReport'
 import { SubjectPerformanceReport } from './reports/SubjectReport'
 import { REPORT_TITLES, type ReportFilters, type ReportType } from './reports/types'
 
-const CURRENT_TERM = SCHOOL.termOptions.find((t) => t.startsWith(SCHOOL.currentTerm)) ?? SCHOOL.termOptions[0]!
-
 export function ReportsPage() {
   const { role } = useSession()
   const { notify } = useToast()
   const classes = classesInScope(role)
+  // The report preview on screen, read for the CSV export.
+  const preview = useRef<HTMLDivElement>(null)
 
   const [type, setType] = useState<ReportType>('student')
   const [filters, setFilters] = useState<ReportFilters>({
-    term: CURRENT_TERM,
     from: '',
     to: '',
     classId: classes[0]?.id ?? 'all',
@@ -51,11 +50,19 @@ export function ReportsPage() {
       ? `${filters.from ? formatDate(filters.from) : 'Start'} – ${filters.to ? formatDate(filters.to) : 'Latest'}`
       : undefined
 
-  const exportLater = (format: string) =>
-    notify(`${format} export is not available yet`, {
-      description: 'Export will be available when the backend is connected.',
-      tone: 'info',
-    })
+  // PDF: the browser's print window makes the file when "Save as PDF" is chosen as the printer.
+  const exportPdf = () => {
+    notify('Choose “Save as PDF” as the printer', { tone: 'info', description: 'The print window is opening. Pick “Save as PDF” (or “Microsoft Print to PDF”) to make a PDF file.' })
+    window.setTimeout(() => window.print(), 300)
+  }
+  // CSV: the headings, figures and tables of the report on screen, as a file Excel or Google Sheets opens.
+  const exportCsv = () => {
+    const rows = reportRows(preview.current?.querySelector('article') ?? null)
+    if (!rows.length) return notify('Nothing to export yet', { tone: 'info' })
+    const filename = `sangyin-${type}-report-${new Date().toISOString().slice(0, 10)}.csv`
+    downloadCsv(filename, rows)
+    notify('CSV downloaded', { description: `${filename} — open it in Excel or Google Sheets. Charts are not included.` })
+  }
 
   const subtitle =
     type === 'student'
@@ -94,10 +101,10 @@ export function ReportsPage() {
           description="Build a student, class, subject or competency report and preview it before printing or exporting."
           actions={
             <>
-              <Button variant="secondary" icon={<FileText className="size-4" aria-hidden />} onClick={() => exportLater('PDF')}>
+              <Button variant="secondary" icon={<FileText className="size-4" aria-hidden />} onClick={exportPdf}>
                 Export PDF
               </Button>
-              <Button variant="secondary" icon={<FileSpreadsheet className="size-4" aria-hidden />} onClick={() => exportLater('CSV / Excel')}>
+              <Button variant="secondary" icon={<FileSpreadsheet className="size-4" aria-hidden />} onClick={exportCsv}>
                 Export CSV/Excel
               </Button>
               <Button icon={<Printer className="size-4" aria-hidden />} onClick={() => window.print()}>
@@ -107,8 +114,9 @@ export function ReportsPage() {
           }
         />
         <DemoNotice className="mb-6">
-          Reports are made in the browser from your school’s recorded results. Printing uses your browser’s print dialog (choose
-          “Save as PDF” for a file). Results are not yet split by term — the term sets the report label.
+          Reports are made in the browser from your school’s recorded results. Export PDF and Print open your browser’s print window
+          (choose “Save as PDF” for a file); Export CSV/Excel downloads the report’s figures and tables. Use the date range to limit a
+          report to one term’s assessments.
         </DemoNotice>
       </div>
 
@@ -130,13 +138,47 @@ export function ReportsPage() {
           </CardBody>
         </Card>
 
-        <div className="min-w-0">
+        <div className="min-w-0" ref={preview}>
           <p className="no-print mb-2 text-xs font-medium uppercase tracking-wide text-ink-3">Preview</p>
-          <ReportDocument title={REPORT_TITLES[type]} subtitle={subtitle} term={filters.term} period={period}>
+          <ReportDocument title={REPORT_TITLES[type]} subtitle={subtitle} period={period}>
             {renderBody()}
           </ReportDocument>
         </div>
       </div>
     </>
   )
+}
+
+/**
+ * The report on screen as rows of text for a CSV file: its heading and details, then each part in order — a line of
+ * text, a block of figures (label, value) or a section with its table or bar list. Charts have no rows.
+ */
+function reportRows(doc: Element | null): string[][] {
+  if (!doc) return []
+  // Text as it reads on screen; a line break inside a cell (a sub-label) becomes " · ".
+  const text = (el: Element | Node | null | undefined) => ((el as HTMLElement | null)?.innerText ?? el?.textContent ?? '').replace(/\s*\n+\s*/g, ' · ').replace(/\s+/g, ' ').trim()
+  const pairs = (dl: Element) => [...dl.querySelectorAll('dt')].map((dt) => [text(dt), text(dt.nextElementSibling)])
+  const rows: string[][] = [[text(doc.querySelector('h2'))]]
+  const header = doc.querySelector('header')
+  const subtitle = header?.querySelector('h2 + p')
+  if (subtitle) rows.push([text(subtitle)])
+  const details = header?.querySelector('dl')
+  if (details) rows.push(...pairs(details))
+  for (const part of doc.querySelectorAll(':scope > div > p, :scope > div > dl, :scope > div > section')) {
+    if (part.tagName === 'P') rows.push([], [text(part)])
+    else if (part.tagName === 'DL') rows.push([], ...pairs(part))
+    else {
+      const body: string[][] = []
+      const table = part.querySelector('table')
+      if (table) for (const tr of table.querySelectorAll('tr')) body.push([...tr.querySelectorAll('th, td')].map(text))
+      else for (const li of part.querySelectorAll('li')) {
+        const [label, value] = li.querySelectorAll(':scope > div:first-child > span')
+        if (label && value) body.push([text(label.firstChild), text(label.querySelector('span')), text(value)])
+      }
+      const note = body.length ? null : part.querySelector(':scope > div > p')
+      if (note) body.push([text(note)])
+      rows.push([], [text(part.querySelector('h3'))], ...(body.length ? body : [['(chart — not included)']]))
+    }
+  }
+  return rows
 }

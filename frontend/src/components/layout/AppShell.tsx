@@ -8,7 +8,6 @@ import { Drawer } from '../ui/Modal'
 import { ErrorBoundary } from './ErrorBoundary'
 import { MobileNav } from './MobileNav'
 import { Sidebar } from './Sidebar'
-import { StatusDot } from './StatusDot'
 import { TopNav } from './TopNav'
 
 /** Application shell: top navigation + routed content. */
@@ -46,7 +45,6 @@ export function AppShell() {
           <Outlet />
         </ErrorBoundary>
       </main>
-      <StatusDot aboveMobileNav={portal} />
       {portal && <MobileNav />}
     </div>
   )

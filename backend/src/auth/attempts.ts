@@ -70,14 +70,17 @@ export function lockedMessage(keys: Counted[], what = 'attempts'): string | null
   return `Too many ${what}. Please wait ${minutes} ${minutes === 1 ? 'minute' : 'minutes'} and try again.`
 }
 
-/** Counts one failed attempt under each key. */
-export function recordFailure(keys: Counted[]) {
+/** Counts one failed attempt under each key. Returns the keys that have just reached their limit: a lockout starts. */
+export function recordFailure(keys: Counted[]): Counted[] {
   const now = Date.now()
-  for (const { key } of keys) {
+  const locked: Counted[] = []
+  for (const { key, max } of keys) {
     const f = failures.get(key)
     if (f && f.resetAt > now) f.count++
     else failures.set(key, { count: 1, resetAt: now + WINDOW_MS })
+    if (failures.get(key)!.count === max) locked.push({ key, max })
   }
+  return locked
 }
 
 /**
@@ -87,6 +90,15 @@ export function recordFailure(keys: Counted[]) {
 export function clearFailures(keys: Counted[]) {
   const first = keys[0]
   if (first) failures.delete(first.key)
+}
+
+/**
+ * Forgets every failed attempt on one account, from every address: an administrator has just set its password
+ * (feed/users/:id/password), so a locked-out teacher can sign in at once.
+ */
+export function clearAccountFailures(email: string) {
+  const account = email.trim().toLowerCase()
+  for (const key of failures.keys()) if (key === `account:${account}` || key.startsWith(`account+visitor:${account}|`)) failures.delete(key)
 }
 
 /** For tests: forget every count. */

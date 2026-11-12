@@ -29,15 +29,12 @@ export function LandingPage() {
             {n.label}
           </a>
         ))}
-        <Link to="/login" className="hidden transition-colors hover:text-white sm:inline">
-          Sign in
-        </Link>
         <Link
           to="/login"
           className="rounded-md px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
           style={{ backgroundColor: LOGO_BLUE }}
         >
-          Get Started
+          Sign in
         </Link>
       </AuthHeader>
 
@@ -82,6 +79,10 @@ export function LandingPage() {
             See how it works
           </a>
         </div>
+        {/* There is no sign-up: every account is made by the school. */}
+        <p className="mt-5 max-w-md text-sm text-white/55">
+          Accounts are created by your school: the administrator adds teachers, and teachers add students and parents. Ask your school for your sign-in details.
+        </p>
 
         <dl className="mt-12 grid grid-cols-3 gap-6 sm:gap-20">
           {STATS.map((s) => (

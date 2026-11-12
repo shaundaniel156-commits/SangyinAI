@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarList } from '../../components/charts/BarList'
 import { ChartContainer } from '../../components/charts/ChartContainer'
-import { LineChart } from '../../components/charts/LineChart'
+import { LineChart, chartRange } from '../../components/charts/LineChart'
 import { AssessmentStatusBadge } from '../../components/domain/AssessmentCard'
 import { Card, CardHeader } from '../../components/ui/Card'
 import { DataTable } from '../../components/ui/DataTable'
@@ -13,7 +13,6 @@ import { useLiveData } from '../../context/LiveDataContext'
 import { useSession } from '../../context/SessionContext'
 import { classAverageLabel, classHasResults, getClass, getClassCompetencyAverages } from '../../data/classes'
 import { getClassTrend } from '../../data/performance'
-import { SCHOOL } from '../../data/school'
 import { assessmentsInScope, classesInScope } from '../../data/selectors'
 import { getStudentsByClass } from '../../data/students'
 import { NO_RESULTS, levelFromScore } from '../../lib/competency'
@@ -31,7 +30,6 @@ export function PerformancePage() {
   const classes = classesInScope(role)
   const [classId, setClassId] = useState(classes[0]?.id ?? '')
   const [subject, setSubject] = useState<Subject>('Mathematics')
-  const [term, setTerm] = useState(SCHOOL.termOptions[SCHOOL.termOptions.length - 1]!)
 
   const cls = getClass(classId)
   const students = getStudentsByClass(classId)
@@ -62,6 +60,12 @@ export function PerformancePage() {
     }
   })
   const trendSeries = classes.slice(0, 3).map((c, i) => ({ name: c.name, points: getClassTrend(c.id), color: SERIES_COLORS[i]! }))
+  // The table view of the trend: one row per assessment, in order; a class with fewer results shows "No results yet"
+  // where it has none. The classes' assessments fall on their own dates, so the date shown is the first class's.
+  const trendRows = Array.from({ length: Math.max(0, ...trendSeries.map((s) => s.points.length)) }, (_, i) => [
+    trendSeries.find((s) => s.points[i])?.points[i]?.label ?? '',
+    ...trendSeries.map((s) => (s.points[i] ? `${s.points[i]!.value}%` : NO_RESULTS)),
+  ])
 
   return (
     <>
@@ -77,7 +81,6 @@ export function PerformancePage() {
             onChange: (v) => setSubject(v as Subject),
             options: subjectChoices(classSubjects, [subject]).map((s) => ({ value: s, label: s })),
           },
-          { id: 'term', label: 'Term', value: term, onChange: setTerm, options: SCHOOL.termOptions.map((t) => ({ value: t, label: t })) },
         ]}
       />
 
@@ -93,16 +96,13 @@ export function PerformancePage() {
           className="xl:col-span-2"
           title="Performance trends"
           description="Class averages across recent assessments (%)"
-          table={{
-            headers: ['Month', ...trendSeries.map((s) => s.name)],
-            rows: (trendSeries[0]?.points ?? []).map((p, i) => [p.label, ...trendSeries.map((s) => `${s.points[i]?.value}%`)]),
-          }}
+          table={{ headers: ['Date', ...trendSeries.map((s) => s.name)], rows: trendRows }}
         >
-          <LineChart ariaLabel="Class average trends" series={trendSeries} min={40} max={80} />
+          <LineChart ariaLabel="Class average trends" series={trendSeries} {...chartRange(trendSeries)} />
         </ChartContainer>
         <ChartContainer
           title="Subject performance"
-          description={`${cls?.name} · average mastery`}
+          description={cls ? `${cls.name} · average mastery` : 'Average mastery by subject'}
           table={{ headers: ['Subject', 'Average'], rows: subjectAverages.map((s) => [s.subject, `${s.value}%`]) }}
         >
           <BarList items={subjectAverages.map((s) => ({ id: s.subject, label: s.subject, value: s.value }))} />
@@ -153,7 +153,7 @@ export function PerformancePage() {
       </div>
 
       <Card className="mt-6">
-        <CardHeader title="Assessment history" description={`${cls?.name} · ${term}`} />
+        <CardHeader title="Assessment history" description={cls?.name} />
         <DataTable
           caption="Assessment history"
           rows={history}

@@ -145,6 +145,8 @@ export function CreateAssessmentPage() {
     }
     if (!title.trim()) return notify('Add a title first', { tone: 'info' })
     if (topics.length > MAX_AREAS.paper) return notify(`Up to ${MAX_AREAS.paper} areas`, { tone: 'info', description: `An assessment can cover up to ${MAX_AREAS.paper} areas; ${topics.length} are chosen. Untick some first.` })
+    // Marks only reach a learner's progress through the areas an assessment covers: without one they would never show.
+    if (!draft && !topics.length) return notify('Choose what it covers', { tone: 'info', description: 'Pick or add at least one curriculum area. Results count towards learners’ progress only through the areas an assessment covers, so without one the marks would never reach the dashboards. (A draft can wait.)' })
     if (online && !draft) return createOnline()
     setWorking('Saving…')
     try {
@@ -337,7 +339,7 @@ export function CreateAssessmentPage() {
                 <SummaryRow label="Class" value={cls?.name ?? '—'} />
                 <SummaryRow label="Students" value={online && students.length > MAX_STUDENTS_ONLINE ? `${students.length} (online: up to ${MAX_STUDENTS_ONLINE})` : String(cls?.studentCount ?? 0)} />
                 {online && <SummaryRow label="Questions" value={count} />}
-                <SummaryRow label="Areas" value={topics.length ? topics.join(', ') : 'None selected'} />
+                <SummaryRow label="Areas" value={topics.length ? topics.join(', ') : 'None yet — choose at least one for results to count'} />
               </dl>
               <div className="mt-4 flex items-start gap-2 rounded-lg bg-info-soft p-3 text-sm text-brand-ink">
                 <Info className="mt-0.5 size-4 shrink-0" aria-hidden />

@@ -1,6 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/layout/AppShell'
-import { SplashScreen } from './components/layout/SplashScreen'
 import { useLiveData } from './context/LiveDataContext'
 import { LandingPage } from './pages/auth/LandingPage'
 import { LoginPage } from './pages/auth/LoginPage'
@@ -43,17 +42,17 @@ import { CreateAssessmentPage } from './pages/staff/CreateAssessmentPage'
 import { ImportResultsPage } from './pages/staff/ImportResultsPage'
 import { StudentProfilePage } from './pages/staff/StudentProfilePage'
 import { StudentsPage } from './pages/staff/StudentsPage'
+import { RoleRoute } from './routes/RoleRoute'
 
 /**
- * Application routes. Pages inside AppShell need a signed-in account (AppShell sends others to /login);
- * the account's role decides which navigation and dashboards show.
+ * Application routes. Pages inside AppShell need a signed-in account (AppShell sends others to /login); the
+ * account's role decides which navigation and dashboards show, and which pages open at all (RoleRoute): a page
+ * for another kind of account says so instead of opening empty. Ask AI, notifications and settings are for everyone.
  */
 export default function App() {
   // Reading the live data here redraws every page, in place, each time the data is reloaded.
   useLiveData()
   return (
-    <>
-    <SplashScreen />
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/welcome" element={<Navigate to="/" replace />} />
@@ -61,45 +60,52 @@ export default function App() {
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route element={<AppShell />}>
         <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/students" element={<StudentsPage />} />
-        <Route path="/students/:id" element={<StudentProfilePage />} />
-        <Route path="/classes" element={<ClassesPage />} />
-        <Route path="/classes/:id" element={<ClassDetailPage />} />
-        <Route path="/assessments" element={<AssessmentsPage />} />
-        <Route path="/assessments/new" element={<CreateAssessmentPage />} />
-        <Route path="/assessments/import" element={<ImportResultsPage />} />
-        <Route path="/assessments/:id" element={<AssessmentDetailPage />} />
         <Route path="/ask-ai" element={<AskAiPage />} />
-        <Route path="/ai-assessments" element={<AiAssessmentsPage />} />
-        <Route path="/ai-assessments/new" element={<AiAssessmentNewPage />} />
-        <Route path="/ai-assessments/:id" element={<AiAssessmentReviewPage />} />
-        <Route path="/curriculum" element={<CurriculumPage />} />
-        <Route path="/reports" element={<ReportsPage />} />
-        <Route path="/performance" element={<PerformancePage />} />
-        <Route path="/diagnostics" element={<DiagnosticsPage />} />
-        <Route path="/diagnostics/new" element={<AnalyseExamPage />} />
-        <Route path="/diagnostics/:id" element={<DiagnosticDetailPage />} />
-        <Route path="/guidance" element={<GuidancePage />} />
-        <Route path="/guidance/:id" element={<GuidanceDetailPage />} />
-        <Route path="/admin/structure" element={<AcademicStructurePage />} />
-        <Route path="/data" element={<ManualFeedPage />} />
-        <Route path="/admin/users" element={<UsersPage />} />
-        <Route path="/admin/teachers" element={<TeachersPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/parent/dashboard" element={<ParentDashboard />} />
-        <Route path="/parent/children" element={<ParentChildrenPage />} />
-        <Route path="/parent/progress" element={<ParentProgressPage />} />
-        <Route path="/parent/focus" element={<ParentFocusPage />} />
-        <Route path="/parent/home-support" element={<ParentHomeSupportPage />} />
-        <Route path="/student/dashboard" element={<StudentDashboard />} />
-        <Route path="/student/learning" element={<StudentLearningPage />} />
-        <Route path="/student/practice" element={<StudentPracticePage />} />
-        <Route path="/student/progress" element={<StudentProgressPage />} />
-        <Route path="/student/feedback" element={<StudentFeedbackPage />} />
+        <Route element={<RoleRoute roles={['teacher', 'admin']} />}>
+          <Route path="/students" element={<StudentsPage />} />
+          <Route path="/students/:id" element={<StudentProfilePage />} />
+          <Route path="/classes" element={<ClassesPage />} />
+          <Route path="/classes/:id" element={<ClassDetailPage />} />
+          <Route path="/assessments" element={<AssessmentsPage />} />
+          <Route path="/assessments/new" element={<CreateAssessmentPage />} />
+          <Route path="/assessments/import" element={<ImportResultsPage />} />
+          <Route path="/assessments/:id" element={<AssessmentDetailPage />} />
+          <Route path="/ai-assessments" element={<AiAssessmentsPage />} />
+          <Route path="/ai-assessments/new" element={<AiAssessmentNewPage />} />
+          <Route path="/ai-assessments/:id" element={<AiAssessmentReviewPage />} />
+          <Route path="/curriculum" element={<CurriculumPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/performance" element={<PerformancePage />} />
+          <Route path="/diagnostics" element={<DiagnosticsPage />} />
+          <Route path="/diagnostics/new" element={<AnalyseExamPage />} />
+          <Route path="/diagnostics/:id" element={<DiagnosticDetailPage />} />
+          <Route path="/guidance" element={<GuidancePage />} />
+          <Route path="/guidance/:id" element={<GuidanceDetailPage />} />
+          <Route path="/data" element={<ManualFeedPage />} />
+        </Route>
+        <Route element={<RoleRoute roles={['admin']} />}>
+          <Route path="/admin/structure" element={<AcademicStructurePage />} />
+          <Route path="/admin/users" element={<UsersPage />} />
+          <Route path="/admin/teachers" element={<TeachersPage />} />
+        </Route>
+        <Route element={<RoleRoute roles={['parent']} />}>
+          <Route path="/parent/dashboard" element={<ParentDashboard />} />
+          <Route path="/parent/children" element={<ParentChildrenPage />} />
+          <Route path="/parent/progress" element={<ParentProgressPage />} />
+          <Route path="/parent/focus" element={<ParentFocusPage />} />
+          <Route path="/parent/home-support" element={<ParentHomeSupportPage />} />
+        </Route>
+        <Route element={<RoleRoute roles={['student']} />}>
+          <Route path="/student/dashboard" element={<StudentDashboard />} />
+          <Route path="/student/learning" element={<StudentLearningPage />} />
+          <Route path="/student/practice" element={<StudentPracticePage />} />
+          <Route path="/student/progress" element={<StudentProgressPage />} />
+          <Route path="/student/feedback" element={<StudentFeedbackPage />} />
+        </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
-    </>
   )
 }

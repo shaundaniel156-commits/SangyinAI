@@ -20,6 +20,16 @@ interface LineChartProps {
 const PAD = { top: 12, right: 44, bottom: 28, left: 36 }
 const WIDTH = 640
 
+/** A y-axis range that fits the values: whole tens with a little room above and below, kept within 0–100. */
+export function chartRange(series: { points: SeriesPoint[] }[]): { min: number; max: number } {
+  const values = series.flatMap((s) => s.points.map((p) => p.value))
+  if (!values.length) return { min: 0, max: 100 }
+  const min = Math.max(0, Math.floor((Math.min(...values) - 5) / 10) * 10)
+  const max = Math.min(100, Math.ceil((Math.max(...values) + 5) / 10) * 10)
+  // Too narrow a band makes small differences look dramatic: open it up.
+  return max - min < 20 ? { min: Math.max(0, min - 10), max: Math.min(100, max + 10) } : { min, max }
+}
+
 /**
  * Minimal responsive SVG line chart: hairline grid, 2px lines, end labels,
  * and a hover crosshair with tooltip. One shared y-axis only.
@@ -32,9 +42,13 @@ export function LineChart({ series, height = 240, min = 0, max = 100, valueSuffi
   const innerH = height - PAD.top - PAD.bottom
   const x = (i: number) => PAD.left + (labels.length <= 1 ? innerW / 2 : (i / (labels.length - 1)) * innerW)
   const y = (v: number) => PAD.top + innerH - ((v - min) / (max - min)) * innerH
+  // Grid lines on round numbers: fives for a narrow range, tens or twenties for wider ones.
   const ticks = useMemo(() => {
-    const step = (max - min) / 4
-    return [0, 1, 2, 3, 4].map((i) => Math.round(min + step * i))
+    const range = max - min
+    const step = range <= 20 ? 5 : range <= 50 ? 10 : 20
+    const list: number[] = []
+    for (let t = Math.ceil(min / step) * step; t <= max; t += step) list.push(t)
+    return list
   }, [min, max])
 
   // Direct end labels only where they don't collide; otherwise legend + tooltip carry values.

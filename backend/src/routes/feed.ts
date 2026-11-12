@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { hash } from '@node-rs/argon2'
 import { z } from 'zod'
+import { clearAccountFailures } from '../auth/attempts.ts'
 import { requireRole } from '../auth/session.ts'
 import { prisma } from '../db/client.ts'
 import { FEED_KINDS, type Row } from '../feed/kinds.ts'
@@ -24,6 +25,8 @@ const InstitutionSchema = z.object({
   name: z.string().trim().min(1).max(200).optional(),
   district: z.string().trim().max(120).optional(),
   type: z.enum(['primary', 'secondary', 'university', 'mixed']).optional(),
+  // National or Cambridge: with the type, decides the class names offered (Primary 1–7, Grade 1–6, ...).
+  framework: z.enum(['uganda', 'cambridge']).optional(),
 })
 
 export async function feedRoutes(app: FastifyInstance) {
@@ -235,6 +238,8 @@ export async function feedRoutes(app: FastifyInstance) {
     const user = await prisma.user.findFirst({ where: { id: request.params.id, schoolId: request.user!.schoolId } })
     if (!user) return reply.code(404).send({ error: 'User not found.' })
     await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hash(parsed.data.password), status: 'active' } })
+    // Wrong guesses so far are forgotten too, so someone locked out can sign in with the new password at once.
+    clearAccountFailures(user.email)
     request.log.info({ user: user.id, by: request.user!.sub }, 'password set by admin')
     return reply.code(204).send()
   })
@@ -264,12 +269,12 @@ export async function feedRoutes(app: FastifyInstance) {
   // --- The institution itself ---
   app.get('/feed/institution', staffOnly, async (request) => {
     const s = await prisma.school.findUniqueOrThrow({ where: { id: request.user!.schoolId } })
-    return { id: s.id, name: s.name, district: s.district, type: s.type }
+    return { id: s.id, name: s.name, district: s.district, type: s.type, framework: s.framework }
   })
   app.patch('/feed/institution', adminOnly, async (request, reply) => {
     const parsed = InstitutionSchema.safeParse(request.body)
     if (!parsed.success) return reply.code(400).send({ error: 'Invalid institution details.', issues: parsed.error.issues })
     const s = await prisma.school.update({ where: { id: request.user!.schoolId }, data: parsed.data })
-    return { id: s.id, name: s.name, district: s.district, type: s.type }
+    return { id: s.id, name: s.name, district: s.district, type: s.type, framework: s.framework }
   })
 }

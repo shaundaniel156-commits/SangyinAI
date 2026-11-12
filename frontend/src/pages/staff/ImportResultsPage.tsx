@@ -9,9 +9,12 @@ import { PageHeader } from '../../components/ui/PageHeader'
 import { useLiveData } from '../../context/LiveDataContext'
 import { useSession } from '../../context/SessionContext'
 import { useToast } from '../../context/ToastContext'
+import { getClass } from '../../data/classes'
 import { assessmentsInScope } from '../../data/selectors'
+import { getStudentsByClass } from '../../data/students'
 import { api } from '../../lib/api'
 import { cn } from '../../lib/cn'
+import { downloadCsv } from '../../lib/csv'
 
 const STEPS = ['Upload file', 'Match columns', 'Review & confirm']
 
@@ -120,6 +123,21 @@ export function ImportResultsPage() {
     if (f) void choose(f)
   }
 
+  // A CSV to fill in: the columns the import reads, with a row for each student in the chosen assessment's class
+  // (name and ID already filled in, so every row matches), or one example row when no assessment is chosen.
+  const downloadTemplate = () => {
+    const chosen = assessments.find((a) => a.id === assessmentId)
+    const students = chosen ? getStudentsByClass(chosen.classId) : []
+    const rows = students.length ? students.map((s) => [s.name, s.id, '', '']) : [['Amina Nakato', '', '15', '']]
+    const slug = chosen ? `-${chosen.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}` : ''
+    downloadCsv(`sangyin-results-template${slug}.csv`, [['Learner Name', 'Student ID', 'Marks', 'Comment'], ...rows])
+    notify('Template downloaded', {
+      description: students.length
+        ? `One row for each student in ${getClass(chosen!.classId)?.name ?? 'the class'}. Fill in the Marks column (out of ${chosen!.maxScore}) and upload the file here.`
+        : 'Fill in one row per student (Learner Name and Marks) and upload the file here.',
+    })
+  }
+
   // Column mapping from the file once read, otherwise the example.
   const mapping = preview
     ? [
@@ -137,11 +155,7 @@ export function ImportResultsPage() {
         title="Import results"
         description="Bring in scores from an Excel or CSV report card, your School Information System or a paper report instead of typing them one by one."
         actions={
-          <Button
-            variant="secondary"
-            icon={<Download className="size-4" aria-hidden />}
-            onClick={() => notify('Template download not available yet', { tone: 'info', description: 'The import template will be provided with the backend.' })}
-          >
+          <Button variant="secondary" icon={<Download className="size-4" aria-hidden />} onClick={downloadTemplate}>
             Download template
           </Button>
         }

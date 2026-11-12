@@ -7,8 +7,7 @@ export function SchoolInfoCard({ classCount, studentCount }: { classCount: numbe
     ['School name', schoolName()],
     ['Type', SCHOOL.type],
     ['Location', SCHOOL.location],
-    ['Academic year', `${SCHOOL.academicYear} · ${SCHOOL.currentTerm}`],
-    ['Contact', SCHOOL.contactEmail],
+    ['Academic year', SCHOOL.academicYear],
     ['Classes / students', `${classCount} / ${studentCount}`],
   ]
   return (

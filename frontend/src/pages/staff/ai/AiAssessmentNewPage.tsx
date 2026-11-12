@@ -206,8 +206,8 @@ export function AiAssessmentNewPage() {
       notify('Assessment ready for your review', { description: `${saved.questions.length} questions for ${saved.studentIds.length} students.` })
       navigate(`/ai-assessments/${saved.id}`)
     } catch (error) {
-      const message = (error as Error).message
-      notify('Assessment not saved', { tone: 'info', description: message === 'Invalid draft' ? 'The draft has no questions. Press Try again.' : message })
+      // The server says what was wrong with the draft, in plain words.
+      notify('Assessment not saved', { tone: 'info', description: (error as Error).message })
     }
   }
 

@@ -1,27 +1,35 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { cn } from '../../lib/cn'
 import { LogoMark } from './Logo'
 
-const SHOW_MS = 1800
-const FADE_MS = 900
+// Shown at least this long once it appears, so a quick load does not make it flash.
+const MIN_MS = 400
+const FADE_MS = 600
 
 /**
- * Full-screen intro shown once per page load. The app renders underneath,
- * so nothing waits on it; the overlay fades out and then unmounts.
+ * Full-screen intro, shown while the school's data is loading after sign-in (LiveDataProvider). It stays up for
+ * at least MIN_MS, then fades out and unmounts as soon as the data is in. Before sign-in it never shows.
  */
-export function SplashScreen() {
-  const [phase, setPhase] = useState<'show' | 'fade' | 'done'>('show')
+export function SplashScreen({ loading }: { loading: boolean }) {
+  const [phase, setPhase] = useState<'show' | 'fade' | 'done'>(loading ? 'show' : 'done')
+  // When the splash last appeared, so a quick load still shows it for MIN_MS.
+  const shownAt = useRef(0)
 
   useEffect(() => {
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const show = reduced ? 600 : SHOW_MS
-    const fade = setTimeout(() => setPhase('fade'), show)
-    const done = setTimeout(() => setPhase('done'), show + FADE_MS)
+    if (loading) {
+      shownAt.current = Date.now()
+      setPhase('show')
+      return
+    }
+    // Loaded: keep it up to the minimum, then fade. Only a splash that is showing moves on; a finished one stays finished.
+    const wait = Math.max(0, MIN_MS - (Date.now() - shownAt.current))
+    const fade = setTimeout(() => setPhase((p) => (p === 'show' ? 'fade' : p)), wait)
+    const done = setTimeout(() => setPhase((p) => (p === 'fade' ? 'done' : p)), wait + FADE_MS)
     return () => {
       clearTimeout(fade)
       clearTimeout(done)
     }
-  }, [])
+  }, [loading])
 
   if (phase === 'done') return null
 
@@ -55,7 +63,7 @@ export function SplashScreen() {
           <LogoMark className="relative size-20" onDark />
         </div>
         <p className="mt-6 text-3xl font-bold tracking-tight text-[#5b93e6]">Sangyin AI</p>
-        <p className="mt-1.5 text-sm text-white/60">AI-Guided Adaptive Education System</p>
+        <p className="mt-1.5 text-sm text-white/60">Loading your school’s data…</p>
       </div>
       </div>
     </div>

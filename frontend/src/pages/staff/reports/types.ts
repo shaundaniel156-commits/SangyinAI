@@ -3,7 +3,6 @@ import type { Subject } from '../../../types'
 export type ReportType = 'student' | 'class' | 'subject' | 'competency'
 
 export interface ReportFilters {
-  term: string
   /** Optional ISO dates (yyyy-mm-dd) limiting which assessments are listed. */
   from: string
   to: string

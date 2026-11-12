@@ -25,6 +25,9 @@ const FeedbackSchema = z
 // The photos make this request far bigger than the server's usual limit.
 const answersOptions = { onRequest: requireRole('student'), bodyLimit: 40 * 1024 * 1024 }
 
+// Thrown inside the hand-in transaction when a once-only assessment was handed in by another request first.
+const doneAlready = new Error('done already')
+
 // The signed-in student's own practice copy, or null.
 async function findOwnAssignment(user: SessionUser, id: string) {
   return prisma.practiceAssignment.findFirst({
@@ -96,7 +99,8 @@ export async function practiceRoutes(app: FastifyInstance) {
     const item = await findOwnAssignment(request.user!, request.params.id)
     if (!item) return reply.code(404).send({ error: 'Practice not found.' })
     // A formal assessment is done once; practice can be tried again.
-    if (item.aiAssessment.oneAttempt && item.completedAt) return reply.code(409).send({ error: 'You have already done this assessment. Your result is saved.' })
+    const alreadyDone = { error: 'You have already done this assessment. Your result is saved.' }
+    if (item.aiAssessment.oneAttempt && item.completedAt) return reply.code(409).send(alreadyDone)
 
     const questions = item.aiAssessment.questions
     const work = parsed.data.work ?? {}
@@ -116,17 +120,27 @@ export async function practiceRoutes(app: FastifyInstance) {
     })
     const score = marked.filter((m) => m.correct).length
     const completedAt = new Date()
-    await prisma.$transaction([
-      prisma.practiceAssignment.update({
-        where: { id: item.id },
-        data: { status: 'completed', answers, score, completedAt, startedAt: item.startedAt ?? completedAt, ...(parsed.data.feedback ? { feedback: parsed.data.feedback } : {}) },
-      }),
-      ...uploaded.map((q) => {
-        const mark = markOf.get(q.id)
-        const fields = { mimeType: work[q.id]!.mimeType, data: Buffer.from(work[q.id]!.data, 'base64'), correct: mark?.correct ?? null, feedback: mark?.feedback ?? '' }
-        return prisma.practiceUpload.upsert({ where: { assignmentId_questionId: { assignmentId: item.id, questionId: q.id } }, create: { assignmentId: item.id, questionId: q.id, ...fields }, update: fields })
-      }),
-    ])
+    // Marked, the whole result is written in one step. For a once-only assessment that update only matches a copy
+    // not yet done, so of two hand-ins arriving together only the first is saved; the second is refused and writes
+    // nothing (not even its photos). Until then the copy is untouched, so nothing shows it as done early.
+    try {
+      await prisma.$transaction(async (tx) => {
+        const saved = await tx.practiceAssignment.updateMany({
+          where: { id: item.id, ...(item.aiAssessment.oneAttempt ? { completedAt: null } : {}) },
+          data: { status: 'completed', answers, score, completedAt, startedAt: item.startedAt ?? completedAt, ...(parsed.data.feedback ? { feedback: parsed.data.feedback } : {}) },
+        })
+        if (!saved.count) throw doneAlready
+        for (const q of uploaded) {
+          const mark = markOf.get(q.id)
+          const fields = { mimeType: work[q.id]!.mimeType, data: Buffer.from(work[q.id]!.data, 'base64'), correct: mark?.correct ?? null, feedback: mark?.feedback ?? '' }
+          await tx.practiceUpload.upsert({ where: { assignmentId_questionId: { assignmentId: item.id, questionId: q.id } }, create: { assignmentId: item.id, questionId: q.id, ...fields }, update: fields })
+        }
+      // The photos can run to a few MB each; a slow database must not fail a hand-in the AI has already marked.
+      }, { timeout: 60_000 })
+    } catch (error) {
+      if (error === doneAlready) return reply.code(409).send(alreadyDone)
+      throw error
+    }
     // The score goes into the gradebook (Assessments) out of that assessment's maximum, and the assessment is
     // complete once every student it was sent to has done it. Never allowed to fail the student's submission.
     const graded = item.aiAssessment.assessment

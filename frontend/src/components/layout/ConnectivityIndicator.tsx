@@ -10,8 +10,8 @@ const STATES: Record<ConnectivityStatus, { label: string; icon: typeof Wifi; dot
   syncing: { label: 'Syncing…', icon: RefreshCw, dot: 'bg-brand-500', pill: 'text-brand-ink' },
 }
 
-/** Connection status: online/offline from the browser, and when the data was last loaded from the server. */
-export function ConnectivityIndicator({ compact = false, placement = 'down' }: { compact?: boolean; placement?: 'down' | 'up' }) {
+/** Connection status: online/offline from the browser, and when the data was last loaded from the server. Sits in the top bar. */
+export function ConnectivityIndicator({ compact = false }: { compact?: boolean }) {
   const { status, lastSynced } = useConnectivity()
   const { open, setOpen, ref } = usePopover()
   const state = STATES[status]
@@ -47,16 +47,14 @@ export function ConnectivityIndicator({ compact = false, placement = 'down' }: {
           <Icon className={cn('size-4', status === 'syncing' && 'animate-spin [animation-duration:2s]')} aria-hidden />
         )}
         <span className={cn(compact && 'sr-only')}>{state.label}</span>
-        {!compact && status !== 'syncing' && <span className="hidden whitespace-nowrap font-normal text-ink-3 min-[1500px]:inline">· Last synced: {lastSynced}</span>}
+        {!compact && status !== 'syncing' && <span className="hidden whitespace-nowrap font-normal text-ink-3 min-[1500px]:inline">· Last synced: {lastSynced()}</span>}
       </button>
       {open && (
         <div
           role="dialog"
           aria-label="Connection status"
-          className={cn(
-            'absolute z-40 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-line bg-surface p-4 shadow-xl',
-            placement === 'up' ? 'bottom-full left-0 mb-3' : 'right-0 mt-2',
-          )}
+          // On a phone the panel spans the screen under the bar (like the notifications menu); otherwise it hangs from the dot.
+          className="fixed inset-x-3 top-16 z-40 rounded-xl border border-line bg-surface p-4 shadow-xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80"
         >
           <div className="flex items-center gap-2">
             <span className={cn('size-2.5 rounded-full', state.dot)} aria-hidden />
@@ -70,7 +68,7 @@ export function ConnectivityIndicator({ compact = false, placement = 'down' }: {
           <dl className="mt-3 space-y-1.5 rounded-lg bg-surface-2 p-3 text-sm">
             <div className="flex justify-between gap-3">
               <dt className="text-ink-3">Data last loaded</dt>
-              <dd className="text-ink">{lastSynced}</dd>
+              <dd className="text-ink">{lastSynced()}</dd>
             </div>
           </dl>
         </div>

@@ -11,7 +11,8 @@ import { levelFromScore } from './mappers.ts'
  *   - assessment marks: the student's percentage, for each topic the assessment covers;
  *   - practice from the AI Assessment Builder: the share of questions right, per topic.
  * The estimate for a topic is the average of its RECENT most recent results, so new work moves it without one
- * result deciding everything. Call recomputeMastery after any of those is saved.
+ * result deciding everything. Call recomputeMastery after any of those is saved or cleared: a topic with nothing
+ * left behind it loses its level, so the dashboards never keep a stale one.
  */
 const RECENT = 3
 
@@ -84,7 +85,6 @@ export async function recomputeMastery(studentIds: string[]): Promise<void> {
     }
     for (const [name, t] of tally) add(p.studentId, { subject: p.aiAssessment.subject, name, percent: (t.right / t.total) * 100, at: p.completedAt! })
   }
-  if (!byStudent.size) return
 
   // The topic catalogue, matched loosely by name; topics not in it yet are added.
   const catalogue = await prisma.competency.findMany()
@@ -101,14 +101,18 @@ export async function recomputeMastery(studentIds: string[]): Promise<void> {
     return made.id
   }
 
-  for (const [studentId, topics] of byStudent) {
-    for (const evidence of topics.values()) {
+  for (const studentId of ids) {
+    const kept: string[] = []
+    for (const evidence of byStudent.get(studentId)?.values() ?? []) {
       const recent = [...evidence].sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, RECENT)
       const score = Math.min(100, Math.max(0, Math.round(recent.reduce((sum, e) => sum + e.percent, 0) / recent.length)))
       const id = await competencyId(recent[0]!)
       const values = { score, level: levelFromScore(score) }
       await prisma.competencyScore.upsert({ where: { studentId_competencyId: { studentId, competencyId: id } }, create: { studentId, competencyId: id, ...values }, update: values })
+      kept.push(id)
     }
+    // Topics with no result left behind them (a score cleared, an analysis deleted) are dropped, not left as they were.
+    await prisma.competencyScore.deleteMany({ where: { studentId, competencyId: { notIn: kept } } })
   }
 }
 

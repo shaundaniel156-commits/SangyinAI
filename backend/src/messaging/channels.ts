@@ -11,7 +11,7 @@ export interface SendResult {
 
 // Addresses and numbers are masked in the log ("j***@gmail.com", "+256…456"), and a message's text is never
 // logged: it can carry a one-time password or a reset link.
-const maskEmail = (email: string) => email.replace(/^(.).*?(@.*)$/, '$1***$2')
+export const maskEmail = (email: string) => email.replace(/^(.).*?(@.*)$/, '$1***$2')
 const maskPhone = (phone: string) => `${phone.slice(0, 4)}…${phone.slice(-3)}`
 
 let resend: Resend | undefined

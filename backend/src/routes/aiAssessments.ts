@@ -57,6 +57,24 @@ const DraftSchema = EditableFields.extend({
   requestSent: z.record(z.string(), z.unknown()).optional(),
 })
 
+// Why a draft was refused, in plain words, from the first thing wrong with it.
+function draftProblem(error: z.ZodError): string {
+  const issue = error.issues[0]
+  if (!issue) return 'The draft could not be saved.'
+  const field = String(issue.path[0] ?? '')
+  if (field === 'questions') {
+    if (issue.path.length > 1) return `Question ${Number(issue.path[1]) + 1} is not complete (${String(issue.path[2] ?? 'details')}).`
+    return issue.code === 'too_small' ? 'The draft has no questions.' : 'A draft can have up to 30 questions.'
+  }
+  if (field === 'competencies') return issue.code === 'too_big' ? 'A draft can cover up to 10 areas.' : 'Choose at least one area.'
+  if (field === 'studentIds') return 'An assessment can go to up to 200 students.'
+  if (field === 'title') return 'Give the assessment a title.'
+  return `The draft could not be saved (${field || 'details'}: ${issue.message}).`
+}
+
+// Thrown inside the send transaction when the assessment is no longer a draft.
+const alreadySent = new Error('already sent')
+
 const questionRows = (questions: z.infer<typeof QuestionSchema>[]) =>
   questions.map((q, i) => ({ ...q, position: i, options: q.type === 'multiple_choice' ? q.options ?? [] : [] }))
 
@@ -138,7 +156,7 @@ export async function aiAssessmentRoutes(app: FastifyInstance) {
   // Save a new draft (after "Generate draft"). Nothing reaches students until it is sent.
   app.post('/ai/assessments', teacherOrAdmin, async (request, reply) => {
     const parsed = DraftSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send({ error: 'Invalid draft', issues: parsed.error.issues })
+    if (!parsed.success) return reply.code(400).send({ error: draftProblem(parsed.error), issues: parsed.error.issues })
     const user = request.user!
     const { questions, dueDate, requestSent, teachingPlan, ...rest } = parsed.data
     if (!(await prisma.schoolClass.count({ where: { id: rest.classId, ...classScope(user) } }))) return reply.code(404).send({ error: 'Class not found.' })
@@ -232,22 +250,31 @@ export async function aiAssessmentRoutes(app: FastifyInstance) {
     const studentLogins = await prisma.student.findMany({ where: { id: { in: item.studentIds }, userId: { not: null } }, select: { userId: true } })
     const approved = { title: item.title, messageToStudents: item.messageToStudents, parentNote: item.parentNote ?? '', rationale: item.rationale, questions: item.questions.map(({ competency, type, difficulty, prompt, options, answer, explanation }) => ({ competency, type, difficulty, prompt, options, answer, explanation })) }
 
-    // Every sent assessment has a place in the gradebook (Assessments), where each student's score is entered as
-    // they finish: the assessment it was made from, or one added now.
-    if (item.assessmentId) {
-      await prisma.assessment.update({ where: { id: item.assessmentId }, data: { status: 'awaiting_scores' } })
-    } else {
-      const graded = await prisma.assessment.create({
-        data: { classId: item.classId, createdById: request.user!.sub, title: item.title, type: 'quiz', subject: item.subject, date: new Date(), maxScore: item.questions.length, status: 'awaiting_scores', topics: item.competencies.slice(0, 20) },
+    // All in one transaction, starting with the status: that update only matches a draft, so of two sends arriving
+    // together the second finds nothing to claim and is refused, and nothing else of it happens.
+    let sent
+    try {
+      sent = await prisma.$transaction(async (tx) => {
+        const claimed = await tx.aiAssessment.updateMany({ where: { id: item.id, status: 'draft' }, data: { status: 'sent', sentAt: new Date() } })
+        if (!claimed.count) throw alreadySent
+        // Every sent assessment has a place in the gradebook (Assessments), where each student's score is entered as
+        // they finish: the assessment it was made from, or one added now.
+        if (item.assessmentId) {
+          await tx.assessment.update({ where: { id: item.assessmentId }, data: { status: 'awaiting_scores' } })
+        } else {
+          const graded = await tx.assessment.create({
+            data: { classId: item.classId, createdById: request.user!.sub, title: item.title, type: 'quiz', subject: item.subject, date: new Date(), maxScore: item.questions.length, status: 'awaiting_scores', topics: item.competencies.slice(0, 20) },
+          })
+          await tx.aiAssessment.update({ where: { id: item.id }, data: { assessmentId: graded.id } })
+        }
+        await tx.practiceAssignment.createMany({ data: item.studentIds.map((studentId) => ({ aiAssessmentId: item.id, studentId })), skipDuplicates: true })
+        if (item.requestSent) await tx.trainingExample.create({ data: { task: 'assessment', request: item.requestSent as Prisma.InputJsonValue, approved } })
+        return tx.aiAssessment.findUniqueOrThrow({ where: { id: item.id }, include: aiAssessmentInclude })
       })
-      await prisma.aiAssessment.update({ where: { id: item.id }, data: { assessmentId: graded.id } })
+    } catch (error) {
+      if (error === alreadySent) return reply.code(409).send({ error: 'This assessment has already been sent.' })
+      throw error
     }
-
-    const [sent] = await prisma.$transaction([
-      prisma.aiAssessment.update({ where: { id: item.id }, data: { status: 'sent', sentAt: new Date() }, include: aiAssessmentInclude }),
-      prisma.practiceAssignment.createMany({ data: item.studentIds.map((studentId) => ({ aiAssessmentId: item.id, studentId })), skipDuplicates: true }),
-      ...(item.requestSent ? [prisma.trainingExample.create({ data: { task: 'assessment', request: item.requestSent as Prisma.InputJsonValue, approved } })] : []),
-    ])
     // Tell students (in the app, plus an email copy) and, if shared, their parents (app, email and SMS). Failures are logged and never block the send.
     void notifyUsers(studentLogins.map((s) => s.userId!), { kind: 'practice_update', title: item.oneAttempt ? 'New assessment from your teacher' : 'New practice ready', body: item.oneAttempt ? `“${item.title}” is ready for you to do. You can do it once, so take your time.` : `“${item.title}” has been added to your practice list.`, link: '/student/practice' })
       .catch((error) => request.log.error(error, 'student notifications failed'))

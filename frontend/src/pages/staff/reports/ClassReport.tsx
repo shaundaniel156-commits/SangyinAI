@@ -1,5 +1,5 @@
 import { BarList } from '../../../components/charts/BarList'
-import { LineChart } from '../../../components/charts/LineChart'
+import { LineChart, chartRange } from '../../../components/charts/LineChart'
 import { toneForScore } from '../../../components/ui/ProgressBar'
 import { getAssessmentsByClass } from '../../../data/assessments'
 import { classAverageLabel, getClassCompetencyAverages } from '../../../data/classes'
@@ -37,7 +37,7 @@ export function ClassReport({ cls, filters }: { cls: SchoolClass; filters: Repor
         ]}
       />
       <DocSection title="Class average trend" description="Class average across recent assessment periods (%)">
-        <LineChart ariaLabel={`${cls.name} average trend`} series={[{ name: 'Class average', points: trend, color: 'var(--color-series-1)' }]} min={30} max={90} height={200} />
+        <LineChart ariaLabel={`${cls.name} average trend`} series={[{ name: 'Class average', points: trend, color: 'var(--color-series-1)' }]} {...chartRange([{ points: trend }])} height={200} />
       </DocSection>
       <DocSection title="Competency averages" description="Average mastery per competency">
         {competencies.length ? (

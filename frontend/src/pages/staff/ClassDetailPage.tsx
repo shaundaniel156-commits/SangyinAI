@@ -2,7 +2,7 @@ import { ClipboardList, GraduationCap, LifeBuoy, Mail, TrendingUp, Users } from 
 import { useNavigate, useParams } from 'react-router-dom'
 import { BarList } from '../../components/charts/BarList'
 import { ChartContainer } from '../../components/charts/ChartContainer'
-import { LineChart } from '../../components/charts/LineChart'
+import { LineChart, chartRange } from '../../components/charts/LineChart'
 import { AssessmentCard } from '../../components/domain/AssessmentCard'
 import { FrameworkBadge } from '../../components/domain/FrameworkBadge'
 import { Avatar } from '../../components/ui/Avatar'
@@ -80,7 +80,7 @@ export function ClassDetailPage() {
           description="Class average across recent assessments (%)"
           table={{ headers: ['Month', 'Average'], rows: trend.map((p) => [p.label, `${p.value}%`]) }}
         >
-          <LineChart ariaLabel={`${cls.name} average trend`} series={[{ name: 'Class average', points: trend, color: 'var(--color-series-1)' }]} min={30} max={90} />
+          <LineChart ariaLabel={`${cls.name} average trend`} series={[{ name: 'Class average', points: trend, color: 'var(--color-series-1)' }]} {...chartRange([{ points: trend }])} />
         </ChartContainer>
 
         <Card>

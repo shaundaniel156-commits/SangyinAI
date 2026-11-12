@@ -1,4 +1,5 @@
 import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { SplashScreen } from '../components/layout/SplashScreen'
 import { liveState } from '../data/liveState'
 import { ApiError, getAuthProfile, getAuthToken } from '../lib/api'
 import { loadLiveData } from '../lib/liveData'
@@ -92,37 +93,35 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
   const version = state.version
   const value = useMemo<LiveDataValue>(() => ({ live, version, refresh }), [live, version, refresh])
 
-  if (token && state.loadedFor !== token) {
-    return (
-      <div className="grid min-h-screen place-items-center bg-canvas text-sm text-ink-3" role="status">
-        Loading your school data…
-      </div>
-    )
-  }
+  // The first load after sign-in: the splash screen covers the page while it runs, then fades (a later refresh shows nothing).
+  const loading = Boolean(token) && state.loadedFor !== token
   // The first load failed (a later refresh failing keeps the data already shown).
-  if (token && !state.live && !wasLive.current) {
-    return (
-      <div className="grid min-h-screen place-items-center bg-canvas px-4 text-center" role="alert">
-        <div className="max-w-sm">
-          <p className="text-base font-semibold text-ink">Couldn’t load your school data</p>
-          <p className="mt-1 text-sm text-ink-3">The Sangyin server didn’t respond. Check your connection, then try again.</p>
-          <div className="mt-4 flex justify-center gap-2">
-            <button type="button" onClick={() => void load(token)} className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
-              Try again
-            </button>
-            <button type="button" onClick={signOut} className="rounded-md border border-line px-4 py-2 text-sm font-medium text-ink-2 hover:bg-surface-2">
-              Sign out
-            </button>
+  const failed = Boolean(token) && !loading && !state.live && !wasLive.current
+  return (
+    <>
+      <SplashScreen loading={loading} />
+      {loading ? null : failed ? (
+        <div className="grid min-h-screen place-items-center bg-canvas px-4 text-center" role="alert">
+          <div className="max-w-sm">
+            <p className="text-base font-semibold text-ink">Couldn’t load your school data</p>
+            <p className="mt-1 text-sm text-ink-3">The Sangyin server didn’t respond. Check your connection, then try again.</p>
+            <div className="mt-4 flex justify-center gap-2">
+              <button type="button" onClick={() => void load(token!)} className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
+                Try again
+              </button>
+              <button type="button" onClick={signOut} className="rounded-md border border-line px-4 py-2 text-sm font-medium text-ink-2 hover:bg-surface-2">
+                Sign out
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    )
-  }
-  // The new `version` redraws the pages in place (App reads it); a new key starts every page afresh.
-  return (
-    <LiveDataContext.Provider value={value}>
-      <Fragment key={state.starts}>{children}</Fragment>
-    </LiveDataContext.Provider>
+      ) : (
+        // The new `version` redraws the pages in place (App reads it); a new key starts every page afresh.
+        <LiveDataContext.Provider value={value}>
+          <Fragment key={state.starts}>{children}</Fragment>
+        </LiveDataContext.Provider>
+      )}
+    </>
   )
 }
 

@@ -4,6 +4,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useSession } from '../../context/SessionContext'
 import { cn } from '../../lib/cn'
 import { NAVIGATION, type NavGroup, type NavItem } from '../../routes/navigation'
+import { ConnectivityIndicator } from './ConnectivityIndicator'
 import { Logo } from './Logo'
 import { NotificationMenu } from './NotificationMenu'
 import { UserMenu } from './UserMenu'
@@ -61,6 +62,8 @@ export function TopNav({ onOpenNav }: { onOpenNav: () => void }) {
               />
             </form>
           )}
+          {/* Online/offline dot: in the bar, so it never sits over a message box or button on small screens */}
+          <ConnectivityIndicator compact />
           <NotificationMenu />
           <UserMenu />
         </div>

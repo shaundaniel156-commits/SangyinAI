@@ -5,7 +5,6 @@ import { cn } from '../../../lib/cn'
 interface ReportDocumentProps {
   title: string
   subtitle?: string
-  term: string
   period?: string
   children: ReactNode
 }
@@ -15,7 +14,7 @@ interface ReportDocumentProps {
  * as a document on screen and on paper. The print stylesheet below forces the
  * light palette so dark-mode users still get a legible printout.
  */
-export function ReportDocument({ title, subtitle, term, period, children }: ReportDocumentProps) {
+export function ReportDocument({ title, subtitle, period, children }: ReportDocumentProps) {
   const generated = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())
   return (
     <article
@@ -32,8 +31,6 @@ export function ReportDocument({ title, subtitle, term, period, children }: Repo
         <dl className="grid shrink-0 grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs sm:text-right">
           <dt className="text-ink-3">School</dt>
           <dd className="text-ink">{schoolName()}</dd>
-          <dt className="text-ink-3">Term</dt>
-          <dd className="text-ink">{term}</dd>
           {period && (
             <>
               <dt className="text-ink-3">Assessments</dt>

@@ -47,11 +47,13 @@ const lastActive = (iso: string | null) => {
 
 export async function loadLiveData(role: Role): Promise<void> {
   const staff = role === 'teacher' || role === 'admin'
-  const [school, classes, students, assessments, guidance, notifications, aiAssessments, curriculum, diagnostics] = await Promise.all([
+  const [school, classes, students, assessments, results, guidance, notifications, aiAssessments, curriculum, diagnostics] = await Promise.all([
     api<{ name: string; district: string | null; type: string; framework: CurriculumFramework }>('/school'),
     api<SchoolClass[]>('/classes'),
     api<Student[]>('/students'),
     api<Assessment[]>('/assessments'),
+    // Every assessment's scores in one request (the per-assessment route is for the detail page).
+    api<{ assessmentId: string; results: AssessmentResult[] }[]>('/assessments/results'),
     api<GuidancePlan[]>('/guidance'),
     api<AppNotification[]>('/notifications'),
     api<AiAssessment[]>('/ai/assessments'),
@@ -62,7 +64,6 @@ export async function loadLiveData(role: Role): Promise<void> {
   const schoolBank = staff ? await api<(QuestionBank & { id: string; competency: string })[]>('/feed/questions') : []
   // Administrators: the full staff list and every account (Teachers and Users pages, usage figures).
   const [staffList, accounts] = role === 'admin' ? await Promise.all([api<StaffRow[]>('/feed/staff'), api<AccountRow[]>('/feed/users')]) : [null, null]
-  const results = await Promise.all(assessments.map((a) => api<AssessmentResult[]>(`/assessments/${a.id}/results`).then((r) => [a.id, r] as const)))
 
   // Practice: the student's own list, or each of a parent's children's (kept apart, for whichever child is chosen).
   const practice = role === 'student' ? await api<PracticeActivity[]>('/me/practice') : null
@@ -80,7 +81,7 @@ export async function loadLiveData(role: Role): Promise<void> {
   replace(STUDENTS, students)
   replace(ASSESSMENTS, assessments)
   LIVE_RESULTS.clear()
-  for (const [id, r] of results) LIVE_RESULTS.set(id, r)
+  for (const r of results) LIVE_RESULTS.set(r.assessmentId, r.results)
   replace(GUIDANCE_PLANS, guidance)
   replace(NOTIFICATIONS, notifications)
   replace(LIVE_AI_ASSESSMENTS, aiAssessments)

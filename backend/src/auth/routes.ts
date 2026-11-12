@@ -3,6 +3,7 @@ import { hash, verify } from '@node-rs/argon2'
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../db/client.ts'
+import { maskEmail } from '../messaging/channels.ts'
 import { sendPasswordReset } from '../messaging/messages.ts'
 import { attemptKeys, clearFailures, lockedMessage, recordFailure } from './attempts.ts'
 import { authConfigured, requireUser, signToken } from './session.ts'
@@ -34,7 +35,10 @@ export async function authRoutes(app: FastifyInstance) {
     }
     const ok = user?.passwordHash && user.status === 'active' && (await verify(user.passwordHash, parsed.data.password))
     if (!user || !ok) {
-      recordFailure(keys)
+      const locked = recordFailure(keys)
+      // A lockout is worth a line in the log (someone guessing, or a teacher who needs help): the masked address and
+      // which limit was reached, never the password.
+      if (locked.length) request.log.warn({ account: maskEmail(parsed.data.email.trim().toLowerCase()), limit: locked.map((k) => k.key.split(':')[0]) }, 'sign-in locked after too many wrong passwords')
       return reply.code(401).send({ error: 'Wrong email or password.' })
     }
     clearFailures(keys)

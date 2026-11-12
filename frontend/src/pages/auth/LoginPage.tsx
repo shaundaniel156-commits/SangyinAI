@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, BookOpen, Building2, Globe2, GraduationCap, HeartHandshake, Landmark, Presentation, School } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BookOpen, Building2, Globe2, Landmark, School } from 'lucide-react'
 import { useId, useState, type FormEvent, type InputHTMLAttributes } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
@@ -6,30 +6,10 @@ import { RevealButton, TextField } from '../../components/ui/Field'
 import { Modal } from '../../components/ui/Modal'
 import { useSession } from '../../context/SessionContext'
 import { api, ApiError } from '../../lib/api'
-import { classLevels, CURRICULUM_LABEL, SCHOOL_TYPE_LABEL, type SchoolSetup } from '../../lib/classLevels'
-import { readStorage, writeStorage } from '../../lib/storage'
-import { ROLE_HOME, ROLE_LABEL } from '../../data/users'
+import { classLevels, type SchoolSetup } from '../../lib/classLevels'
+import { ROLE_HOME } from '../../data/users'
 import { cn } from '../../lib/cn'
-import type { Role } from '../../types'
 import { ACCENT, AuthCanvas, AuthHeader, LOGO_BLUE, PhotoBackdrop } from './AuthChrome'
-
-const ROLE_OPTIONS: { role: Role; icon: typeof School; heading: string; blurb: string }[] = [
-  { role: 'teacher', icon: Presentation, heading: 'Sign in to your teaching workspace', blurb: 'Review diagnostics, approve guidance and track your classes.' },
-  { role: 'admin', icon: School, heading: 'Sign in to school administration', blurb: 'Manage users, classes and curriculum configuration.' },
-  { role: 'parent', icon: HeartHandshake, heading: 'Welcome, parent or guardian', blurb: 'See how your child is doing and how you can help at home.' },
-  { role: 'student', icon: GraduationCap, heading: 'Hi there! Ready to learn?', blurb: 'Continue your practice and see your progress.' },
-]
-
-const SETUP_KEY = 'sangyin.schoolSetup'
-
-function savedSetup(): SchoolSetup | null {
-  try {
-    const s = JSON.parse(readStorage(SETUP_KEY) ?? 'null') as SchoolSetup | null
-    return s && SCHOOL_TYPE_LABEL[s.type] && CURRICULUM_LABEL[s.framework] ? s : null
-  } catch {
-    return null
-  }
-}
 
 /** "Primary 1 to Primary 7" */
 const levelSpan = (s: SchoolSetup) => {
@@ -38,34 +18,30 @@ const levelSpan = (s: SchoolSetup) => {
 }
 
 /**
- * Standalone sign-in page, reached from the landing page at /. It first asks for the school's level and curriculum
- * (remembered on this device). The server saves that choice only at a school's very first administrator sign-in;
- * after that the school's type and curriculum are changed in Manual feed (institution details).
+ * Standalone sign-in page, reached from the landing page at /. One form for every kind of account: the server knows
+ * who is signing in. Below it, an administrator setting up a brand-new school can choose its type and curriculum;
+ * the server saves that only at a school's very first administrator sign-in (backend auth/routes.ts). After that the
+ * school's type and curriculum are changed in Settings or Manual feed (institution details).
  */
 export function LoginPage() {
   const { signIn } = useSession()
   const navigate = useNavigate()
-  const [setup, setSetup] = useState<SchoolSetup | null>(savedSetup)
-  const [choosing, setChoosing] = useState(setup === null)
-  const [role, setRole] = useState<Role>('teacher')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(true)
+  const [newSchool, setNewSchool] = useState(false)
+  const [setup, setSetup] = useState<Partial<SchoolSetup>>({})
   const [forgotOpen, setForgotOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const current = ROLE_OPTIONS.find((r) => r.role === role)!
-
-  const chooseRole = (r: Role) => {
-    setRole(r)
-    setError(null)
-  }
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError(null)
     setBusy(true)
-    const result = await signIn({ email, password, remember, school: setup })
+    // The new-school choice goes along only when it is open and complete.
+    const school = newSchool && setup.type && setup.framework ? { type: setup.type, framework: setup.framework } : null
+    const result = await signIn({ email, password, remember, school })
     setBusy(false)
     if (!result.ok) {
       setError(result.error)
@@ -92,60 +68,15 @@ export function LoginPage() {
             aria-hidden
           />
           <div className="relative rounded-2xl border border-white/10 bg-[#070b14]/85 p-6 shadow-2xl backdrop-blur transition duration-300 group-hover:border-[#5b93e6]/60 group-hover:shadow-[0_0_40px_rgba(91,147,230,0.35)] motion-safe:group-hover:-translate-y-1 sm:p-8">
-          {choosing ? (
-            <SchoolStep
-              initial={setup}
-              onDone={(s) => {
-                writeStorage(SETUP_KEY, JSON.stringify(s))
-                setSetup(s)
-                setChoosing(false)
-              }}
-            />
-          ) : (
-          <>
-          {setup && (
-            <p className="mb-5 flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/3 px-3 py-2 text-xs text-white/70">
-              <span>
-                {SCHOOL_TYPE_LABEL[setup.type]} · {CURRICULUM_LABEL[setup.framework]}
-              </span>
-              <button type="button" onClick={() => setChoosing(true)} className="font-medium hover:underline" style={{ color: ACCENT }}>
-                Change
-              </button>
-            </p>
-          )}
-          <h1 className="text-2xl font-semibold tracking-tight">{current.heading}</h1>
-          <p className="mt-1.5 text-sm text-white/60">{current.blurb}</p>
-
-          <fieldset className="mt-6">
-            <legend className="mb-2 text-sm font-medium">I am a…</legend>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {ROLE_OPTIONS.map((o) => {
-                const active = o.role === role
-                return (
-                  <button
-                    key={o.role}
-                    type="button"
-                    onClick={() => chooseRole(o.role)}
-                    aria-pressed={active}
-                    className={cn(
-                      'flex flex-col items-center gap-1.5 rounded-xl border px-2 py-3 text-xs font-medium transition-colors',
-                      active ? 'bg-[#5b93e6]/10' : 'border-white/10 bg-white/2 text-white/60 hover:border-white/25 hover:text-white/80',
-                    )}
-                    style={active ? { borderColor: ACCENT, color: ACCENT } : undefined}
-                  >
-                    <o.icon className="size-5" aria-hidden />
-                    {o.role === 'admin' ? 'Administrator' : ROLE_LABEL[o.role]}
-                  </button>
-                )
-              })}
-            </div>
-          </fieldset>
+          <h1 className="text-2xl font-semibold tracking-tight">Sign in to Sangyin AI</h1>
+          <p className="mt-1.5 text-sm text-white/60">Teachers, administrators, parents and students all sign in here. What you see depends on your account.</p>
 
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
             <DarkField
-              label={role === 'student' ? 'Username or email' : 'Email or username'}
-              type="text"
-              autoComplete="username"
+              label="Email"
+              type="email"
+              autoComplete="email"
+              placeholder="name@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -186,8 +117,17 @@ export function LoginPage() {
               <ArrowRight className="size-4" aria-hidden />
             </button>
           </form>
-          </>
-          )}
+
+          {/* There is no sign-up: every account is made by the school. */}
+          <p className="mt-5 text-xs text-white/50">
+            Accounts are created by your school: the administrator adds teachers, and teachers add students and parents. Ask your school for your sign-in details.
+          </p>
+          <div className="mt-4 border-t border-white/10 pt-4">
+            <button type="button" onClick={() => setNewSchool((v) => !v)} aria-expanded={newSchool} className="text-sm font-medium hover:underline" style={{ color: ACCENT }}>
+              {newSchool ? 'Hide new-school setup' : 'Administrator setting up a brand-new school?'}
+            </button>
+            {newSchool && <NewSchoolSetup value={setup} onChange={setSetup} />}
+          </div>
           </div>
         </div>
       </main>
@@ -197,21 +137,20 @@ export function LoginPage() {
   )
 }
 
-/** The step before signing in: the type of school and its curriculum. */
-function SchoolStep({ initial, onDone }: { initial: SchoolSetup | null; onDone: (s: SchoolSetup) => void }) {
-  const [type, setType] = useState<SchoolSetup['type'] | null>(initial?.type ?? null)
-  const [framework, setFramework] = useState<SchoolSetup['framework'] | null>(initial?.framework ?? null)
-  const ready = type && framework
-
+/** For a brand-new school's first administrator sign-in only: the school's type and curriculum, sent with the sign-in. */
+function NewSchoolSetup({ value, onChange }: { value: Partial<SchoolSetup>; onChange: (v: Partial<SchoolSetup>) => void }) {
+  const { type, framework } = value
   return (
-    <div>
-      <h1 className="text-2xl font-semibold tracking-tight">Tell us about your school</h1>
-      <p className="mt-1.5 text-sm text-white/60">This sets up the classes you choose from, for example Primary 1 to Primary 7.</p>
-
+    <div className="mt-4 rounded-lg border border-white/10 bg-white/3 p-4">
+      <p className="text-sm text-white/70">
+        This counts only the first time an administrator signs in to a school that has no classes yet: it sets the type of school and
+        curriculum, which decide the class names offered. For every other sign-in it changes nothing. Later, change them in Settings or
+        Manual feed.
+      </p>
       <ChoiceGroup
         legend="Type of school"
-        value={type}
-        onChange={setType}
+        value={type ?? null}
+        onChange={(t) => onChange({ ...value, type: t })}
         options={[
           { value: 'primary', icon: School, label: 'Primary school', detail: framework === 'cambridge' ? 'Grade 1 to 6' : 'Primary 1 to 7' },
           { value: 'secondary', icon: Building2, label: 'Secondary school', detail: framework === 'cambridge' ? 'Grade 7 to 12' : 'Senior 1 to 6' },
@@ -219,30 +158,21 @@ function SchoolStep({ initial, onDone }: { initial: SchoolSetup | null; onDone: 
       />
       <ChoiceGroup
         legend="Curriculum"
-        value={framework}
-        onChange={setFramework}
+        value={framework ?? null}
+        onChange={(f) => onChange({ ...value, framework: f })}
         options={[
           { value: 'uganda', icon: Landmark, label: 'National', detail: 'Uganda national curriculum' },
           { value: 'cambridge', icon: Globe2, label: 'Cambridge', detail: type === 'secondary' ? 'Cambridge Secondary' : 'Cambridge Primary' },
         ]}
       />
-
-      {ready && (
+      {type && framework ? (
         <p className="mt-5 flex items-start gap-2 text-sm text-white/70">
           <BookOpen className="mt-0.5 size-4 shrink-0" style={{ color: ACCENT }} aria-hidden />
-          Classes: {levelSpan({ type, framework })}.
+          Classes: {levelSpan({ type, framework })}. Sent with your sign-in.
         </p>
+      ) : (
+        <p className="mt-5 text-xs text-white/50">Choose both, or simply sign in without them.</p>
       )}
-      <button
-        type="button"
-        disabled={!ready}
-        onClick={() => ready && onDone({ type, framework })}
-        className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
-        style={{ backgroundColor: LOGO_BLUE }}
-      >
-        Continue to sign in
-        <ArrowRight className="size-4" aria-hidden />
-      </button>
     </div>
   )
 }

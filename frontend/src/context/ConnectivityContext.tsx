@@ -8,7 +8,8 @@ import type { ConnectivityStatus } from '../types'
  */
 interface ConnectivityValue {
   status: ConnectivityStatus
-  lastSynced: string
+  /** When the data was last loaded, as "Today, 9:05 AM" or "Not yet": read at the moment it is shown, so it is always current. */
+  lastSynced: () => string
   pendingItems: number
 }
 
@@ -34,7 +35,7 @@ export function ConnectivityProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('offline', update)
     }
   }, [])
-  const value = useMemo<ConnectivityValue>(() => ({ status: online ? 'online' : 'offline', lastSynced: syncedLabel(), pendingItems: 0 }), [online])
+  const value = useMemo<ConnectivityValue>(() => ({ status: online ? 'online' : 'offline', lastSynced: syncedLabel, pendingItems: 0 }), [online])
   return <ConnectivityContext.Provider value={value}>{children}</ConnectivityContext.Provider>
 }
 
