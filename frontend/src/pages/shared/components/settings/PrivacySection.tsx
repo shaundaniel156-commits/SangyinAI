@@ -4,7 +4,7 @@ import { SettingsSection } from './SettingsSection'
 
 const LAW = 'Uganda Data Protection and Privacy Act, 2019'
 
-/** How student data is handled. Consent is not recorded in Sangyin yet, so there are no settings to save here. */
+/** How student data is handled. Consent is not recorded in Sangezi Academia yet, so there are no settings to save here. */
 export function PrivacySection() {
   const { role } = useSession()
   return (
@@ -25,8 +25,8 @@ export function PrivacySection() {
         {role === 'student'
           ? 'If you have a question about your information, ask your teacher.'
           : role === 'parent'
-            ? 'Consent for your child’s results to be used in Sangyin is given to the school. Recording or withdrawing it here is not available yet; speak to the school if you want to change it.'
-            : 'Consent records, local-only storage and research sharing are not available in Sangyin yet. Consent is kept by the school for now, so there is nothing to set here.'}
+            ? 'Consent for your child’s results to be used in Sangezi Academia is given to the school. Recording or withdrawing it here is not available yet; speak to the school if you want to change it.'
+            : 'Consent records, local-only storage and research sharing are not available in Sangezi Academia yet. Consent is kept by the school for now, so there is nothing to set here.'}
       </p>
     </SettingsSection>
   )

@@ -13,7 +13,7 @@ console.log(`Asking ${model}...`);
 
 const response = await ai.models.generateContent({
   model,
-  contents: "In one short sentence, say hello to a teacher using Sangyin AI.",
+  contents: "In one short sentence, say hello to a teacher using Sangezi Academia.",
 });
 
 console.log("Gemini says:", response.text);

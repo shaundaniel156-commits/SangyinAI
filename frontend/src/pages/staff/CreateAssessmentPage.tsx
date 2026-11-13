@@ -21,7 +21,7 @@ import { subjectChoices } from '../../lib/subjects'
 import type { AiQuestionType, Assessment, AssessmentType, Subject } from '../../types'
 
 const TYPES: AssessmentType[] = ['Test', 'Quiz', 'Assignment', 'Teacher Observation']
-// How the class does it: on paper (the teacher enters the marks) or online (students answer in Sangyin).
+// How the class does it: on paper (the teacher enters the marks) or online (students answer in Sangezi Academia).
 type Mode = 'paper' | 'online'
 const COUNTS = ['5', '8', '10', '15'] as const
 const QUESTION_TYPES: AiQuestionType[] = ['multiple_choice', 'short_answer', 'written_work']
@@ -204,7 +204,7 @@ export function CreateAssessmentPage() {
                     {(
                       [
                         { id: 'paper', label: 'On paper', detail: 'You mark it and enter each student’s score.' },
-                        { id: 'online', label: 'Online, in Sangyin', detail: 'The AI writes the questions; students answer on their own account and are marked automatically.' },
+                        { id: 'online', label: 'Online, in Sangezi Academia', detail: 'The AI writes the questions; students answer on their own account and are marked automatically.' },
                       ] as const
                     ).map((m) => (
                       <button
@@ -335,7 +335,7 @@ export function CreateAssessmentPage() {
               <dl className="space-y-3 text-sm">
                 <SummaryRow label="Title" value={title || '—'} />
                 <SummaryRow label="Type" value={type} />
-                <SummaryRow label="Done" value={online ? 'Online, in Sangyin' : 'On paper'} />
+                <SummaryRow label="Done" value={online ? 'Online, in Sangezi Academia' : 'On paper'} />
                 <SummaryRow label="Class" value={cls?.name ?? '—'} />
                 <SummaryRow label="Students" value={online && students.length > MAX_STUDENTS_ONLINE ? `${students.length} (online: up to ${MAX_STUDENTS_ONLINE})` : String(cls?.studentCount ?? 0)} />
                 {online && <SummaryRow label="Questions" value={count} />}

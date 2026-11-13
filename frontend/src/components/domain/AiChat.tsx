@@ -9,7 +9,7 @@ import { Card, CardHeader } from '../ui/Card'
 
 /**
  * A conversation with the AI: the hook keeps the turns and streams replies from the server; ChatThread shows
- * them; ChatComposer is the box to type in. Used by Ask Sangyin AI and by the AI Assessment Builder's panel.
+ * them; ChatComposer is the box to type in. Used by Ask Sangezi Academia and by the AI Assessment Builder's panel.
  */
 
 export interface ChatTurn {
@@ -134,7 +134,7 @@ export function useAiChat({ storageKey, context, onReply }: Options = {}) {
           if (!reply.trim()) failed = 'The AI did not answer. Please try again.'
         }
       } catch {
-        failed = 'I can’t reach the Sangyin server. Check your connection and try again.'
+        failed = 'I can’t reach the Sangezi Academia server. Check your connection and try again.'
       } finally {
         update(aiId, failed ? { streaming: false, failed: true, text: failed } : { streaming: false })
         setBusy(false)
@@ -240,7 +240,7 @@ interface ChatComposerProps {
 }
 
 /** The box to write to the AI. */
-export function ChatComposer({ onSend, busy, placeholder = 'Ask Sangyin AI anything…', multiline, className }: ChatComposerProps) {
+export function ChatComposer({ onSend, busy, placeholder = 'Ask Sangezi Academia anything…', multiline, className }: ChatComposerProps) {
   const [draft, setDraft] = useState('')
   const send = () => {
     const text = draft.trim()
@@ -292,11 +292,11 @@ interface AssistantCardProps {
   className?: string
 }
 
-/** "Sangyin AI" as a card beside a page: the teacher asks anything, with the page's context sent along. */
+/** "Sangezi Academia" as a card beside a page: the teacher asks anything, with the page's context sent along. */
 export function AssistantCard({ chat, busy = false, description, emptyHint, attachment, className }: AssistantCardProps) {
   return (
     <Card className={cn('flex max-h-[calc(100vh-7rem)] min-h-[30rem] flex-col', className)}>
-      <CardHeader title="Sangyin AI" description={description} icon={<Sparkles className="size-5" aria-hidden />} />
+      <CardHeader title="Sangezi Academia" description={description} icon={<Sparkles className="size-5" aria-hidden />} />
       <ChatThread
         turns={chat.turns}
         compact
@@ -313,7 +313,7 @@ export function AssistantCard({ chat, busy = false, description, emptyHint, atta
           </div>
         }
       />
-      <ChatComposer busy={busy || chat.busy} onSend={(text) => void chat.send(text)} placeholder="Ask Sangyin AI anything…" className="border-t border-line p-3" />
+      <ChatComposer busy={busy || chat.busy} onSend={(text) => void chat.send(text)} placeholder="Ask Sangezi Academia anything…" className="border-t border-line p-3" />
       <p className="px-4 pb-3 text-center text-xs text-ink-3">The AI can make mistakes. Check anything you will use with learners.</p>
     </Card>
   )

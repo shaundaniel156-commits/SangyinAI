@@ -41,7 +41,7 @@ export async function feedRoutes(app: FastifyInstance) {
     const kind = FEED_KINDS[request.params.kind]
     if (!kind || !kind.roles.includes(request.user!.role)) return reply.code(404).send({ error: 'Unknown data type.' })
     const csv = [csvLine(kind.columns.map((c) => c.header)), csvLine(kind.columns.map((c) => c.example))].join('\r\n') + '\r\n'
-    return reply.header('content-type', 'text/csv; charset=utf-8').header('content-disposition', `attachment; filename="sangyin-${kind.key}-template.csv"`).send('﻿' + csv)
+    return reply.header('content-type', 'text/csv; charset=utf-8').header('content-disposition', `attachment; filename="sangezi-${kind.key}-template.csv"`).send('﻿' + csv)
   })
 
   // Checks rows without saving: an uploaded CSV/Excel file, or rows from a form ({ rows: [...] }).

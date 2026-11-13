@@ -59,7 +59,7 @@ export function BulkUpload({ kind, onSaved }: { kind: FeedKindInfo; onSaved?: ()
           variant="secondary"
           size="sm"
           icon={<Download className="size-4" aria-hidden />}
-          onClick={() => downloadFromApi(`/feed/${kind.key}/template`, `sangyin-${kind.key}-template.csv`).catch((e: Error) => notify('Template not downloaded', { tone: 'info', description: e.message }))}
+          onClick={() => downloadFromApi(`/feed/${kind.key}/template`, `sangezi-${kind.key}-template.csv`).catch((e: Error) => notify('Template not downloaded', { tone: 'info', description: e.message }))}
         >
           Download template
         </Button>

@@ -24,7 +24,7 @@ export function ReportDocument({ title, subtitle, period, children }: ReportDocu
       <style>{PRINT_CSS}</style>
       <header className="flex flex-col gap-4 border-b-2 border-ink pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-ink">Sangyin AI</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-ink">Sangezi Academia</p>
           <h2 className="mt-1 text-xl font-semibold tracking-tight text-ink">{title}</h2>
           {subtitle && <p className="mt-0.5 text-sm text-ink-2">{subtitle}</p>}
         </div>
@@ -43,8 +43,8 @@ export function ReportDocument({ title, subtitle, period, children }: ReportDocu
       </header>
       <div className="mt-6 space-y-7">{children}</div>
       <footer className="mt-8 border-t border-line pt-3 text-[11px] leading-relaxed text-ink-3">
-        Prepared with Sangyin AI from the school’s recorded results. Competency levels: 70% and above is a strength, 50–69% developing,
-        below 50% needs support. Curriculum references use Sangyin’s own-words outline, not official NCDC or Cambridge International text.
+        Prepared with Sangezi Academia from the school’s recorded results. Competency levels: 70% and above is a strength, 50–69% developing,
+        below 50% needs support. Curriculum references use Sangezi Academia’s own-words outline, not official NCDC or Cambridge International text.
       </footer>
     </article>
   )

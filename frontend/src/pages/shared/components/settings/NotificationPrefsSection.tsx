@@ -46,7 +46,7 @@ const IN_APP: Record<Role, Pref[]> = {
 }
 
 const CHANNELS: (Pref & { note?: string })[] = [
-  { id: 'app', label: 'Mobile app', description: 'Updates in the Sangyin AI app.' },
+  { id: 'app', label: 'Mobile app', description: 'Updates in the Sangezi Academia app.' },
   {
     id: 'ussd',
     label: 'USSD',

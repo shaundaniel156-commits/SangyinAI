@@ -59,7 +59,7 @@ export function AuthHeader({ children }: { children: ReactNode }) {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-8">
         <Link to="/" className="flex items-center gap-2.5 text-lg font-bold tracking-tight" style={{ color: ACCENT }}>
           <LogoMark className="size-8" onDark />
-          Sangyin AI
+          Sangezi Academia
         </Link>
         <nav className="flex items-center gap-6 text-sm text-white/90">{children}</nav>
       </div>

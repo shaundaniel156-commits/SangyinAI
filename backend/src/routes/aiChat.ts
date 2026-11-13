@@ -56,7 +56,7 @@ const ConversationId = z.string().regex(/^[A-Za-z0-9-]{8,64}$/)
 const KEEP = 50
 
 export async function aiChatRoutes(app: FastifyInstance) {
-  // "Ask Sangyin AI": the conversation so far goes in, the reply streams back as plain text while the AI writes it.
+  // "Ask Sangezi Academia": the conversation so far goes in, the reply streams back as plain text while the AI writes it.
   // Saving the conversation is separate (PUT /ai/chats/:id below), done by the page once a reply has finished.
   app.post(
     '/ai/chat',

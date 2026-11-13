@@ -293,7 +293,7 @@ export interface CurriculumCompetency {
 export interface CurriculumTopic {
   id: string
   name: string
-  /** Sangyin's own short description of the topic. */
+  /** Sangezi Academia's own short description of the topic. */
   description?: string
   competencies: CurriculumCompetency[]
 }

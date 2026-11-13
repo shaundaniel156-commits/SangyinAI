@@ -15,7 +15,7 @@ export function ParentHomeSupportPage() {
   const today = formatDate(new Date().toISOString())
   const tip = summary.tips[0]
   // Kept within a single 160-character SMS for low-cost delivery.
-  const sms = `Sangyin AI: ${summary.focus ? `${child.name} is working on ${summary.focus}.` : `No results are recorded for ${child.name} yet.`}${tip ? ` Tip: ${tip.title}, about ${tip.minutes} min a day.` : ''} Reply STOP to opt out.`.slice(0, 160)
+  const sms = `Sangezi Academia: ${summary.focus ? `${child.name} is working on ${summary.focus}.` : `No results are recorded for ${child.name} yet.`}${tip ? ` Tip: ${tip.title}, about ${tip.minutes} min a day.` : ''} Reply STOP to opt out.`.slice(0, 160)
 
   return (
     <>

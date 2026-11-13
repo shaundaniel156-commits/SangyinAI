@@ -26,11 +26,11 @@ const FOR_ROLE: Record<Role, { description: string; suggestions: string[] }> = {
     ],
   },
   admin: {
-    description: 'Ask anything about running the school in Sangyin, supporting your teachers, or teaching and learning.',
+    description: 'Ask anything about running the school in Sangezi Academia, supporting your teachers, or teaching and learning.',
     suggestions: [
       'How do I add a new teacher and give them a class?',
       'What should I look at each week to see which classes need help?',
-      'Write a short message to parents explaining how to use Sangyin to follow their child’s progress.',
+      'Write a short message to parents explaining how to use Sangezi Academia to follow their child’s progress.',
       'How can teachers use Analyse exam results and AI Guidance after end-of-term exams?',
       'Suggest a simple plan for a class that is behind in reading.',
     ],
@@ -81,7 +81,7 @@ function when(iso: string): string {
 }
 
 /**
- * Ask Sangyin AI, for every signed-in user: an open conversation with the AI. The reply streams in
+ * Ask Sangezi Academia, for every signed-in user: an open conversation with the AI. The reply streams in
  * as the AI writes it. Each conversation is saved to the user's account once the AI has answered, and listed
  * under "Recent chats" to reopen and carry on, on any device.
  */
@@ -209,7 +209,7 @@ export function AskAiPage() {
 
       <div className="flex min-h-[calc(100vh-8rem)] min-w-0 flex-col">
         <PageHeader
-          title="Ask Sangyin AI"
+          title="Ask Sangezi Academia"
           description={description}
         />
 
@@ -241,7 +241,7 @@ export function AskAiPage() {
           multiline
           busy={chat.busy}
           onSend={(text) => void chat.send(text)}
-          placeholder="Ask Sangyin AI anything… (Enter to send, Shift+Enter for a new line)"
+          placeholder="Ask Sangezi Academia anything… (Enter to send, Shift+Enter for a new line)"
           // On a phone, students and parents have a tab bar along the bottom: the box sits above it.
           className={cn('sticky rounded-2xl border border-line bg-surface p-2 shadow-lg', role === 'student' || role === 'parent' ? 'bottom-20 lg:bottom-4' : 'bottom-4')}
         />

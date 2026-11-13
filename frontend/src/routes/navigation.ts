@@ -65,7 +65,7 @@ export const NAVIGATION: Record<Role, NavGroup[]> = {
         { label: 'Performance', to: '/performance', icon: LineChart },
         { label: 'Diagnostics', to: '/diagnostics', icon: Stethoscope },
         { label: 'Analyse exam results', to: '/diagnostics/new', icon: FileSearch },
-        { label: 'Ask Sangyin AI', to: '/ask-ai', icon: MessageSquareText },
+        { label: 'Ask Sangezi Academia', to: '/ask-ai', icon: MessageSquareText },
         { label: 'AI Guidance', to: '/guidance', icon: Sparkles },
         { label: 'AI Assessment Builder', to: '/ai-assessments', icon: Wand2 },
       ],
@@ -95,7 +95,7 @@ export const NAVIGATION: Record<Role, NavGroup[]> = {
     {
       label: 'Academics',
       items: [
-        { label: 'Ask Sangyin AI', to: '/ask-ai', icon: MessageSquareText },
+        { label: 'Ask Sangezi Academia', to: '/ask-ai', icon: MessageSquareText },
         { label: 'Curriculum', to: '/curriculum', icon: Library },
         { label: 'Manual feed', to: '/data', icon: DatabaseZap },
         { label: 'Reports', to: '/reports', icon: FileBarChart2 },
@@ -111,7 +111,7 @@ export const NAVIGATION: Record<Role, NavGroup[]> = {
         { label: 'Progress', to: '/parent/progress', icon: TrendingUp, mobile: true },
         { label: 'Current Learning Focus', to: '/parent/focus', icon: Target, mobile: true, mobileLabel: 'Focus' },
         { label: 'Home Support', to: '/parent/home-support', icon: HeartHandshake, mobile: true, mobileLabel: 'Help' },
-        { label: 'Ask Sangyin AI', to: '/ask-ai', icon: Sparkles, mobile: true, mobileLabel: 'Ask AI' },
+        { label: 'Ask Sangezi Academia', to: '/ask-ai', icon: Sparkles, mobile: true, mobileLabel: 'Ask AI' },
       ],
     },
     {
@@ -129,7 +129,7 @@ export const NAVIGATION: Record<Role, NavGroup[]> = {
         { label: 'My Learning', to: '/student/learning', icon: BookOpenCheck, mobile: true, mobileLabel: 'Learning' },
         { label: 'Practice', to: '/student/practice', icon: PencilRuler, mobile: true },
         { label: 'Progress', to: '/student/progress', icon: TrendingUp, mobile: true },
-        { label: 'Ask Sangyin AI', to: '/ask-ai', icon: Sparkles, mobile: true, mobileLabel: 'Ask AI' },
+        { label: 'Ask Sangezi Academia', to: '/ask-ai', icon: Sparkles, mobile: true, mobileLabel: 'Ask AI' },
         { label: 'Feedback', to: '/student/feedback', icon: MessageSquareText },
       ],
     },
@@ -164,5 +164,5 @@ export function titleForPath(role: Role, pathname: string): string {
       if (pathname === item.to || pathname.startsWith(item.to + '/')) return item.label
     }
   }
-  return 'Sangyin AI'
+  return 'Sangezi Academia'
 }

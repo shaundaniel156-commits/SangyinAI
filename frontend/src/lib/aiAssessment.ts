@@ -184,7 +184,7 @@ export function curriculumRefsFor(classId: string, subject: Subject, competency:
   const framework = found?.framework ?? getFramework(cls.framework)
   const level = found?.level
   const topic = curriculumSubjectFor(classId, subject)?.topics.find((t) => t.name === competency)
-  // Official objectives the school added come first; otherwise Sangyin's own outline statements for the topic.
+  // Official objectives the school added come first; otherwise Sangezi Academia's own outline statements for the topic.
   const objectives = topic?.competencies.flatMap((c) => c.objectives) ?? []
   if (objectives.length) return objectives.map((o) => `${o.code} — ${o.text}`)
   const where = `${framework.shortName} · ${level?.name ?? cls.level} ${subject} · ${competency}`

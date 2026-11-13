@@ -36,7 +36,7 @@ export function SplashScreen({ loading }: { loading: boolean }) {
   return (
     <div
       role="status"
-      aria-label="Loading Sangyin AI"
+      aria-label="Loading Sangezi Academia"
       className={cn(
         'fixed inset-0 z-100 flex flex-col items-center justify-center bg-black text-white transition-opacity ease-out',
         phase === 'fade' && 'pointer-events-none opacity-0',
@@ -62,7 +62,7 @@ export function SplashScreen({ loading }: { loading: boolean }) {
           <div className="splash-pulse absolute -inset-6 rounded-full bg-brand-600/50 blur-2xl" aria-hidden />
           <LogoMark className="relative size-20" onDark />
         </div>
-        <p className="mt-6 text-3xl font-bold tracking-tight text-[#5b93e6]">Sangyin AI</p>
+        <p className="mt-6 text-3xl font-bold tracking-tight text-[#5b93e6]">Sangezi Academia</p>
         <p className="mt-1.5 text-sm text-white/60">Loading your school’s data…</p>
       </div>
       </div>

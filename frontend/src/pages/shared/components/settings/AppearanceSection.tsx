@@ -14,7 +14,7 @@ export function AppearanceSection() {
   const { preference, setPreference } = useTheme()
   return (
     <Card>
-      <CardHeader title="Appearance" description="Choose how Sangyin AI looks on this device. Changes apply straight away." />
+      <CardHeader title="Appearance" description="Choose how Sangezi Academia looks on this device. Changes apply straight away." />
       <fieldset className="p-5">
         <legend className="sr-only">Theme</legend>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

@@ -59,7 +59,7 @@ export function FeedResults({ result, onDismiss }: { result: CommitResult; onDis
               </tbody>
             </table>
           </div>
-          <Button size="sm" variant="secondary" className="mt-2" icon={<Download className="size-4" aria-hidden />} onClick={() => saveBlob(accountsCsv(result.accounts!), 'sangyin-new-accounts.csv')}>
+          <Button size="sm" variant="secondary" className="mt-2" icon={<Download className="size-4" aria-hidden />} onClick={() => saveBlob(accountsCsv(result.accounts!), 'sangezi-new-accounts.csv')}>
             Download passwords (CSV)
           </Button>
         </div>

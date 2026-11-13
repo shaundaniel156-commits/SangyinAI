@@ -1,7 +1,7 @@
 import { prisma } from '../db/client.ts'
 import { sendEmail, sendSms, type SendResult } from './channels.ts'
 
-// What Sangyin sends, and to whom. Account details and password resets always go (people need them);
+// What Sangezi Academia sends, and to whom. Account details and password resets always go (people need them);
 // updates and notification copies follow each person's email/SMS preferences.
 
 const appUrl = () => (process.env.APP_URL ?? 'http://localhost:5173').replace(/\/$/, '')
@@ -15,7 +15,7 @@ interface Email {
 }
 
 /** A plain, readable email: greeting, paragraphs, optional button, footer. */
-function email(subject: string, greeting: string, paragraphs: string[], button?: { label: string; url: string }, footer = 'You are receiving this because you have an account on Sangyin AI.'): Email {
+function email(subject: string, greeting: string, paragraphs: string[], button?: { label: string; url: string }, footer = 'You are receiving this because you have an account on Sangezi Academia.'): Email {
   const html = `<!doctype html><html><body style="margin:0;background:#f5f6f8;font-family:Segoe UI,Arial,sans-serif;color:#1f2937">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">
 <table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border-radius:12px;padding:28px" cellpadding="0" cellspacing="0"><tr><td>
@@ -61,12 +61,12 @@ async function deliver(to: Recipient, message: { email?: Email; sms?: string }, 
 export async function sendAccountDetails(account: { name: string; email: string; role: string; phone?: string | null }, tempPassword: string, schoolName: string): Promise<Delivery> {
   const login = `${appUrl()}/login`
   return deliver(account, {
-    email: email(`Your Sangyin AI account at ${schoolName}`, `Hello ${account.name},`, [
+    email: email(`Your Sangezi Academia account at ${schoolName}`, `Hello ${account.name},`, [
       `An account has been created for you as a <strong>${esc(ROLE_NAME[account.role] ?? account.role)}</strong> at ${esc(schoolName)}.`,
       `Email: <strong>${esc(account.email)}</strong><br>One-time password: <strong style="font-family:Consolas,monospace">${esc(tempPassword)}</strong>`,
       'Sign in, then choose a new password in <strong>Settings → Security</strong>. Keep this email private.',
-    ], { label: 'Sign in to Sangyin AI', url: login }, 'You are receiving this because your school created a Sangyin AI account for you.'),
-    sms: `Sangyin AI: your ${ROLE_NAME[account.role] ?? account.role} account at ${short(schoolName, 30)} is ready. Email: ${account.email} One-time password: ${tempPassword} Sign in at ${login} and change it in Settings.`,
+    ], { label: 'Sign in to Sangezi Academia', url: login }, 'You are receiving this because your school created a Sangezi Academia account for you.'),
+    sms: `Sangezi Academia: your ${ROLE_NAME[account.role] ?? account.role} account at ${short(schoolName, 30)} is ready. Email: ${account.email} One-time password: ${tempPassword} Sign in at ${login} and change it in Settings.`,
   }, true)
 }
 
@@ -75,8 +75,8 @@ export async function sendAccountDetails(account: { name: string; email: string;
 export async function sendPasswordReset(user: { name: string; email: string }, token: string): Promise<Delivery> {
   const link = `${appUrl()}/reset-password?token=${encodeURIComponent(token)}`
   return deliver(user, {
-    email: email('Reset your Sangyin AI password', `Hello ${user.name},`, [
-      'Someone (hopefully you) asked to reset the password for your Sangyin AI account.',
+    email: email('Reset your Sangezi Academia password', `Hello ${user.name},`, [
+      'Someone (hopefully you) asked to reset the password for your Sangezi Academia account.',
       'The link below works once and expires in 30 minutes. If you did not ask for this, you can ignore this email; your password stays the same.',
     ], { label: 'Choose a new password', url: link }),
   }, true)
@@ -103,8 +103,8 @@ export async function notifyParents(studentIds: string[], update: { title: strin
       email: email(`${firstName} is working on ${update.focus}`, `Hello ${guardian.name},`, [
         `${esc(student.name)} is working on <strong>${esc(update.focus)}</strong>.`,
         esc(update.note),
-      ], { label: 'Open Sangyin AI', url: `${appUrl()}${update.link ?? '/parent/home-support'}` }, 'You are receiving this because you are linked to a learner on Sangyin AI. You can turn these emails off in Settings.'),
-      sms: short(`Sangyin AI: ${firstName} is working on ${update.focus}. ${update.note}`, 300),
+      ], { label: 'Open Sangezi Academia', url: `${appUrl()}${update.link ?? '/parent/home-support'}` }, 'You are receiving this because you are linked to a learner on Sangezi Academia. You can turn these emails off in Settings.'),
+      sms: short(`Sangezi Academia: ${firstName} is working on ${update.focus}. ${update.note}`, 300),
     })
   }
   return links.length
@@ -119,7 +119,7 @@ export async function notifyUsers(userIds: string[], note: { kind: string; title
   const users = await prisma.user.findMany({ where: { id: { in: userIds } } })
   for (const user of users) {
     void deliver(user, {
-      email: email(note.title, `Hello ${user.name},`, [esc(note.body)], note.link ? { label: 'Open in Sangyin AI', url: `${appUrl()}${note.link}` } : undefined, 'You can turn these emails off in Settings → Notifications.'),
+      email: email(note.title, `Hello ${user.name},`, [esc(note.body)], note.link ? { label: 'Open in Sangezi Academia', url: `${appUrl()}${note.link}` } : undefined, 'You can turn these emails off in Settings → Notifications.'),
     })
   }
 }

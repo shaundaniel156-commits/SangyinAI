@@ -1,11 +1,11 @@
 /**
  * Curriculum frameworks. The levels, subjects, topics and competencies are loaded from the backend after sign-in
- * (lib/liveData.ts replaces this list): Sangyin's own-words outline and whatever the school adds in the Manual feed.
+ * (lib/liveData.ts replaces this list): Sangezi Academia's own-words outline and whatever the school adds in the Manual feed.
  */
 import type { CurriculumFramework, CurriculumFrameworkData } from '../types'
 
 export const CURRICULUM_DISCLAIMER =
-  'Curriculum entries are Sangyin’s own-words outline plus what your school has added — check them against the official NCDC or Cambridge documents.'
+  'Curriculum entries are Sangezi Academia’s own-words outline plus what your school has added — check them against the official NCDC or Cambridge documents.'
 
 export const CURRICULUM_FRAMEWORKS: CurriculumFrameworkData[] = [
   {

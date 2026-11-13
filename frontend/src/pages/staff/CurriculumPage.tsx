@@ -145,7 +145,7 @@ export function CurriculumPage() {
       />
 
       <DemoNotice className="mb-6">
-        <strong className="font-semibold text-ink">Sangyin curriculum outline.</strong> Topics and competencies are written by Sangyin in
+        <strong className="font-semibold text-ink">Sangezi Academia curriculum outline.</strong> Topics and competencies are written by Sangezi Academia in
         plain words to guide practice and AI drafts; they are not copied from NCDC or Cambridge documents. Official learning objectives
         appear here when your school adds them{editing ? ' — open a topic and choose “Add objective”' : ''}. Only your school sees them.
       </DemoNotice>
@@ -187,7 +187,7 @@ export function CurriculumPage() {
           <CardHeader
             icon={<Library className="size-5" aria-hidden />}
             title="Curriculum browser"
-            description={`${framework.name} · Sangyin outline`}
+            description={`${framework.name} · Sangezi Academia outline`}
           />
           <div className="space-y-4 border-b border-line px-5 py-4">
             <HierarchyPath
@@ -229,7 +229,7 @@ export function CurriculumPage() {
               description={
                 subject
                   ? `${subject.name} at ${level?.name} has no topics yet. Add them in the Manual feed.`
-                  : `${level?.name ?? 'This level'} has no subjects yet. Add them in the Manual feed, or load Sangyin’s outline on the server (npm run curriculum:outline).`
+                  : `${level?.name ?? 'This level'} has no subjects yet. Add them in the Manual feed, or load Sangezi Academia’s outline on the server (npm run curriculum:outline).`
               }
             />
           )}

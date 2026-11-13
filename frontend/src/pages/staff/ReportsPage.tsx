@@ -59,7 +59,7 @@ export function ReportsPage() {
   const exportCsv = () => {
     const rows = reportRows(preview.current?.querySelector('article') ?? null)
     if (!rows.length) return notify('Nothing to export yet', { tone: 'info' })
-    const filename = `sangyin-${type}-report-${new Date().toISOString().slice(0, 10)}.csv`
+    const filename = `sangezi-${type}-report-${new Date().toISOString().slice(0, 10)}.csv`
     downloadCsv(filename, rows)
     notify('CSV downloaded', { description: `${filename} — open it in Excel or Google Sheets. Charts are not included.` })
   }

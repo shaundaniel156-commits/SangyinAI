@@ -104,7 +104,7 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
         <div className="grid min-h-screen place-items-center bg-canvas px-4 text-center" role="alert">
           <div className="max-w-sm">
             <p className="text-base font-semibold text-ink">Couldn’t load your school data</p>
-            <p className="mt-1 text-sm text-ink-3">The Sangyin server didn’t respond. Check your connection, then try again.</p>
+            <p className="mt-1 text-sm text-ink-3">The Sangezi Academia server didn’t respond. Check your connection, then try again.</p>
             <div className="mt-4 flex justify-center gap-2">
               <button type="button" onClick={() => void load(token!)} className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
                 Try again

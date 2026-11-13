@@ -457,7 +457,7 @@ function PeopleTab({ kinds, onChanged }: { kinds: Partial<Record<FeedKindKey, Fe
     <div className="space-y-6">
       {institution && (
         <Card>
-          <CardHeader title="Your institution" description="The type decides how Sangyin talks about levels: classes and subjects, or programmes, years and course units." />
+          <CardHeader title="Your institution" description="The type decides how Sangezi Academia talks about levels: classes and subjects, or programmes, years and course units." />
           <CardBody>
             <form onSubmit={saveInstitution} className="grid grid-cols-1 items-end gap-3 sm:grid-cols-4">
               <TextField label="Name" value={institution.name} onChange={(e) => setInstitution({ ...institution, name: e.target.value })} className="sm:col-span-2" />

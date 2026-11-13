@@ -1,7 +1,7 @@
 import { useId } from 'react'
 import { cn } from '../../lib/cn'
 
-// The Sangyin symbol: two brackets around a map of Africa drawn in stripes (public/svg/sangyin-symbol-full.svg),
+// The Sangezi Academia symbol: two brackets around a map of Africa drawn in stripes (public/svg/sangyin-symbol-full.svg),
 // in the website's colours. They follow the theme: brand blue and teal on a light page; white, light blue and
 // bright teal on a dark one.
 const AFRICA =
@@ -41,13 +41,13 @@ export function LogoMark({ className, onDark = false }: { className?: string; on
   )
 }
 
-/** Sangyin AI wordmark with the symbol. */
+/** Sangezi Academia wordmark with the symbol. */
 export function Logo({ className, showSubtitle = true, inverted = false }: { className?: string; showSubtitle?: boolean; inverted?: boolean }) {
   return (
     <div className={cn('flex min-w-0 items-center gap-2.5', className)}>
       <LogoMark className="size-9" onDark={inverted} />
       <div className="min-w-0 leading-tight">
-        <p className={cn('text-[15px] font-semibold tracking-tight', inverted ? 'text-white' : 'text-ink')}>Sangyin AI</p>
+        <p className={cn('text-[15px] font-semibold tracking-tight', inverted ? 'text-white' : 'text-ink')}>Sangezi Academia</p>
         {showSubtitle && (
           <p className={cn('truncate text-[11px]', inverted ? 'text-white/70' : 'text-ink-3')}>AI-Guided Adaptive Education System</p>
         )}

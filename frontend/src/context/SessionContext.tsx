@@ -55,7 +55,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     try {
       res = await fetch(`${API_URL}/auth/login`, { method: 'POST', headers: apiHeaders(), body: JSON.stringify({ email, password, ...(school ? { school } : {}) }) })
     } catch {
-      return { ok: false, error: 'Can’t reach the Sangyin server. Check your connection and try again.' }
+      return { ok: false, error: 'Can’t reach the Sangezi Academia server. Check your connection and try again.' }
     }
 
     const body = (await res.json().catch(() => ({}))) as { token?: string; user?: AuthProfile; error?: string; message?: string }

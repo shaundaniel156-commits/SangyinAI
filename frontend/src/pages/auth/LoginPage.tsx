@@ -68,7 +68,7 @@ export function LoginPage() {
             aria-hidden
           />
           <div className="relative rounded-2xl border border-white/10 bg-[#070b14]/85 p-6 shadow-2xl backdrop-blur transition duration-300 group-hover:border-[#5b93e6]/60 group-hover:shadow-[0_0_40px_rgba(91,147,230,0.35)] motion-safe:group-hover:-translate-y-1 sm:p-8">
-          <h1 className="text-2xl font-semibold tracking-tight">Sign in to Sangyin AI</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Sign in to Sangezi Academia</h1>
           <p className="mt-1.5 text-sm text-white/60">Teachers, administrators, parents and students all sign in here. What you see depends on your account.</p>
 
           <form onSubmit={onSubmit} className="mt-6 space-y-4">

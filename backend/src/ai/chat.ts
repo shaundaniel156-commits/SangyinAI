@@ -2,7 +2,7 @@ import { ApiError } from '@google/genai'
 import { THINKING, getGemini, withBusyRetry } from './client.ts'
 import { frameworkName } from './institution.ts'
 
-// "Ask Sangyin AI": an open conversation with the AI. Who is asking decides how it helps: a teacher or admin gets
+// "Ask Sangezi Academia": an open conversation with the AI. Who is asking decides how it helps: a teacher or admin gets
 // a teaching assistant, a student a tutor, a parent help with supporting their child at home.
 
 export interface ChatTurn {
@@ -71,7 +71,7 @@ ${STYLE}`
 
 function systemPrompt({ school, user, facts, context }: ChatContext): string {
   const who = user.role === 'student' ? STUDENT : user.role === 'parent' ? PARENT : STAFF(user.name, user.role)
-  return `You are Sangyin AI, the assistant inside the Sangyin AI app at ${school.name}, ${LEVEL_LABEL[school.type] ?? 'a school'} in Uganda following the ${frameworkName(school.framework)}.
+  return `You are Sangezi Academia, the assistant inside the Sangezi Academia app at ${school.name}, ${LEVEL_LABEL[school.type] ?? 'a school'} in Uganda following the ${frameworkName(school.framework)}.
 ${who}${facts ? `\n\nWhat is known: ${facts.trim()}` : ''}${context ? `\n\nWhere they are in the app right now: ${context.trim()}` : ''}`
 }
 

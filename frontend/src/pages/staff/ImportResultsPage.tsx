@@ -130,7 +130,7 @@ export function ImportResultsPage() {
     const students = chosen ? getStudentsByClass(chosen.classId) : []
     const rows = students.length ? students.map((s) => [s.name, s.id, '', '']) : [['Amina Nakato', '', '15', '']]
     const slug = chosen ? `-${chosen.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}` : ''
-    downloadCsv(`sangyin-results-template${slug}.csv`, [['Learner Name', 'Student ID', 'Marks', 'Comment'], ...rows])
+    downloadCsv(`sangezi-results-template${slug}.csv`, [['Learner Name', 'Student ID', 'Marks', 'Comment'], ...rows])
     notify('Template downloaded', {
       description: students.length
         ? `One row for each student in ${getClass(chosen!.classId)?.name ?? 'the class'}. Fill in the Marks column (out of ${chosen!.maxScore}) and upload the file here.`
@@ -264,7 +264,7 @@ export function ImportResultsPage() {
           <Card className={cn(!file && 'opacity-60')}>
             <CardHeader
               title="3. Match columns"
-              description={preview ? 'The columns found in your file and what they were matched to.' : 'Example of how spreadsheet columns will be matched to Sangyin AI fields.'}
+              description={preview ? 'The columns found in your file and what they were matched to.' : 'Example of how spreadsheet columns will be matched to Sangezi Academia fields.'}
             />
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
