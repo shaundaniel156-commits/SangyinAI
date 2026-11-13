@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { LogoMark } from '../../components/layout/Logo'
 import { Link } from 'react-router-dom'
-import heroImage from '../../assets/hero-ai-learner.jpg'
+import heroImage from '../../assets/hero-ai-book.jpg'
 
 /*
  * Shared look for the public pages (landing + sign-in): black canvas, blue glow, logo-blue accents.
