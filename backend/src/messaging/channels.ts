@@ -1,8 +1,9 @@
 import africastalking from 'africastalking'
 import { Resend } from 'resend'
 
-// Email (Resend) and SMS (Africa's Talking). Both are optional: without keys in .env, messages are logged and
-// skipped. A failed send is logged and never breaks the action that triggered it.
+// Email (Resend) and SMS (Africa's Talking): the one place the whole app sends from. Both are optional: without
+// keys in .env, a message is skipped, logged, and reported as not sent (never as sent). A failed send is logged
+// and never breaks the action that triggered it.
 
 export interface SendResult {
   sent: boolean
@@ -12,22 +13,25 @@ export interface SendResult {
 // Addresses and numbers are masked in the log ("j***@gmail.com", "+256…456"), and a message's text is never
 // logged: it can carry a one-time password or a reset link.
 export const maskEmail = (email: string) => email.replace(/^(.).*?(@.*)$/, '$1***$2')
-const maskPhone = (phone: string) => `${phone.slice(0, 4)}…${phone.slice(-3)}`
+export const maskPhone = (phone: string) => `${phone.slice(0, 4)}…${phone.slice(-3)}`
 
 let resend: Resend | undefined
+/** Email needs only the Resend key. */
 export function emailConfigured(): boolean {
-  return Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM)
+  return Boolean(process.env.RESEND_API_KEY)
 }
+// Who emails come from: RESEND_FROM, or the older EMAIL_FROM, or Resend's test sender.
+const emailFrom = () => process.env.RESEND_FROM || process.env.EMAIL_FROM || 'Sangezi Academia <onboarding@resend.dev>'
 
 /** Sends one email. Never throws. */
 export async function sendEmail(to: string, subject: string, html: string, text: string): Promise<SendResult> {
   if (!emailConfigured()) {
-    console.log(`[email] skipped "${subject}" to ${maskEmail(to)}: email is not set up (RESEND_API_KEY, EMAIL_FROM)`)
-    return { sent: false, error: 'Email is not set up (RESEND_API_KEY, EMAIL_FROM).' }
+    console.log(`[email] skipped "${subject}" to ${maskEmail(to)}: email is not set up (RESEND_API_KEY)`)
+    return { sent: false, error: 'Email is not set up yet on the server.' }
   }
   try {
     resend ??= new Resend(process.env.RESEND_API_KEY)
-    const { error } = await resend.emails.send({ from: process.env.EMAIL_FROM!, to, subject, html, text })
+    const { error } = await resend.emails.send({ from: emailFrom(), to, subject, html, text })
     if (error) {
       console.error(`[email] "${subject}" to ${maskEmail(to)} failed: ${error.message}`)
       return { sent: false, error: error.message }
@@ -42,11 +46,13 @@ export async function sendEmail(to: string, subject: string, html: string, text:
 
 type SmsClient = { send: (options: { to: string[]; message: string; from?: string }) => Promise<{ SMSMessageData?: { Recipients?: { number: string; status: string; statusCode: number }[]; Message?: string } }> }
 let sms: SmsClient | undefined
+/** SMS needs only the Africa's Talking key; without AT_USERNAME, their sandbox is used. */
 export function smsConfigured(): boolean {
-  return Boolean(process.env.AT_USERNAME && process.env.AT_API_KEY)
+  return Boolean(process.env.AT_API_KEY)
 }
+const smsUsername = () => process.env.AT_USERNAME || 'sandbox'
 export function smsIsSandbox(): boolean {
-  return process.env.AT_USERNAME === 'sandbox'
+  return smsUsername() === 'sandbox'
 }
 
 /**
@@ -68,11 +74,11 @@ export async function sendSms(phone: string, message: string): Promise<SendResul
   const to = normalisePhone(phone)
   if (!to) return { sent: false, error: `Not a usable phone number: ${phone}` }
   if (!smsConfigured()) {
-    console.log(`[sms] skipped to ${maskPhone(to)}: SMS is not set up (AT_USERNAME, AT_API_KEY)`)
-    return { sent: false, error: 'SMS is not set up (AT_USERNAME, AT_API_KEY).' }
+    console.log(`[sms] skipped to ${maskPhone(to)}: SMS is not set up (AT_API_KEY)`)
+    return { sent: false, error: 'SMS is not set up yet on the server.' }
   }
   try {
-    sms ??= (africastalking({ apiKey: process.env.AT_API_KEY!, username: process.env.AT_USERNAME! }) as unknown as { SMS: SmsClient }).SMS
+    sms ??= (africastalking({ apiKey: process.env.AT_API_KEY!, username: smsUsername() }) as unknown as { SMS: SmsClient }).SMS
     const res = await sms.send({ to: [to], message, ...(process.env.AT_SENDER_ID ? { from: process.env.AT_SENDER_ID } : {}) })
     const recipient = res.SMSMessageData?.Recipients?.[0]
     const ok = recipient && recipient.statusCode >= 100 && recipient.statusCode < 200

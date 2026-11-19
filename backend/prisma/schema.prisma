@@ -582,3 +582,41 @@ model PasswordReset {
   usedAt    DateTime?
   createdAt DateTime  @default(now())
 }
+
+// TEMPORARY: testing-period sign-up (backend/src/signup). Someone who has filled in the sign-up form but not yet
+// typed in their codes. No User or School exists for them until they do. Only fingerprints are stored: of the
+// ticket the starting browser holds, and of the code sent by email and the one sent by SMS.
+model PendingSignup {
+  id            String          @id @default(cuid())
+  ticketHash    String          @unique
+  email         String
+  phone         String
+  name          String
+  schoolName    String
+  schoolType    InstitutionType @default(primary)
+  framework     Framework       @default(uganda)
+  passwordHash  String
+  emailCodeHash String
+  phoneCodeHash String
+  // Tries at each of the current codes (5 and it is dead).
+  emailAttempts Int             @default(0)
+  phoneAttempts Int             @default(0)
+  lastSentAt    DateTime        @default(now())
+  expiresAt     DateTime
+  createdAt     DateTime        @default(now())
+
+  @@index([email])
+}
+
+// TEMPORARY: testing-period sign-up. Each time sign-up codes were sent, to limit how many go to one phone, one
+// email, and in all. Rows are cleared after a day.
+model SignupSend {
+  id        String   @id @default(cuid())
+  email     String
+  phone     String
+  createdAt DateTime @default(now())
+
+  @@index([phone, createdAt])
+  @@index([email, createdAt])
+  @@index([createdAt])
+}

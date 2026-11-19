@@ -1,11 +1,12 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/layout/AppShell'
 import { useLiveData } from './context/LiveDataContext'
+import { useSession } from './context/SessionContext'
 import { LandingPage } from './pages/auth/LandingPage'
 import { LoginPage } from './pages/auth/LoginPage'
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage'
 import { DashboardPage } from './pages/shared/DashboardPage'
-import { NotFoundPage } from './pages/shared/NotFoundPage'
+import { NotFoundPage, PublicNotFoundPage } from './pages/shared/NotFoundPage'
 import { CurriculumPage } from './pages/staff/CurriculumPage'
 import { AiAssessmentNewPage } from './pages/staff/ai/AiAssessmentNewPage'
 import { AiAssessmentReviewPage } from './pages/staff/ai/AiAssessmentReviewPage'
@@ -52,6 +53,7 @@ import { RoleRoute } from './routes/RoleRoute'
 export default function App() {
   // Reading the live data here redraws every page, in place, each time the data is reloaded.
   useLiveData()
+  const { signedIn } = useSession()
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
@@ -104,8 +106,11 @@ export default function App() {
           <Route path="/student/progress" element={<StudentProgressPage />} />
           <Route path="/student/feedback" element={<StudentFeedbackPage />} />
         </Route>
-        <Route path="*" element={<NotFoundPage />} />
+        {/* An address that matches nothing above. Signed in, the notice shows inside the app. */}
+        {signedIn && <Route path="*" element={<NotFoundPage />} />}
       </Route>
+      {/* Signed out, it shows by itself. (Real pages that need an account still go to /login, through AppShell.) */}
+      {!signedIn && <Route path="*" element={<PublicNotFoundPage />} />}
     </Routes>
   )
 }

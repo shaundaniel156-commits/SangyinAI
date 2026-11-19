@@ -2,13 +2,11 @@ import cors from '@fastify/cors'
 import multipart from '@fastify/multipart'
 import rateLimit from '@fastify/rate-limit'
 import Fastify, { type FastifyRequest } from 'fastify'
-import { aiConfigured, MODEL } from './ai/client.ts'
 import { generateAssessment } from './ai/generateAssessment.ts'
 import { GuidanceRequestSchema, generateGuidance } from './ai/guidance.ts'
 import { GenerateAssessmentRequestSchema } from './ai/schemas.ts'
 import { authConfigured, requireRole } from './auth/session.ts'
 import { authRoutes } from './auth/routes.ts'
-import { databaseReachable } from './db/client.ts'
 import { aiAssessmentRoutes } from './routes/aiAssessments.ts'
 import { aiChatRoutes } from './routes/aiChat.ts'
 import { assessmentRoutes } from './routes/assessments.ts'
@@ -20,6 +18,7 @@ import { backfillMastery } from './routes/mastery.ts'
 import { notificationRoutes } from './routes/notifications.ts'
 import { practiceRoutes } from './routes/practice.ts'
 import { studentRoutes } from './routes/students.ts'
+import { signupRoutes } from './signup/routes.ts'
 
 // trustProxy: only the proxy connected to this server (Render's, hop 0) is trusted, so request.ip is the address
 // it saw, not whatever a client wrote in X-Forwarded-For. The sign-in limits read the headers themselves (auth/attempts.ts).
@@ -56,18 +55,14 @@ const aiRoute = {
   },
 }
 
-// Health check: is the server up, and are the AI, sign-in and database ready?
-app.get('/health', async () => ({
-  ok: true,
-  // The commit this server was built from (set by Render), to tell which version is live.
-  version: process.env.RENDER_GIT_COMMIT?.slice(0, 7) ?? 'local',
-  ai: aiConfigured() ? MODEL : 'offline',
-  signIn: authConfigured() ? 'ready' : 'not set up',
-  database: (await databaseReachable()) ? 'connected' : 'unreachable',
-}))
+// Health check, open to anyone: says only that the server is up. (Nothing about the version, the AI or the database:
+// any detail here can be read by the whole internet.)
+app.get('/health', async () => ({ ok: true }))
 
 // Sign-in, then the data routes. Each checks who is signed in and only returns their school's data.
 await app.register(authRoutes)
+// Temporary, for the testing period: people can create their own account (signup/routes.ts says how to remove it).
+await app.register(signupRoutes)
 await app.register(classRoutes)
 await app.register(studentRoutes)
 await app.register(assessmentRoutes)

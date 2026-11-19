@@ -19,7 +19,7 @@ function email(subject: string, greeting: string, paragraphs: string[], button?:
   const html = `<!doctype html><html><body style="margin:0;background:#f5f6f8;font-family:Segoe UI,Arial,sans-serif;color:#1f2937">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">
 <table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border-radius:12px;padding:28px" cellpadding="0" cellspacing="0"><tr><td>
-<p style="margin:0 0 16px;font-size:13px;font-weight:600;color:#1f4e79;letter-spacing:.3px">SANGYIN AI</p>
+<p style="margin:0 0 16px;font-size:13px;font-weight:600;color:#1f4e79;letter-spacing:.3px">SANGEZI ACADEMIA</p>
 <p style="margin:0 0 12px;font-size:15px">${esc(greeting)}</p>
 ${paragraphs.map((p) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.5">${p}</p>`).join('\n')}
 ${button ? `<p style="margin:20px 0"><a href="${esc(button.url)}" style="background:#1d5fbf;color:#ffffff;text-decoration:none;padding:11px 18px;border-radius:8px;font-weight:600;display:inline-block">${esc(button.label)}</a></p>` : ''}

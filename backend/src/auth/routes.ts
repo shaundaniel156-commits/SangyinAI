@@ -3,7 +3,7 @@ import { hash, verify } from '@node-rs/argon2'
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../db/client.ts'
-import { maskEmail } from '../messaging/channels.ts'
+import { emailConfigured, maskEmail } from '../messaging/channels.ts'
 import { sendPasswordReset } from '../messaging/messages.ts'
 import { attemptKeys, clearFailures, lockedMessage, recordFailure } from './attempts.ts'
 import { authConfigured, requireUser, signToken } from './session.ts'
@@ -75,6 +75,8 @@ export async function authRoutes(app: FastifyInstance) {
   app.post('/auth/forgot-password', async (request, reply) => {
     const parsed = z.object({ email: z.string().trim().min(3).max(200) }).safeParse(request.body)
     if (!parsed.success) return reply.code(400).send({ error: 'Enter your email address.' })
+    // Without the email key no link can go out, so say so instead of promising one. (Said to everyone, whoever they name.)
+    if (!emailConfigured()) return reply.code(503).send({ error: 'Password reset by email is not set up yet. Ask your school administrator to set a new password for you.' })
     const keys = attemptKeys(request, parsed.data.email)
     const locked = lockedMessage(keys, 'password reset requests')
     if (locked) return reply.code(429).send({ error: locked })
@@ -86,7 +88,11 @@ export async function authRoutes(app: FastifyInstance) {
       const token = randomBytes(32).toString('base64url')
       await prisma.passwordReset.deleteMany({ where: { userId: user.id, usedAt: null } })
       await prisma.passwordReset.create({ data: { userId: user.id, tokenHash: sha256(token), expiresAt: new Date(Date.now() + RESET_MINUTES * 60_000) } })
-      void sendPasswordReset(user, token)
+      // The reply below stays the same either way; a reset email that did not go out is logged (address masked).
+      const account = maskEmail(user.email)
+      void sendPasswordReset(user, token).then((d) => {
+        if (!d.email?.sent) request.log.error({ account, reason: d.email?.error }, 'forgot-password: the reset email was NOT sent')
+      })
     } catch (error) {
       request.log.error(error, 'forgot-password failed')
       return reply.code(503).send({ error: 'Password reset is unavailable right now. Please try again shortly.' })

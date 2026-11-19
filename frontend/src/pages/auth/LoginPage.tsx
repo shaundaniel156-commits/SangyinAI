@@ -10,6 +10,7 @@ import { classLevels, type SchoolSetup } from '../../lib/classLevels'
 import { ROLE_HOME } from '../../data/users'
 import { cn } from '../../lib/cn'
 import { ACCENT, AuthCanvas, AuthHeader, LOGO_BLUE, PhotoBackdrop } from './AuthChrome'
+import { SignUpSection } from './SignUpSection'
 
 /** "Primary 1 to Primary 7" */
 const levelSpan = (s: SchoolSetup) => {
@@ -38,6 +39,7 @@ export function LoginPage() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError(null)
+    if (!email.trim() || !password) return setError('Enter your email and password.')
     setBusy(true)
     // The new-school choice goes along only when it is open and complete.
     const school = newSchool && setup.type && setup.framework ? { type: setup.type, framework: setup.framework } : null
@@ -71,18 +73,23 @@ export function LoginPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Sign in to Sangezi Academia</h1>
           <p className="mt-1.5 text-sm text-white/60">Teachers, administrators, parents and students all sign in here. What you see depends on your account.</p>
 
-          <form onSubmit={onSubmit} className="mt-6 space-y-4">
+          {/* noValidate: the fields are marked required for password managers and screen readers, and the message below (not the browser's own bubble) says what is wrong. */}
+          <form onSubmit={onSubmit} noValidate className="mt-6 space-y-4">
             <DarkField
               label="Email"
+              name="email"
               type="email"
-              autoComplete="email"
+              required
+              autoComplete="username"
               placeholder="name@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
             <DarkField
               label="Password"
+              name="password"
               type="password"
+              required
               autoComplete="current-password"
               placeholder="••••••••"
               value={password}
@@ -118,13 +125,16 @@ export function LoginPage() {
             </button>
           </form>
 
-          {/* There is no sign-up: every account is made by the school. */}
+          {/* Temporary, for the testing period: shows nothing once the server has sign-up switched off. */}
+          <SignUpSection />
+
+          {/* Apart from that, there is no sign-up: every account is made by the school. */}
           <p className="mt-5 text-xs text-white/50">
             Accounts are created by your school: the administrator adds teachers, and teachers add students and parents. Ask your school for your sign-in details.
           </p>
           <div className="mt-4 border-t border-white/10 pt-4">
             <button type="button" onClick={() => setNewSchool((v) => !v)} aria-expanded={newSchool} className="text-sm font-medium hover:underline" style={{ color: ACCENT }}>
-              {newSchool ? 'Hide new-school setup' : 'Administrator setting up a brand-new school?'}
+              {newSchool ? 'Hide school type and curriculum' : 'Given an administrator account for a new school? Set its type and curriculum'}
             </button>
             {newSchool && <NewSchoolSetup value={setup} onChange={setSetup} />}
           </div>
@@ -258,7 +268,7 @@ function ForgotPasswordModal({ initialEmail, onClose }: { initialEmail: string; 
         <p className="text-sm text-ink-2">{done} Check your spam folder if it doesn&apos;t arrive in a few minutes.</p>
       ) : (
         <>
-          <TextField label="Email" type="email" autoComplete="email" value={address} onChange={(e) => setAddress(e.target.value)} />
+          <TextField label="Email" name="email" type="email" required autoComplete="email" value={address} onChange={(e) => setAddress(e.target.value)} />
           {error && (
             <p role="alert" className="mt-3 text-sm text-red-600">
               {error}
