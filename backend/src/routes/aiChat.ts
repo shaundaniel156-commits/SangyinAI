@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { chatStream } from '../ai/chat.ts'
-import { aiConfigured } from '../ai/client.ts'
+import { aiAvailable } from '../ai/ask.ts'
 import { logAiError } from '../ai/errors.ts'
 import type { SessionUser } from '../auth/session.ts'
 import { requireUser } from '../auth/session.ts'
@@ -68,7 +68,7 @@ export async function aiChatRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const parsed = ChatSchema.safeParse(request.body)
       if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Invalid message' })
-      if (!aiConfigured()) return reply.code(503).send({ error: 'The AI is not set up on this server yet.' })
+      if (!aiAvailable()) return reply.code(503).send({ error: 'The AI is not set up on this server yet.' })
       const user = request.user!
       const school = await prisma.school.findUnique({ where: { id: user.schoolId }, select: { name: true, type: true, framework: true } })
       if (!school) return reply.code(404).send({ error: 'School not found.' })
@@ -82,7 +82,7 @@ export async function aiChatRoutes(app: FastifyInstance) {
         first = await stream.next()
       } catch (error) {
         logAiError(error)
-        return reply.code(503).send({ error: 'Sorry — I can’t reach the AI service right now; Google says it is busy. Please try again in a few minutes.' })
+        return reply.code(503).send({ error: 'Sorry — I can’t reach the AI service right now. Please try again in a few minutes.' })
       }
 
       // From here the reply is written directly, piece by piece (Fastify's own reply handling is bypassed).

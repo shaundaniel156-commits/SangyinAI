@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { documentText } from '../feed/references.ts'
-import { aiConfigured, askGeminiForJson } from './client.ts'
+import { aiAvailable, askAiForJson, type AiProvider } from './ask.ts'
 import { logAiError } from './errors.ts'
 import { frameworkName, institutionContext } from './institution.ts'
 
@@ -64,9 +64,9 @@ function fromMarks(r: ExamDiagnosisRequest): ExamDiagnosis {
 export async function diagnoseExam(
   r: ExamDiagnosisRequest,
   context: { classLevel: string; framework: string; schoolId: string },
-): Promise<{ diagnosis: ExamDiagnosis; source: 'gemini' | 'offline' } | null> {
+): Promise<{ diagnosis: ExamDiagnosis; source: AiProvider | 'offline' } | null> {
   const offline = r.items.length ? { diagnosis: fromMarks(r), source: 'offline' as const } : null
-  if (!aiConfigured()) return offline
+  if (!aiAvailable()) return offline
   // The document: PDFs and photos go to the AI as files; Word and text files as their text.
   let files: { mimeType: string; data: string }[] = []
   let documentNote = ''
@@ -84,8 +84,8 @@ Marks:
 ${r.items.map((i) => `- ${i.topic}: ${i.score}/${i.outOf} (${pct(i)}%)`).join('\n') || '- (none entered)'}
 Teacher's report or comments: ${r.report || '(none)'}${files.length ? `\nUploaded document: ${r.document!.name} (attached)` : documentNote}${refs.references ? `\n\n${refs.references}` : ''}`
   try {
-    const diagnosis = await askGeminiForJson(ExamDiagnosisSchema, SYSTEM_PROMPT, prompt, 'exam-diagnosis', files)
-    return diagnosis ? { diagnosis, source: 'gemini' } : offline
+    const answer = await askAiForJson(ExamDiagnosisSchema, SYSTEM_PROMPT, prompt, 'exam-diagnosis', files)
+    return answer ? { diagnosis: answer.value, source: answer.source } : offline
   } catch (error) {
     logAiError(error)
     return offline

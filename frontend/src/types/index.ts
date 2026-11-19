@@ -257,7 +257,7 @@ export interface AiAssessment {
   status: AiAssessmentStatus
   sentOn?: string
   /** Who wrote the draft (the AI or the offline bank) and the anonymous request sent to the AI (kept for fine-tuning). */
-  source?: 'gemini' | 'offline'
+  source?: 'gemini' | 'claude' | 'offline'
   requestSent?: Record<string, unknown>
   /** Its place in the gradebook (Assessments), where each student's score is entered as they finish. */
   assessmentId?: string

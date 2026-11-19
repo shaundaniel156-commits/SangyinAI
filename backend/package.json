@@ -15,6 +15,7 @@
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
     "user": "node --env-file=.env scripts/createUser.ts",
+    "claude": "node --env-file=.env scripts/claudeCheck.ts",
     "scrape:example": "node scripts/scrape/example.ts",
     "curriculum:outline": "node --env-file=.env scripts/importCurriculumOutline.ts"
   },
@@ -26,6 +27,7 @@
     "node": "24.x"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.10.0",
     "@fastify/cors": "^11.3.0",
     "@fastify/multipart": "^10.1.2",
     "@fastify/rate-limit": "^11.2.1",

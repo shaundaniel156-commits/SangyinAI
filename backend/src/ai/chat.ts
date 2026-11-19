@@ -1,5 +1,4 @@
-import { ApiError } from '@google/genai'
-import { THINKING, getGemini, withBusyRetry } from './client.ts'
+import { aiChatStream } from './ask.ts'
 import { frameworkName } from './institution.ts'
 
 // "Ask Sangezi Academia": an open conversation with the AI. Who is asking decides how it helps: a teacher or admin gets
@@ -76,23 +75,7 @@ ${who}${facts ? `\n\nWhat is known: ${facts.trim()}` : ''}${context ? `\n\nWhere
 }
 
 /** The AI's reply, piece by piece as it writes it. Throws when the AI can't be reached (the caller tells the user). */
-export async function* chatStream(messages: ChatTurn[], context: ChatContext): AsyncGenerator<string> {
-  const contents = messages.map((m) => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text }] }))
-  const config = { systemInstruction: systemPrompt(context) }
-  const start = (model: string, thinking: boolean) => getGemini().models.generateContentStream({ model, contents, config: thinking ? { ...config, thinkingConfig: { thinkingLevel: THINKING } } : config })
-
-  // withBusyRetry tries again when Google is busy, then the fallback models.
-  const stream = await withBusyRetry('chat', async (model) => {
-    try {
-      return await start(model, true)
-    } catch (error) {
-      // A model that doesn't take this thinking level refuses the whole request: ask again without it.
-      if (!(error instanceof ApiError) || error.status !== 400 || !/thinking/i.test(error.message)) throw error
-      return start(model, false)
-    }
-  })
-  for await (const chunk of stream) {
-    const text = chunk.text
-    if (text) yield text
-  }
+export function chatStream(messages: ChatTurn[], context: ChatContext): AsyncGenerator<string> {
+  // Gemini, or Claude when Gemini cannot (ai/ask.ts).
+  return aiChatStream(systemPrompt(context), messages, 'chat')
 }

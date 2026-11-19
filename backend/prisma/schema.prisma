@@ -102,6 +102,8 @@ enum PracticeStatus {
 
 enum AiSource {
   gemini
+  // The backup AI, used when Gemini cannot do the work (backend/src/ai/ask.ts).
+  claude
   offline
 }
 
@@ -388,7 +390,7 @@ model GuidancePlan {
   competencyGap       String
   curriculumReference String
   plan                Json
-  // gemini or offline; empty for sample plans.
+  // gemini, claude or offline; empty for sample plans.
   source              AiSource?
   status              GuidanceStatus @default(pending_review)
   edits               Json?
@@ -420,7 +422,7 @@ model AiAssessment {
   shareWithParents  Boolean              @default(true)
   // How to teach the targeted gaps (ai/schemas.ts TeachingPlan), drafted with the questions.
   teachingPlan      Json?
-  // gemini or offline, when known; and the anonymous request sent to the AI (kept for fine-tuning).
+  // gemini, claude or offline, when known; and the anonymous request sent to the AI (kept for fine-tuning).
   source            AiSource?
   requestSent       Json?
   // Its place in the gradebook (Assessments), where each student's score is entered as they finish: the assessment

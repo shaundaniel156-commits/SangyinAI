@@ -74,7 +74,7 @@ export async function studentRoutes(app: FastifyInstance) {
             return { assessmentTitle: r.examTitle, item: `${i.topic}: ${i.score} / ${i.outOf}`, outcome: pct >= 70 ? 'correct' : pct >= 40 ? 'partial' : 'incorrect' }
           }),
         ],
-        processing: source === 'gemini' ? 'refined' : 'local',
+        processing: source === 'offline' ? 'local' : 'refined',
         basis: 'exam',
       }
       const report = await prisma.diagnosticReport.create({ data: { studentId: student.id, subject: r.subject, summary } })

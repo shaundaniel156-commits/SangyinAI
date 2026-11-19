@@ -15,7 +15,7 @@ const thinkingRefused = new Set<string>()
 // Give up on a request after this long, so an unanswered call can't hang a teacher's page for minutes.
 const REQUEST_TIMEOUT_MS = 60_000
 
-// True when a key is set. Without one, the app uses the offline question bank.
+// True when a Gemini key is set. (Whether any AI can be asked, Claude the backup included: aiAvailable in ai/ask.ts.)
 export function aiConfigured(): boolean {
   return Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY)
 }
@@ -99,6 +99,28 @@ export async function withBusyRetry<R>(label: string, call: (model: string) => P
     }
   }
   throw new Error('unreachable')
+}
+
+/** Gemini's reply to a conversation, piece by piece as it writes it. Throws when Gemini can't be reached. */
+export async function* geminiChatStream(systemInstruction: string, turns: { role: 'user' | 'ai'; text: string }[], label: string): AsyncGenerator<string> {
+  const contents = turns.map((m) => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text }] }))
+  const config = { systemInstruction }
+  const start = (model: string, thinking: boolean) => getGemini().models.generateContentStream({ model, contents, config: thinking ? { ...config, thinkingConfig: { thinkingLevel: THINKING } } : config })
+
+  // withBusyRetry tries again when Google is busy, then the fallback models.
+  const stream = await withBusyRetry(label, async (model) => {
+    try {
+      return await start(model, true)
+    } catch (error) {
+      // A model that doesn't take this thinking level refuses the whole request: ask again without it.
+      if (!(error instanceof ApiError) || error.status !== 400 || !/thinking/i.test(error.message)) throw error
+      return start(model, false)
+    }
+  })
+  for await (const chunk of stream) {
+    const text = chunk.text
+    if (text) yield text
+  }
 }
 
 // Asks Gemini for JSON in an exact shape, then checks the answer really fits that shape.

@@ -48,7 +48,7 @@ const DraftSchema = EditableFields.extend({
   curriculumRefs: EditableFields.shape.curriculumRefs.default([]),
   parentNote: EditableFields.shape.parentNote.optional(),
   shareWithParents: EditableFields.shape.shareWithParents.default(true),
-  source: z.enum(['gemini', 'offline']).optional(),
+  source: z.enum(['gemini', 'claude', 'offline']).optional(),
   teachingPlan: TeachingPlanSchema.optional(),
   // Made from Create assessment ("online"): the gradebook assessment it fills in, done once by each student.
   assessmentId: z.string().min(1).optional(),

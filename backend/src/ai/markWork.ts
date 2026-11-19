@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { aiConfigured, askGeminiForJson } from './client.ts'
+import { aiAvailable, askAiForJson } from './ask.ts'
 import { logAiError } from './errors.ts'
 
 // Marks photos of work students did on paper (written_work questions) against the model answer.
@@ -20,7 +20,7 @@ export interface WorkMark {
   feedback: string
 }
 
-const MarkingSchema = z.object({
+export const MarkingSchema = z.object({
   results: z.array(
     z.object({
       item: z.number().int().describe('The work number, starting at 1, in the order given'),
@@ -45,7 +45,7 @@ Never guess marks you cannot see. The teacher can read the photo too.`
  */
 export async function markWrittenWork(items: WorkToMark[], context: { subject: string; classLevel: string }): Promise<(WorkMark | null)[]> {
   if (!items.length) return []
-  if (!aiConfigured()) return items.map(() => null)
+  if (!aiAvailable()) return items.map(() => null)
 
   const prompt = `Mark these ${items.length} piece${items.length === 1 ? '' : 's'} of work. Subject: ${context.subject}. Class level: ${context.classLevel}.
 The photos follow in the same order: photo 1 is work 1, and so on.
@@ -60,14 +60,15 @@ Explanation to use in feedback: ${w.explanation}`,
   .join('\n\n')}`
 
   try {
-    const result = await askGeminiForJson(
+    const answer = await askAiForJson(
       MarkingSchema,
       MARKING_SYSTEM_PROMPT,
       prompt,
       'marking',
       items.map((w) => ({ mimeType: w.mimeType, data: w.data })),
     )
-    if (!result) return items.map(() => null)
+    if (!answer) return items.map(() => null)
+    const result = answer.value
     return items.map((_, i) => {
       const r = result.results.find((x) => x.item === i + 1) ?? result.results[i]
       return r ? { correct: r.correct, feedback: r.feedback.trim() } : null

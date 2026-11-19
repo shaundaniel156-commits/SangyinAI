@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { aiConfigured, askGeminiForJson } from './client.ts'
+import { aiAvailable, askAiForJson, type AiProvider } from './ask.ts'
 import { logAiError } from './errors.ts'
 import { frameworkName, institutionContext } from './institution.ts'
 
@@ -103,8 +103,8 @@ function templatePlan(r: GuidanceRequest): GuidancePlan {
 }
 
 // schoolId: the signed-in user's institution, so the plan can draw on its reference material.
-export async function generateGuidance(r: GuidanceRequest, schoolId?: string): Promise<{ plan: GuidancePlan; source: 'gemini' | 'offline' }> {
-  if (!aiConfigured()) return { plan: templatePlan(r), source: 'offline' }
+export async function generateGuidance(r: GuidanceRequest, schoolId?: string): Promise<{ plan: GuidancePlan; source: AiProvider | 'offline' }> {
+  if (!aiAvailable()) return { plan: templatePlan(r), source: 'offline' }
   const context = await institutionContext(schoolId, { subject: r.subject, level: r.classLevel, topics: [r.competencyGap] })
   const prompt = `Class level: ${r.classLevel}
 Curriculum: ${frameworkName(r.framework)}
@@ -116,9 +116,9 @@ Evidence from assessments:
 ${r.evidence.map((e) => `- ${e}`).join('\n') || '- (none supplied)'}
 What the learner said: ${r.studentFeedback || '(nothing)'}${r.teacherRequest ? `\nThe teacher asked for an earlier plan to be rewritten. Follow their request: ${r.teacherRequest}` : ''}${context.references ? `\n\n${context.references}` : ''}`
   try {
-    const plan = await askGeminiForJson(GuidancePlanSchema, GUIDANCE_SYSTEM_PROMPT, prompt, 'guidance')
-    if (!plan) return { plan: templatePlan(r), source: 'offline' }
-    return { plan, source: 'gemini' }
+    const answer = await askAiForJson(GuidancePlanSchema, GUIDANCE_SYSTEM_PROMPT, prompt, 'guidance')
+    if (!answer) return { plan: templatePlan(r), source: 'offline' }
+    return { plan: answer.value, source: answer.source }
   } catch (error) {
     logAiError(error)
     return { plan: templatePlan(r), source: 'offline' }

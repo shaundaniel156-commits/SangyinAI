@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import type { SessionUser } from '../auth/session.ts'
 import { requireRole, requireUser } from '../auth/session.ts'
@@ -22,8 +22,14 @@ const AnswersSchema = z.object({
 const FeedbackSchema = z
   .object({ feedback: z.enum(['easy', 'okay', 'difficult']).optional(), confidence: z.enum(['confident', 'unsure', 'need_help']).optional() })
   .refine((f) => f.feedback || f.confidence, { message: 'Nothing to save' })
-// The photos make this request far bigger than the server's usual limit.
-const answersOptions = { onRequest: requireRole('student'), bodyLimit: 40 * 1024 * 1024 }
+// The photos make this request far bigger than the server's usual limit. Handing in can have the AI mark photos,
+// so each student may hand in 30 times an hour (a class doing its practice needs a handful each), counted per
+// student after the sign-in check, like the other AI routes.
+const answersOptions = {
+  onRequest: requireRole('student'),
+  bodyLimit: 40 * 1024 * 1024,
+  config: { rateLimit: { max: 30, timeWindow: '1 hour', hook: 'preHandler' as const, keyGenerator: (request: FastifyRequest) => request.user?.sub ?? request.ip } },
+}
 
 // Thrown inside the hand-in transaction when a once-only assessment was handed in by another request first.
 const doneAlready = new Error('done already')

@@ -301,7 +301,7 @@ export async function generateAssessmentDraft(input: GenerateInput): Promise<AiD
   try {
     const res = await fetch(`${API_URL}/ai/assessments/generate`, { method: 'POST', headers: apiHeaders(), body: JSON.stringify(request) })
     if (!res.ok) throw new Error(`Server replied ${res.status}`)
-    const { draft, source } = (await res.json()) as { draft: ServerDraft; source: 'gemini' | 'offline' }
+    const { draft, source } = (await res.json()) as { draft: ServerDraft; source: 'gemini' | 'claude' | 'offline' }
     // No topics chosen: the AI picked them from the teacher's instructions, so take them from its questions.
     const competencies = input.competencies.length ? input.competencies : [...new Set(draft.questions.map((q) => q.competency))].slice(0, 10)
  
