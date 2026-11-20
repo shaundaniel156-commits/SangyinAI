@@ -19,9 +19,9 @@ export function claudeConfigured(): boolean {
 // what the largest real answer needs, and some room.
 // - assessment: 15 questions at about 300 tokens each, a teaching plan of up to 5 topics at about 550, and the
 //   title, messages and reasons: about 9,000.
-// - guidance: 6 teaching steps and 6 learner steps with examples, the teacher sheet and the notes: about 3,500.
+// - guidance: 6 teaching steps and 6 learner steps with examples, the teacher sheet and the notes: about 4,500 measured in testing.
 // - marking: up to 15 pieces of work at about 100. exam-diagnosis: 12 competencies and 5 next steps: about 800.
-const JSON_MAX_TOKENS: Record<string, number> = { assessment: 12_000, guidance: 6_000, marking: 3_000, 'exam-diagnosis': 2_000 }
+const JSON_MAX_TOKENS: Record<string, number> = { assessment: 12_000, guidance: 8_000, marking: 3_000, 'exam-diagnosis': 2_000 }
 const JSON_MAX_TOKENS_OTHER = 4_000
 // A chat reply: about 1,500 words. A longer one is cut there and says so.
 const CHAT_MAX_TOKENS = 2_000
@@ -29,7 +29,9 @@ const CHAT_MAX_TOKENS = 2_000
 const CHAT_INPUT_CHARS = 30_000
 
 // How long Claude is waited for. By the time it is asked, the person has usually waited through Gemini's tries.
+// A full 15-question assessment with its teaching plan took 46 seconds in testing, so it is given longer.
 const JSON_TIMEOUT_MS = 60_000
+const JSON_TIMEOUT_MS_BY_LABEL: Record<string, number> = { assessment: 120_000 }
 const CHAT_FIRST_PIECE_MS = 30_000
 const CHAT_WHOLE_REPLY_MS = 120_000
 // A call that fails within this time for a passing reason (busy, rate limit, dropped connection) is tried once
@@ -161,7 +163,7 @@ export async function askClaudeForJson<T>(schema: z.ZodType<T>, system: string, 
         // Structured output: Claude's answer is held to this JSON shape.
         output_config: { format: claudeFormat(schema) },
       },
-      { timeout: JSON_TIMEOUT_MS },
+      { timeout: JSON_TIMEOUT_MS_BY_LABEL[label] ?? JSON_TIMEOUT_MS },
     ),
   )
 
