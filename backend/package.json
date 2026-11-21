@@ -16,6 +16,7 @@
     "db:studio": "prisma studio",
     "user": "node --env-file=.env scripts/createUser.ts",
     "claude": "node --env-file=.env scripts/claudeCheck.ts",
+    "email": "node --env-file=.env scripts/emailCheck.ts",
     "scrape:example": "node scripts/scrape/example.ts",
     "curriculum:outline": "node --env-file=.env scripts/importCurriculumOutline.ts"
   },
@@ -43,6 +44,7 @@
     "fastify": "^5.12.5",
     "jsonwebtoken": "^9.0.3",
     "mammoth": "^1.13.0",
+    "nodemailer": "^10.6.0",
     "pg": "^8.23.1",
     "playwright": "^1.64.1",
     "prisma": "^7.10.1",
@@ -53,6 +55,7 @@
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.19.1",
+    "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.23.1",
     "typescript": "~6.0.2"
   },

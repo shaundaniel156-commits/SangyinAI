@@ -1,82 +1,111 @@
 // TEMPORARY: testing-period sign-up. Delete this folder (backend/src/signup) when official users are onboarded.
 // See the list of what else to remove at the top of signup/routes.ts.
 //
-// Sends the sign-up codes through the app's own senders (messaging/channels.ts, which stay): one code by email and
-// a different one by SMS:
-// - the email code is always asked for, so the email address is always proven. A live server without the Resend
-//   key therefore has sign-up closed. On a developer's own computer with no Resend key the code is written to the
-//   console instead, so the flow can still be finished;
-// - the SMS code only with a live Africa's Talking account. Their sandbox delivers to an online simulator, not to
-//   phones, so there the SMS is still sent (to be seen in the simulator) but its code is not asked for.
-// The codes are never logged on a live server.
+// Sends the sign-up code through the app's own senders (messaging/channels.ts, which stay): one code, by email or
+// by text message (SMS), whichever the person chose. Which of the two can be chosen:
+// - email, when the server can send email (a Gmail account or Resend);
+// - text message, when Africa's Talking is set up with a live account. Their sandbox delivers to an online
+//   simulator, not to phones, so on a live server it is offered only with SIGNUP_ALLOW_SANDBOX_SMS=true (for the
+//   owner to try it), and the page then says so.
+// On a developer's own computer, a way that is not set up is still offered and its code is written to the console,
+// so the flow can be finished. A code is never logged on a live server.
 
-import { emailConfigured, maskEmail, sendEmail, sendSms, smsConfigured, smsIsSandbox, type SendResult } from '../messaging/channels.ts'
+import { emailConfigured, maskEmail, maskPhone, sendEmail, sendSms, smsConfigured, smsIsSandbox, type SendResult } from '../messaging/channels.ts'
 
 export const CODE_MINUTES = 10
+export type Channel = 'email' | 'sms'
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 // Render sets RENDER on its servers, so a live server counts as production even if NODE_ENV was left unset.
 const isProduction = () => process.env.NODE_ENV === 'production' || Boolean(process.env.RENDER)
-
-/** Which codes a person must type in to finish: always the emailed one, and the texted one too with live SMS. */
-export function signupNeeds(): { email: boolean; phone: boolean } {
-  return { email: true, phone: smsConfigured() && !smsIsSandbox() }
-}
-
-/** False on a live server that cannot send email, whatever SMS can do: sign-up is then closed. */
-export function signupUsable(): boolean {
-  return emailConfigured() || !isProduction()
-}
+const sandboxAllowed = () => ['true', '1', 'on', 'yes'].includes((process.env.SIGNUP_ALLOW_SANDBOX_SMS ?? '').trim().toLowerCase())
 
 /**
- * Sends the email code and the SMS code. Never throws. Returns false when a code the person will be asked for
- * could not be sent, so the sign-up cannot go on.
- * alreadyRegistered: the email already has an account. Everything is done the same way, so the person asking
- * cannot tell, except that the email says "you already have an account" and carries no code.
+ * The ways a code can be sent right now. smsTest: text messages are offered on a live server but go to the
+ * Africa's Talking simulator, not to phones (the page says so).
  */
-export async function sendSignupCodes(to: { name: string; email: string; phone: string }, codes: { email: string; phone: string }, alreadyRegistered = false): Promise<boolean> {
-  const needs = signupNeeds()
-  const hasEmail = emailConfigured()
-  const hasSms = smsConfigured()
-  // Local testing only: a code with no key to send it is shown here.
-  if (!isProduction()) {
-    if (!hasEmail) console.log(`[signup] LOCAL TESTING ONLY, no email key is set. Email code for ${maskEmail(to.email)}: ${codes.email}`)
-    if (!hasSms) console.log(`[signup] LOCAL TESTING ONLY, no SMS key is set. Text-message code for ${maskEmail(to.email)}: ${codes.phone}`)
-  }
+export function signupChannels(): { email: boolean; sms: boolean; smsTest: boolean } {
+  const live = isProduction()
+  const sms = smsConfigured() ? !smsIsSandbox() || !live || sandboxAllowed() : !live
+  return { email: emailConfigured() || !live, sms, smsTest: sms && live && smsConfigured() && smsIsSandbox() }
+}
 
-  const note = `It works for ${CODE_MINUTES} minutes. If you did not ask for it, you can ignore this message.`
-  const html = `<!doctype html><html><body style="margin:0;background:#f5f6f8;font-family:Segoe UI,Arial,sans-serif;color:#1f2937">
+/** For the page: "s•••@gmail.com". */
+export const hiddenEmail = (email: string) => email.replace(/^(.).*?(@.*)$/, '$1•••$2')
+/** For the page and the notice email: "07•• ••• 432" for a Ugandan number, "+254 ••• ••• 432" for another. */
+export function hiddenPhone(phone: string): string {
+  const last = phone.slice(-3)
+  return phone.startsWith('+256') ? `0${phone[4]}•• ••• ${last}` : `${phone.slice(0, 4)} ••• ••• ${last}`
+}
+
+// A plain email in the app's look: greeting, paragraphs (already safe HTML), and nothing else.
+function letter(greeting: string, paragraphs: string[]): string {
+  return `<!doctype html><html><body style="margin:0;background:#f5f6f8;font-family:Segoe UI,Arial,sans-serif;color:#1f2937">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">
 <table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border-radius:12px;padding:28px" cellpadding="0" cellspacing="0"><tr><td>
 <p style="margin:0 0 16px;font-size:13px;font-weight:600;color:#1f4e79;letter-spacing:.3px">SANGEZI ACADEMIA</p>
-<p style="margin:0 0 12px;font-size:15px">Hello ${esc(to.name)},</p>
-<p style="margin:0 0 12px;font-size:15px">Enter this code to finish creating your account:</p>
-<p style="margin:16px 0;font-size:30px;font-weight:700;letter-spacing:6px;font-family:Consolas,monospace">${codes.email}</p>
-<p style="margin:0 0 12px;font-size:15px;line-height:1.5">${esc(note)}</p>
+<p style="margin:0 0 12px;font-size:15px">${esc(greeting)}</p>
+${paragraphs.map((p) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.5">${p}</p>`).join('\n')}
 </td></tr></table></td></tr></table></body></html>`
-  const text = [`Hello ${to.name},`, '', `Your Sangezi Academia sign-up code is ${codes.email}.`, note].join('\n')
-
-  // The senders log what happened to each message (addresses masked, never the text).
-  const [email, sms] = await Promise.all([
-    !hasEmail ? null : alreadyRegistered ? sendAlreadyRegistered(to) : sendEmail(to.email, 'Your Sangezi Academia sign-up code', html, text),
-    hasSms ? sendSms(to.phone, `Sangezi Academia: your sign-up code is ${codes.phone}. It works for ${CODE_MINUTES} minutes. Do not share it.`) : null,
-  ])
-  const emailOk = !hasEmail || Boolean(email?.sent)
-  const smsOk = !needs.phone || Boolean(sms?.sent)
-  return emailOk && smsOk
 }
 
 /**
- * Someone tried to sign up with an email that already has an account. They are told so by email only, so the
+ * Sends the code the chosen way. Never throws. Returns whether it went (on a developer's computer, a way that is
+ * not set up counts as sent: the code is in the console).
+ * alreadyRegistered: the email already has an account. By email, its owner is told so and gets no code; by text
+ * message the code goes to the phone as usual (the sign-up still cannot be finished: signup/routes.ts). Either
+ * way the person asking sees the same replies.
+ */
+export async function sendSignupCode(to: { name: string; email: string; phone: string }, channel: Channel, code: string, alreadyRegistered = false): Promise<SendResult> {
+  if (channel === 'sms') {
+    if (!smsConfigured()) {
+      if (isProduction()) return { sent: false, error: 'SMS is not set up yet on the server.' }
+      // Local testing only: with no SMS key, the code is shown here.
+      console.log(`[signup] LOCAL TESTING ONLY, no SMS key is set. Text-message code for ${maskPhone(to.phone)}: ${code}`)
+      return { sent: true }
+    }
+    // Under 160 plain characters: one text message.
+    return sendSms(to.phone, `Sangezi Academia: your sign-up code is ${code}. It expires in ${CODE_MINUTES} minutes. Do not share it.`)
+  }
+  if (!emailConfigured()) {
+    if (isProduction()) return { sent: false, error: 'Email is not set up yet on the server.' }
+    console.log(`[signup] LOCAL TESTING ONLY, no email sender is set. Email code for ${maskEmail(to.email)}: ${code}`)
+    return { sent: true }
+  }
+  if (alreadyRegistered) return sendAlreadyRegistered(to)
+  const note = `It expires in ${CODE_MINUTES} minutes. If you did not ask for it, you can ignore this message.`
+  const html = letter(`Hello ${to.name},`, [
+    'Enter this code to finish creating your account:',
+    `<span style="font-size:30px;font-weight:700;letter-spacing:6px;font-family:Consolas,monospace">${code}</span>`,
+    esc(note),
+  ])
+  return sendEmail(to.email, 'Your Sangezi Academia sign-up code', html, [`Hello ${to.name},`, '', `Your Sangezi Academia sign-up code is ${code}.`, note].join('\n'))
+}
+
+/**
+ * Someone tried to sign up with an email that already has an account. Its owner is told so by email, so the
  * sign-up page gives the same reply either way and cannot be used to find out which emails have accounts.
  */
-function sendAlreadyRegistered(to: { name: string; email: string }): Promise<SendResult> {
+export function sendAlreadyRegistered(to: { name: string; email: string }): Promise<SendResult> {
   const appUrl = (process.env.APP_URL ?? 'http://localhost:5173').replace(/\/$/, '')
   const lines = [
     'Someone (hopefully you) tried to create a Sangezi Academia account with this email address, but it already has one.',
     `Sign in at ${appUrl}/login. If you have forgotten your password, choose "Forgot password?" there.`,
     'If this was not you, you can ignore this email; nothing has changed.',
   ]
-  const html = `<!doctype html><html><body style="font-family:Segoe UI,Arial,sans-serif;color:#1f2937"><p>Hello ${esc(to.name)},</p>${lines.map((l) => `<p>${esc(l)}</p>`).join('')}</body></html>`
-  return sendEmail(to.email, 'You already have a Sangezi Academia account', html, [`Hello ${to.name},`, '', ...lines].join('\n'))
+  return sendEmail(to.email, 'You already have a Sangezi Academia account', letter(`Hello ${to.name},`, lines.map(esc)), [`Hello ${to.name},`, '', ...lines].join('\n'))
+}
+
+/**
+ * An account was made with this email address by someone who proved a phone number, not the address. The
+ * address is told, so its real owner knows and can take the account over. No code, and nothing that needs a reply.
+ */
+export function sendCreatedByPhone(to: { name: string; email: string; phone: string }): Promise<SendResult> {
+  const appUrl = (process.env.APP_URL ?? 'http://localhost:5173').replace(/\/$/, '')
+  const lines = [
+    `A Sangezi Academia account was created with this email address. The person confirmed it with a code sent by text message to the phone number ${hiddenPhone(to.phone)}.`,
+    `If this was you, there is nothing to do: sign in at ${appUrl}/login.`,
+    `If this was not you, the account is still under your email address and only you can reset its password: open ${appUrl}/login, choose "Forgot password?" and set a new one. That locks the other person out.`,
+  ]
+  return sendEmail(to.email, 'A Sangezi Academia account was created with your email address', letter(`Hello ${to.name},`, lines.map(esc)), [`Hello ${to.name},`, '', ...lines].join('\n'))
 }

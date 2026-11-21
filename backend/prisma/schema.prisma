@@ -158,6 +158,10 @@ model User {
   subjects           String[]
   lastActiveAt       DateTime?
   // Whether this person wants copies by email and short messages by SMS (they can turn these off in Settings).
+  // When the email address, and the phone number, were proven to be this person's (by typing in a code sent
+  // there). Empty: not known, as for every account made before this was recorded.
+  emailVerifiedAt    DateTime?
+  phoneVerifiedAt    DateTime?
   emailNotifications Boolean             @default(true)
   smsNotifications   Boolean             @default(true)
   createdAt          DateTime            @default(now())
@@ -586,39 +590,43 @@ model PasswordReset {
 }
 
 // TEMPORARY: testing-period sign-up (backend/src/signup). Someone who has filled in the sign-up form but not yet
-// typed in their codes. No User or School exists for them until they do. Only fingerprints are stored: of the
-// ticket the starting browser holds, and of the code sent by email and the one sent by SMS.
+// typed in their code. No User or School exists for them until they do. Only fingerprints are stored: of the
+// ticket the starting browser holds, and of the one code last sent.
 model PendingSignup {
-  id            String          @id @default(cuid())
-  ticketHash    String          @unique
-  email         String
-  phone         String
-  name          String
-  schoolName    String
-  schoolType    InstitutionType @default(primary)
-  framework     Framework       @default(uganda)
-  passwordHash  String
-  emailCodeHash String
-  phoneCodeHash String
-  // Tries at each of the current codes (5 and it is dead).
-  emailAttempts Int             @default(0)
-  phoneAttempts Int             @default(0)
-  lastSentAt    DateTime        @default(now())
-  expiresAt     DateTime
-  createdAt     DateTime        @default(now())
+  id           String          @id @default(cuid())
+  ticketHash   String          @unique
+  email        String
+  phone        String
+  name         String
+  schoolName   String
+  schoolType   InstitutionType @default(primary)
+  framework    Framework       @default(uganda)
+  passwordHash String
+  // Where the current code went: email or sms.
+  channel      String          @default("email")
+  codeHash     String          @default("")
+  // Tries at the current code (5 and it is dead).
+  attempts     Int             @default(0)
+  lastSentAt   DateTime        @default(now())
+  expiresAt    DateTime
+  createdAt    DateTime        @default(now())
 
   @@index([email])
 }
 
-// TEMPORARY: testing-period sign-up. Each time sign-up codes were sent, to limit how many go to one phone, one
-// email, and in all. Rows are cleared after a day.
+// TEMPORARY: testing-period sign-up. Each time a sign-up code was sent and how (email or sms), to limit how many
+// go to one phone, one email, by text message, and in all. Rows are cleared after a day.
 model SignupSend {
   id        String   @id @default(cuid())
   email     String
   phone     String
+  channel   String   @default("email")
+  // Set on a record that may exist only once (a notice to one address on one day); empty on all the others.
+  onceKey   String?  @unique
   createdAt DateTime @default(now())
 
   @@index([phone, createdAt])
   @@index([email, createdAt])
   @@index([createdAt])
+  @@index([channel, createdAt])
 }

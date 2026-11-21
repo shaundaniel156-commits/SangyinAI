@@ -22,7 +22,8 @@ const ReferenceSchema = z.object({
   rightsConfirmed: z.boolean(),
 })
 const InstitutionSchema = z.object({
-  name: z.string().trim().min(1).max(200).optional(),
+  // No line breaks or other unprintable characters: the name goes into email subjects and reports.
+  name: z.string().trim().min(1).max(200).regex(/^[^\p{Cc}\p{Zl}\p{Zp}]*$/u).optional(),
   district: z.string().trim().max(120).optional(),
   type: z.enum(['primary', 'secondary', 'university', 'mixed']).optional(),
   // National or Cambridge: with the type, decides the class names offered (Primary 1–7, Grade 1–6, ...).
@@ -92,13 +93,17 @@ export async function feedRoutes(app: FastifyInstance) {
     // Send each new account its sign-in details (email, plus SMS if a phone was given), and tell the admin what went out.
     if (result.accounts?.length) {
       const school = await prisma.school.findUnique({ where: { id: request.user!.schoolId } })
-      await Promise.all(result.accounts.map(async (account) => {
-        const d = await sendAccountDetails(account, account.tempPassword, school?.name ?? 'your school')
-        account.emailSent = Boolean(d.email?.sent)
-        if (d.sms) account.smsSent = d.sms.sent
-        const errors = [d.email?.error, d.sms?.error].filter(Boolean)
-        if (errors.length) account.deliveryError = errors.join(' ')
-      }))
+      // A few at a time, not a whole staff list at once: the email and SMS services take them at their own pace.
+      const SENT_TOGETHER = 5
+      for (let i = 0; i < result.accounts.length; i += SENT_TOGETHER) {
+        await Promise.all(result.accounts.slice(i, i + SENT_TOGETHER).map(async (account) => {
+          const d = await sendAccountDetails(account, account.tempPassword, school?.name ?? 'your school')
+          account.emailSent = Boolean(d.email?.sent)
+          if (d.sms) account.smsSent = d.sms.sent
+          const errors = [d.email?.error, d.sms?.error].filter(Boolean)
+          if (errors.length) account.deliveryError = errors.join(' ')
+        }))
+      }
     }
     return { ...result, rejected }
   })
@@ -273,7 +278,10 @@ export async function feedRoutes(app: FastifyInstance) {
   })
   app.patch('/feed/institution', adminOnly, async (request, reply) => {
     const parsed = InstitutionSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send({ error: 'Invalid institution details.', issues: parsed.error.issues })
+    if (!parsed.success) {
+      const badName = parsed.error.issues.some((i) => i.path[0] === 'name')
+      return reply.code(400).send({ error: badName ? 'Enter the name on one line, up to 200 characters, with no line breaks.' : 'Invalid institution details.', issues: parsed.error.issues })
+    }
     const s = await prisma.school.update({ where: { id: request.user!.schoolId }, data: parsed.data })
     return { id: s.id, name: s.name, district: s.district, type: s.type, framework: s.framework }
   })
